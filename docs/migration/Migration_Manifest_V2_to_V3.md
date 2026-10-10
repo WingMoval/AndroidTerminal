@@ -1,0 +1,162 @@
+# Migration Manifest — AndroidTerminal V2 → V3
+
+> **AT.V3-0 deliverable** — 建立 Legacy → V3 Migration Manifest 与 V3 migration map。
+>
+> 原则（Canonical V1 §3.2 / §20）：**按职责迁移，不是按旧 Module 搬家；Verified migration，不是 rewrite。**
+>
+> V2 = Verified Reference / Evidence / Regression Oracle / Migration Source（READ-ONLY）。
+> V3 = New Production Mainline。
+
+---
+
+## 1. Migration 状态模型
+
+每个迁移项状态：
+
+```text
+NOT_STARTED  尚未开始
+INVENTORIED  V2 职责已盘点（本 Manifest 状态）
+EXTRACTED    已从 V2 拆出并放入 V3 正确模块
+COMPILED     V3 编译通过
+PARITY       行为与 V2 对照一致（含真机 regression）
+MIGRATED     EXTRACTED + COMPILED + PARITY
+```
+
+当前（AT.V3-0 结束）全部真实代码迁移项 = **INVENTORIED**（仅盘点，未迁移）。
+
+---
+
+## 2. 目标模块结构（V3 初始，PROVISIONAL）
+
+```text
+AndroidTerminal-V3/
+├─ :adb-engine          ADB Engine（独立执行 provider）
+├─ :at-engine           AT Engine（可复用终端执行能力）
+├─ :at-backend-local    Local Backend（→ Local execution provider）
+├─ :at-backend-adb      ADB Backend（→ ADB Engine）
+├─ :app                 AndroidTerminal Human UI（consumer）
+└─ :test-host           Test Host（独立 consumer）
+```
+
+模块数 / package 名 **PROVISIONAL**（Canonical §27 不提前锁死）。
+
+---
+
+## 3. V3 Migration Map
+
+来源文件（V2） → 目标模块（V3） → 状态 → 迁移方式
+
+### 3.1 → `:adb-engine`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| `at-core/.../adb/crypto/*` | RSA-2048 + X.509 + android_pubkey | 迁 native 源码 | INVENTORIED |
+| `at-core/.../adb/tls/*` | TLS 1.3 client + EKM | 迁 native | INVENTORIED |
+| `at-core/.../adb/transport/*` | TCP + TLS transport | 迁 native | INVENTORIED |
+| `at-core/.../adb/connection/*` | CNXN/STLS/packet/stream + feature | 迁 native | INVENTORIED |
+| `at-core/.../adb/client/adb_key_store.*` | 持久身份 | 迁 native | INVENTORIED |
+| `at-core/.../adb/client/adb_client.*` | one-shot shell + connect | 迁 native（ADB Backend 消费）| INVENTORIED |
+| `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| INVENTORIED |
+| `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | INVENTORIED |
+| `at-core/.../adb/service/shell_v2_protocol.*` | shell-v2 帧 | 迁 native | INVENTORIED |
+| `at-core/.../adb_protocol/*` | packet framing | 迁 native | INVENTORIED |
+| `at-core/.../transport/*` | TCP transport | 迁 native | INVENTORIED |
+| `at-core/.../jni/terminal_jni.cpp`（JNI 部分） | JNI marshal | 迁（剥离 legacy handshake）| INVENTORIED |
+| `at-core/.../AdbManager.kt`（JNI bridge 部分） | JNI bridge | 迁 | INVENTORIED |
+| `at-runtime/.../AtConnectionRequest.kt` | explicit 连接输入 | 迁 Kotlin | INVENTORIED |
+| `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁 Kotlin | INVENTORIED |
+| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁 Kotlin | INVENTORIED |
+| `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁 Kotlin | INVENTORIED |
+| `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁 Kotlin | INVENTORIED |
+| `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁 Kotlin | INVENTORIED |
+| `at-core/.../third_party/boringssl/*` | BoringSSL 依赖 | 迁 vendored | INVENTORIED |
+
+### 3.2 → `:at-engine`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| `at-core/.../TerminalRuntime.kt`（one-shot facade） | one-shot 执行语义入口 | 迁/重构为 AT Engine public surface | INVENTORIED |
+| `at-core/.../TerminalResult.kt`（ShellOutcome/TerminalResult） | one-shot 结果语义 | 迁 | INVENTORIED |
+| `at-core/.../at_core/at_core.*`（exec 语义） | one-shot 执行内核 | 迁（consumes ADB Engine）| INVENTORIED |
+| `at-core/.../runtime/MinimalRuntime.*` | process-scoped 执行生命周期 | 迁（consumes ADB Engine）| INVENTORIED |
+| `at-runtime/.../AtExecutionResult.kt` / `AtExecutionOutcome.kt` | one-shot 结果（Runtime 面） | 迁 | INVENTORIED |
+| `at-runtime/.../AtRuntimeDiagnostic.kt`（诊断面） | 诊断 | 迁 | INVENTORIED |
+| `at-runtime/.../AtRuntime.kt`（execute 语义部分） | one-shot 执行语义 | 拆出（ADB 部分归 ADB Engine）| INVENTORIED |
+| （未来）TerminalSession / Emulator / Screen State | persistent terminal | **新建**（Canonical §24 AT.CONTRACT-0 / AT.EMULATOR-0）| NOT_STARTED |
+
+### 3.3 → `:at-backend-local`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| `atsh/.../shell/LocalShellExecutor.kt` | Local one-shot | 按 backend contract 重写 | INVENTORIED |
+| `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY | 按 backend contract 重写（PROVISIONAL 不直接冻结）| INVENTORIED |
+
+### 3.4 → `:at-backend-adb`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | 交互/one-shot backend | 新建 adapter | NOT_STARTED |
+
+### 3.5 → `:app`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| `app/.../MainActivity.kt` | Human UI consumer | 重建（AT.HUMAN-*）| NOT_STARTED |
+| `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
+
+### 3.6 → `:test-host`
+
+| V2 来源 | 职责 | 方式 | 状态 |
+|---|---|---|---|
+| `at-test-host/.../TestHostController.kt` | 独立 consumer | 迁 | INVENTORIED |
+
+---
+
+## 4. 不迁移项（LEGACY / DEPRECATE / SUPERSEDED）
+
+```text
+AdbManager.execute（legacy 第二套 handshake）        → DEPRECATE（留在 V2 evidence）
+terminal_jni.cpp 第二套 handshake                    → DEPRECATE（AGENTS.md 已记债）
+network_probe / ProbeReceiver                        → 不进入 V3 生产（诊断留 V2）
+TerminalService 占位                                  → 不迁移（V3 视需要重建）
+WirelessAdbDiscovery.kt（已删，被 :at-runtime 取代）   → SUPERSEDED
+auth_placeholder.h / shell_placeholder.h（dead headers）→ 不迁移
+atsh MainActivity（evidence UI）                      → 留 V2 evidence
+```
+
+---
+
+## 5. Migration Sequence（Canonical §22 / §24）
+
+```text
+AT.V3-0  Canonical Bootstrap                                    ← 本轮（本文档）
+AT.V3-1  ADB Engine Extraction / Migration Baseline             → 3.1 项 EXTRACTED
+AT.CONTRACT-0  Minimum Contract v0 Draft                        → 3.2/3.4 契约草稿
+AT.PERSIST-0   Local Persistent Vertical Slice                  → 3.3 + at-engine session
+AT.PERSIST-1   ADB Persistent Vertical Slice                    → 3.4 + 3.1 interactive
+AT.EMULATOR-0  Minimal Emulator + Screen State                  → at-engine 新增
+AT.CONTRACT-1  Contract Freeze（真实行为验证后）
+AT.HUMAN-* / AG.TERMINAL-*                                     → 3.5 / AG 消费
+```
+
+---
+
+## 6. Regression / Parity 策略（Canonical §20 / §31）
+
+- **行为 parity**：每个迁移项在 V3 编译通过后，用 V2 已验证行为做对照（one-shot stdout/stderr/exitCode、Golden Chain、pairing、interactive stream、Local PTY、recovery/no-replay）。
+- **真机 regression**：必要时（JNI/ABI/Kotlin 形状变更）在真机验证，禁止仅凭 build 宣称 PASS（V2 AGENTS §5）。
+- **回归 oracle**：V2 保留为 Regression Oracle；AT.V3-0 已记录 V2 HEAD `726a441` + 工作树未提交已验证改动。
+
+---
+
+## 7. 当前状态（AT.V3-0 结束）
+
+```text
+MIGRATION_MANIFEST   = CREATED（本文档）
+V2_INVENTORY         = COMPLETE（docs/migration/V2_Responsibility_Inventory.md）
+V3_SKELETON          = COMPILED（6 modules assembleDebug BUILD SUCCESSFUL）
+CODE_MIGRATION       = NOT_STARTED（全部 INVENTORIED）
+NEXT                 = AT.V3-1 ADB Engine Extraction / Migration Baseline
+```
+
+> 本文档为 migration map 的记录与总控输入；**不授权执行任何迁移**（下一任务 AT.V3-1 才动手）。

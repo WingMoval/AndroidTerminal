@@ -1,0 +1,26 @@
+# Machine-specific — NOT committed.
+local.properties
+
+# Gradle / Android build outputs
+.gradle/
+build/
+.cxx/
+*.apk
+*.aab
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.so
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Environment / secrets
+*.key
+*.pem
+*.p12
+env/
+secrets/
