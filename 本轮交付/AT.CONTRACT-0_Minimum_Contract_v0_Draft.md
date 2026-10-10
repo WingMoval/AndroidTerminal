@@ -7,8 +7,8 @@
 > 状态语义：
 > ```text
 > ARCHITECTURE      = FROZEN（Canonical V1）
-> CONTRACT          = DRAFT
-> IMPLEMENTATION    = NOT YET VALIDATED BY BOTH BACKENDS
+> CONTRACT          = DRAFT → REVISED_DRAFT（AT.PERSIST-0 reality checks C1/C2/C3 后修订；见 §5.3/§6/§8）
+> IMPLEMENTATION    = LOCAL 已验证（AT.PERSIST-0）；ADB 待 slice
 > ```
 
 ---
@@ -137,7 +137,7 @@ sealed class ATSessionEvent {
 ```kotlin
 interface ATTerminalSession {
     fun write(bytes: ByteArray): Int     // 写输入；-1 = 不可写
-    fun read(timeoutMs: Int): ByteArray? // 读输出；null = EOF/error
+    fun read(timeoutMs: Int): ByteArray? // 读输出；null = 会话已结束
     fun resize(rows: Int, cols: Int): Boolean
     fun close(terminateProcess: Boolean = true)
 }
@@ -145,6 +145,10 @@ interface ATTerminalSession {
 
 - `write(bytes)` = 字节级输入（无需键盘抽象 / 复杂 IME；Canonical §18）。
 - output 交给 AT Engine 的消费方式 = `setListener((ATSessionEvent) -> Unit)`（**IMPLEMENTATION SHAPE PROVISIONAL**，见 §9）。
+
+> **REVISION（AT.PERSIST-0 reality check C1）**：`read`（pull）与 `setListener`（push）**并存但互斥为同一流的两种消费模式**——设置 listener 即启动后台 reader 独占 fd 并分发事件；listener 激活期间 `read` 不是合法并发消费者。默认（未设 listener）为 pull。禁止两者同时抢同一份数据。
+
+> **REVISION（C2）**：`read(timeoutMs)` 返回 **null = 会话已结束**（不再有输出）；`state` 区分 `EXITED`（进程退）/ `FAILED`（错误）/ `CLOSED`（调用方关）/ EOF。`read` 永不在一种状态里混淆 process exit / failure / caller close / EOF。timeout 返回**空数组**（会话仍 ACTIVE），非 null。
 
 ## 6. TerminalSession Draft 边界
 
@@ -165,6 +169,8 @@ interface ATTerminalSession {
   Backend bytes → TerminalSession → Terminal Emulator → Screen State
   ```
   为未来只留**极薄**边界（`ATSessionEvent.Data(bytes)`），标记 PROVISIONAL / DEFERRED，不发明 screen API。
+
+> **REVISION（AT.PERSIST-0 reality check C3 — ownership）**：`ATPersistentBackend.openSession()` 返回 `ATOpenSessionResult`（含 `ATTerminalSession`），**会**让 backend 构造并返回一个 AT-domain session 对象。经真实 Local 实现验证，这是 **implementation placement 而非 ownership 反转**：backend 提供底层 primitive（`LocalPtySession`），其返回的 `LocalTerminalSession` 是 AT-domain view；**logical ownership 仍在 AT Engine**（consumer 只经 AT 类型交互；状态/事件语义由 session 对象承载）。结论：不引入额外 backend-session primitive（避免过度设计）；未来若 ADB slice 暴露需要，再评估。
 
 ## 7. Backend Capability Contract（DRAFT）
 
@@ -187,16 +193,16 @@ interface ATPersistentBackend {
 
 ## 8. Provider Reality Check
 
-### Local mapping（ATsh.T0/T1 evidence）
+### Local mapping（ATsh.T0/T1 evidence → AT.PERSIST-0 已实现）
 
-| Contract | Local 自然映射 |
-|---|---|
-| `ATOneShotBackend.execute` | ProcessBuilder → `/system/bin/sh -c`（T0）→ stdout/stderr/exitCode 分离 |
-| `ATPersistentBackend.openSession` | posix_openpt → fork → setsid → TIOCSCTTY → exec `sh -i`（T1）→ 字节流/read/write/resize/close |
-| `ATSessionEvent` | PTY read → Data；进程退 → Exited；master 关 → Eof/Closed；errno → Failed |
-| resize | ioctl(TIOCSWINSZ) |
-| Ctrl-C | 0x03 字节经 PTY → SIGINT（行为，不属 API） |
-| cwd/env 持续 | 会话内保持（行为，不属 API） |
+| Contract | Local 自然映射 | AT.PERSIST-0 状态 |
+|---|---|---|
+| `ATOneShotBackend.execute` | ProcessBuilder → `/system/bin/sh -c`（T0）→ stdout/stderr/exitCode 分离 | **IMPLEMENTED**（`LocalOneShotBackend`） |
+| `ATPersistentBackend.openSession` | posix_openpt → fork → setsid → TIOCSCTTY → exec `sh -i`（T1）→ 字节流/read/write/resize/close | **IMPLEMENTED**（`LocalPersistentBackend` → `LocalPtySession` + `LocalTerminalSession`） |
+| `ATSessionEvent` | PTY read → Data；进程退 → Exited；master 关 → Eof/Closed；errno → Failed | **IMPLEMENTED**（reader thread 分发） |
+| resize | ioctl(TIOCSWINSZ) | **IMPLEMENTED**（`LocalPtySession.setWinsize`） |
+| Ctrl-C | 0x03 字节经 PTY → SIGINT（行为，不属 API） | **IMPLEMENTED**（write 0x03 透传） |
+| cwd/env 持续 | 会话内保持（行为，不属 API） | **IMPLEMENTED**（同一 sh -i 进程） |
 
 ### ADB mapping（V3 AdbEngine / AdbInteractiveStream）
 

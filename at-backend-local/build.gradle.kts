@@ -18,6 +18,19 @@ android {
 
     defaultConfig {
         minSdk = 26
+
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                // AT.PERSIST-0: Local PTY native (at_local_backend).
+                arguments += "-DANDROID_STL=c++_static"
+            }
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -28,9 +41,19 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
 }
 
 dependencies {
     // Local Backend implements AT Engine backend contracts.
     implementation(project(":at-engine"))
+
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
