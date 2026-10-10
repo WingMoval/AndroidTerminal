@@ -1,4 +1,5 @@
 # AndroidTerminal Canonical Development Guide V1
+## AndroidTerminal / AT Engine 新架构与 V3 开发总控说明
 
 **文档状态：CANONICAL V1**
 
@@ -8,7 +9,7 @@
 
 ---
 
-## 0. 摘要：我们现在要做什么
+# 0. 摘要：我们现在要做什么
 
 AndroidTerminal 前一阶段已经完成了大量关键能力验证：
 
@@ -66,7 +67,7 @@ Regression / parity 验证
 
 ---
 
-## 1. 我们准备构建什么
+# 1. 我们准备构建什么
 
 最终希望得到的不是一个只能运行 `/system/bin/sh` 的 Android App，也不是一个披着 Terminal 名字的 ADB Client。
 
@@ -127,9 +128,9 @@ AT Engine
 
 ---
 
-## 2. 为什么现在建立 AndroidTerminal-V3
+# 2. 为什么现在建立 AndroidTerminal-V3
 
-### 2.1 V2 没有失败
+## 2.1 V2 没有失败
 
 V3 的出现不是因为 V2 技术路线失败。
 
@@ -192,11 +193,11 @@ V3 = Canonical Production Mainline
 
 ---
 
-## 3. V3 的构建原则
+# 3. V3 的构建原则
 
 V3 必须遵守以下原则。
 
-### 3.1 不重新实现已经验证的底层能力
+## 3.1 不重新实现已经验证的底层能力
 
 例如：
 
@@ -218,7 +219,7 @@ cleanup
 
 ---
 
-### 3.2 按职责迁移，而不是按旧 Module 搬家
+## 3.2 按职责迁移，而不是按旧 Module 搬家
 
 禁止：
 
@@ -267,7 +268,7 @@ Terminal Emulator
 
 ---
 
-### 3.3 架构先固定，接口通过实现验证后再冻结
+## 3.3 架构先固定，接口通过实现验证后再冻结
 
 当前已经具备冻结**职责边界**的条件。
 
@@ -301,7 +302,7 @@ Contract v0 Freeze
 
 ---
 
-## 4. Canonical Architecture
+# 4. Canonical Architecture
 
 V1 正式采用以下架构：
 
@@ -390,7 +391,7 @@ adbd
 
 ---
 
-## 5. AT Engine 的正式定义
+# 5. AT Engine 的正式定义
 
 Canonical AT Engine 定义为：
 
@@ -424,7 +425,7 @@ AndroidAgent
 
 ---
 
-## 6. Historical Terminology Migration
+# 6. Historical Terminology Migration
 
 这是 V3 必须明确的新规则。
 
@@ -483,13 +484,13 @@ Screen State
 
 这些不存在的能力。
 
-这是名称迁移，不是历史文档回写。
+这是名称迁移，不是历史文档回写。上传的架构审查也将这一点识别为当前最重要的术语风险。
 
 ---
 
-## 7. AT Engine 与 ADB Engine
+# 7. AT Engine 与 ADB Engine
 
-### 7.1 架构关系
+## 7.1 架构关系
 
 正式关系：
 
@@ -520,7 +521,7 @@ AT Engine
 
 ---
 
-### 7.2 ADB Engine 负责什么
+## 7.2 ADB Engine 负责什么
 
 ADB Engine 独立负责：
 
@@ -545,7 +546,7 @@ ADB-specific diagnostics
 
 ---
 
-### 7.3 AT Engine 负责什么
+## 7.3 AT Engine 负责什么
 
 AT Engine 只关心：
 
@@ -579,7 +580,7 @@ TERM.A0.5 已将 AT Engine 与 ADB Engine 关系明确为 composition / consumer
 
 ---
 
-### 7.4 打包关系
+## 7.4 打包关系
 
 架构独立不代表 APK 不能同时包含两者。
 
@@ -598,7 +599,7 @@ AndroidTerminal.apk
 
 ---
 
-## 8. Backend Adapter
+# 8. Backend Adapter
 
 Backend 可以通俗理解成：
 
@@ -645,7 +646,7 @@ shell-v2 frame id
 
 ---
 
-## 9. One-shot Execution
+# 9. One-shot Execution
 
 One-shot 是正式的一等能力。
 
@@ -701,7 +702,7 @@ Local Process
 
 ---
 
-## 10. Persistent Terminal
+# 10. Persistent Terminal
 
 AndroidTerminal 产品的主要新增建设方向是 Persistent Terminal。
 
@@ -739,7 +740,7 @@ ATsh.T1 与 ADB.I0 已经分别证明 Local PTY 和 ADB remote PTY 可以支持 
 
 ---
 
-## 11. TerminalSession
+# 11. TerminalSession
 
 TerminalSession 可以简单理解为：
 
@@ -775,7 +776,7 @@ Screen State
 
 ---
 
-## 12. Terminal Emulator 与 Screen State
+# 12. Terminal Emulator 与 Screen State
 
 正式冻结：
 
@@ -817,7 +818,7 @@ TERM.A0.5 已经修订 TERM.A0 原来的 Presentation 边界，将 Emulator / Sc
 
 ---
 
-## 13. Shell / Program
+# 13. Shell / Program
 
 正式禁止：
 
@@ -869,7 +870,7 @@ Launch Target
 
 ---
 
-## 14. Headless Terminal
+# 14. Headless Terminal
 
 Headless Terminal 不等于 AT Engine。
 
@@ -896,7 +897,7 @@ Headless Terminal
 
 ---
 
-## 15. AndroidAgent 与 AT Engine
+# 15. AndroidAgent 与 AT Engine
 
 AndroidAgent 不定义为：
 
@@ -942,9 +943,11 @@ PTY
 AT internal implementation
 ```
 
+上传的路线审查也明确要求将 AndroidAgent 产品公式规范为 Tool-based capability composition。
+
 ---
 
-## 16. AG 的 one-shot / Persistent 策略
+# 16. AG 的 one-shot / Persistent 策略
 
 AT 不替 AG 决定策略。
 
@@ -977,7 +980,7 @@ AT 只保证能力边界正确。
 
 ---
 
-## 17. Human 与 Agent Shared Session
+# 17. Human 与 Agent Shared Session
 
 当前不假设 Human 和 Agent 默认共享 TerminalSession。
 
@@ -1029,7 +1032,7 @@ Human-Agent Shared Session
 
 ---
 
-## 18. Input System
+# 18. Input System
 
 当前只要求 Persistent Session 能支持：
 
@@ -1064,7 +1067,7 @@ AG 输入方式同样由 AG 实际需求决定。
 
 ---
 
-## 19. AndroidTerminal-V3 的物理工程原则
+# 19. AndroidTerminal-V3 的物理工程原则
 
 五层 Canonical Architecture 是职责边界。
 
@@ -1117,7 +1120,7 @@ Backend 依赖方向清楚
 
 ---
 
-## 20. V2 → V3 Migration Model
+# 20. V2 → V3 Migration Model
 
 V2 从 V3 开始承担：
 
@@ -1152,7 +1155,7 @@ MIGRATED / VERIFIED
 
 ---
 
-## 21. 第一项重要迁移：ADB Engine Extraction
+# 21. 第一项重要迁移：ADB Engine Extraction
 
 V3 最重要的前置整理之一，是：
 
@@ -1213,7 +1216,7 @@ AT Engine
 
 ---
 
-## 22. V3 开发路线
+# 22. V3 开发路线
 
 V3 不采用单一路线。
 
@@ -1247,7 +1250,7 @@ ADB Engine Extraction / Migration Baseline
 
 ---
 
-## 23. Track A — ADB Engine
+# 23. Track A — ADB Engine
 
 ADB Engine 继续独立演进：
 
@@ -1274,7 +1277,7 @@ ADB ENGINE Track
 
 ---
 
-## 24. Track B — AT Engine
+# 24. Track B — AT Engine
 
 AT Engine 是 AndroidTerminal 当前最重要的新建设主线。
 
@@ -1316,7 +1319,7 @@ TUI verification        Agent scenarios
 
 ---
 
-## 25. Track C — AndroidAgent
+# 25. Track C — AndroidAgent
 
 AndroidAgent 继续自己的独立主线。
 
@@ -1362,7 +1365,7 @@ Human UI 同样不是 Agent Terminal integration 的前置条件。Human 和 Age
 
 ---
 
-## 26. 当前冻结的内容
+# 26. 当前冻结的内容
 
 Canonical V1 从现在开始冻结以下架构判断：
 
@@ -1424,7 +1427,7 @@ SSH implementation
 
 ---
 
-## 27. 当前不冻结的内容
+# 27. 当前不冻结的内容
 
 以下内容暂时不得因为“Canonical”三个字而提前锁死：
 
@@ -1447,7 +1450,7 @@ SSH API
 
 ---
 
-## 28. 当前明确后置的能力
+# 28. 当前明确后置的能力
 
 ```text
 Human-Agent shared session
@@ -1471,7 +1474,7 @@ plugin system
 
 ---
 
-## 29. E1 / E2 / E3
+# 29. E1 / E2 / E3
 
 TERM.A0.5 已确认：
 
@@ -1499,7 +1502,7 @@ TERM.E3
 
 ---
 
-## 30. 开发纪律
+# 30. 开发纪律
 
 每个 V3 任务继续遵守：
 
@@ -1543,7 +1546,7 @@ STOP
 
 ---
 
-## 31. V3 的成功标准
+# 31. V3 的成功标准
 
 V3 成功不是：
 
@@ -1598,9 +1601,9 @@ AndroidAgent 可以通过 TerminalTool 消费 AT Engine，
 
 ---
 
-## 32. 当前项目定义
+# 32. 当前项目定义
 
-### AndroidTerminal
+## AndroidTerminal
 
 ```text
 AndroidTerminal
@@ -1612,7 +1615,7 @@ AT Engine
 
 ---
 
-### AT Engine
+## AT Engine
 
 ```text
 AT Engine
@@ -1628,7 +1631,7 @@ Backend abstraction
 
 ---
 
-### ADB Engine
+## ADB Engine
 
 ```text
 ADB Engine
@@ -1648,7 +1651,7 @@ ADB lifecycle
 
 ---
 
-### AndroidAgent
+## AndroidAgent
 
 ```text
 AndroidAgent Product
@@ -1671,13 +1674,13 @@ TerminalTool
 
 ---
 
-## 33. 一句话架构定义
+# 33. 一句话架构定义
 
 > **AndroidTerminal 是一个基于 AT Engine 构建的人类终端产品；AT Engine 提供独立于具体 UI 和传输协议的 one-shot execution 与 persistent terminal 能力，通过 Local / ADB 等 Backend 使用相应 Execution Provider。ADB Engine 是独立的 ADB 能力提供者，通过 ADB Backend 被 AT Engine 使用；AndroidAgent 则通过 TerminalTool 按需消费 AT Engine，而不以 AT Engine 作为统一执行总线。**
 
 ---
 
-## 34. 当前阶段结论
+# 34. 当前阶段结论
 
 ```text
 AT_CANONICAL_ARCHITECTURE = V1 FROZEN
@@ -1711,7 +1714,7 @@ HUMAN_AGENT_SHARED_SESSION  = DEFERRED
 
 ---
 
-## 35. Immediate Next Step
+# 35. Immediate Next Step
 
 下一步不继续讨论“AT 到底是什么”。
 
@@ -1758,7 +1761,7 @@ AT.V3-1 — ADB Engine Extraction / Migration
 
 ---
 
-## Final Decision
+# Final Decision
 
 AndroidTerminal 已经完成从：
 

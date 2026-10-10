@@ -46,30 +46,32 @@ AndroidTerminal-V3/
 
 来源文件（V2） → 目标模块（V3） → 状态 → 迁移方式
 
-### 3.1 → `:adb-engine`
+### 3.1 → `:adb-engine`（AT.V3-1 实际状态）
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| `at-core/.../adb/crypto/*` | RSA-2048 + X.509 + android_pubkey | 迁 native 源码 | INVENTORIED |
-| `at-core/.../adb/tls/*` | TLS 1.3 client + EKM | 迁 native | INVENTORIED |
-| `at-core/.../adb/transport/*` | TCP + TLS transport | 迁 native | INVENTORIED |
-| `at-core/.../adb/connection/*` | CNXN/STLS/packet/stream + feature | 迁 native | INVENTORIED |
-| `at-core/.../adb/client/adb_key_store.*` | 持久身份 | 迁 native | INVENTORIED |
-| `at-core/.../adb/client/adb_client.*` | one-shot shell + connect | 迁 native（ADB Backend 消费）| INVENTORIED |
-| `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| INVENTORIED |
-| `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | INVENTORIED |
-| `at-core/.../adb/service/shell_v2_protocol.*` | shell-v2 帧 | 迁 native | INVENTORIED |
-| `at-core/.../adb_protocol/*` | packet framing | 迁 native | INVENTORIED |
-| `at-core/.../transport/*` | TCP transport | 迁 native | INVENTORIED |
-| `at-core/.../jni/terminal_jni.cpp`（JNI 部分） | JNI marshal | 迁（剥离 legacy handshake）| INVENTORIED |
-| `at-core/.../AdbManager.kt`（JNI bridge 部分） | JNI bridge | 迁 | INVENTORIED |
-| `at-runtime/.../AtConnectionRequest.kt` | explicit 连接输入 | 迁 Kotlin | INVENTORIED |
-| `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁 Kotlin | INVENTORIED |
-| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁 Kotlin | INVENTORIED |
-| `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁 Kotlin | INVENTORIED |
-| `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁 Kotlin | INVENTORIED |
-| `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁 Kotlin | INVENTORIED |
-| `at-core/.../third_party/boringssl/*` | BoringSSL 依赖 | 迁 vendored | INVENTORIED |
+| `at-core/.../adb/crypto/*` | RSA-2048 + X.509 + android_pubkey | 迁 native 源码 | **MIGRATED**（编译+链接；identity 真机 parity PASS） |
+| `at-core/.../adb/tls/*` | TLS 1.3 client + EKM | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
+| `at-core/.../adb/transport/*` | TCP + TLS transport | 迁 native | **MIGRATED**（编译+链接；connect 真机 PASS） |
+| `at-core/.../adb/connection/*` | CNXN/STLS/packet/stream + feature | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
+| `at-core/.../adb/client/adb_key_store.*` | 持久身份 | 迁 native | **MIGRATED**（编译+链接；identity/key load 真机 PASS） |
+| `at-core/.../adb/client/adb_client.*` | one-shot shell + connect | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；connect/one-shot/reuse 真机 PASS） |
+| `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；interactive primitive 真机 PASS；加 `connection()` accessor） |
+| `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | **COMPILED**（编译+链接+JNI 暴露；真机 pairing 需配对 UI，未跑） |
+| `at-core/.../adb/service/shell_v2_protocol.*` | shell-v2 帧 | 迁 native | **MIGRATED**（编译+链接；one-shot stdout/stderr/exit 真机 PASS） |
+| `at-core/.../adb_protocol/*` | packet framing | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
+| `at-core/.../transport/*` | TCP transport | 迁 native | **MIGRATED**（编译+链接；connect 真机 PASS） |
+| `at-core/.../jni/terminal_jni.cpp`（JNI 部分） | JNI marshal | 迁为 **`jni/adb_engine_jni.cpp`**（新 canonical JNI，剥离 legacy handshake）| **MIGRATED**（编译+链接；11 JNI symbols == Kotlin externals；真机 PASS） |
+| `at-core/.../AdbManager.kt`（JNI bridge 部分） | JNI bridge | 迁为 **`internal/AdbNative.kt`**（ADB-domain，无 AT 类型）| **MIGRATED**（编译；真机 PASS） |
+| `at-runtime/.../AtConnectionRequest.kt` | explicit 连接输入 | 迁为 **`AdbConnectionRequest.kt`** | **MIGRATED**（编译） |
+| `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁为 **`AdbEndpoint.kt`** | **COMPILED**（编译；未真机） |
+| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁为 **`AdbRuntimeBackends.kt`（AdbDiscoveryBackend / AdbAndroidNsdDiscoveryBackend）** | **COMPILED**（编译；mDNS 真机未跑） |
+| `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁为 **`AdbRuntimeBackends.kt`（AdbWirelessDebuggingReadinessBackend / AdbAndroid...Backend）** | **COMPILED**（编译；WD 查询真机未跑） |
+| `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁为 **`AdbEndpointStore`** | **COMPILED**（编译；未真机） |
+| `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁为 **`AdbConnectionIntent` / `AdbRecoveryPolicy` / `AdbRecoveryCoordinator`**（recovery 改走 **AdbEngine**，不再依赖 AT `TerminalRuntime`）；`LossClassifier` 的 AT-result 耦合留待 AT track | **COMPILED**（编译；真机 recovery 未跑） |
+| `at-core/.../third_party/boringssl/*` | BoringSSL 依赖 | 迁 vendored | **MIGRATED**（编译+链接+真机 PASS） |
+
+> 说明：`AdbClient` 新增 `connection()` accessor（ADB Engine 内部，供 interactive stream 复用同一 ONLINE 连接）。非行为变更。
 
 ### 3.2 → `:at-engine`
 
@@ -129,8 +131,8 @@ atsh MainActivity（evidence UI）                      → 留 V2 evidence
 ## 5. Migration Sequence（Canonical §22 / §24）
 
 ```text
-AT.V3-0  Canonical Bootstrap                                    ← 本轮（本文档）
-AT.V3-1  ADB Engine Extraction / Migration Baseline             → 3.1 项 EXTRACTED
+AT.V3-0  Canonical Bootstrap                                    ← COMPLETE
+AT.V3-1  ADB Engine Extraction / Migration Baseline             ← 本轮（3.1 全部 EXTRACTED，native+JNI=MIGRATED/COMPILED）
 AT.CONTRACT-0  Minimum Contract v0 Draft                        → 3.2/3.4 契约草稿
 AT.PERSIST-0   Local Persistent Vertical Slice                  → 3.3 + at-engine session
 AT.PERSIST-1   ADB Persistent Vertical Slice                    → 3.4 + 3.1 interactive
@@ -155,8 +157,11 @@ AT.HUMAN-* / AG.TERMINAL-*                                     → 3.5 / AG 消�
 MIGRATION_MANIFEST   = CREATED（本文档）
 V2_INVENTORY         = COMPLETE（docs/migration/V2_Responsibility_Inventory.md）
 V3_SKELETON          = COMPILED（6 modules assembleDebug BUILD SUCCESSFUL）
-CODE_MIGRATION       = NOT_STARTED（全部 INVENTORIED）
-NEXT                 = AT.V3-1 ADB Engine Extraction / Migration Baseline
+CODE_MIGRATION       = ADB ENGINE EXTRACTION COMPLETE（AT.V3-1；native+JNI MIGRATED/COMPILED）
+ADB_ENGINE_INDEP     = VERIFIED（:adb-engine 零依赖 :at-engine/UI/AG）
+ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS；
+                       pairing/discovery/recovery = COMPILED，真机待配对 UI/后续 slice）
+NEXT                 = AT.CONTRACT-0 / AT.PERSIST-*（按 Track B；AT.V3-1 已授权完成）
 ```
 
-> 本文档为 migration map 的记录与总控输入；**不授权执行任何迁移**（下一任务 AT.V3-1 才动手）。
+> 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

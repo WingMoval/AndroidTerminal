@@ -20,6 +20,19 @@ android {
 
     defaultConfig {
         minSdk = 26
+
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                // AT.V3-1: ADB Engine native (adbd_engine).
+                arguments += "-DANDROID_STL=c++_static"
+            }
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -30,8 +43,18 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
 }
 
 dependencies {
     // ADB Engine has NO dependency on :at-engine, :at-backend-*, or any UI.
+
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
