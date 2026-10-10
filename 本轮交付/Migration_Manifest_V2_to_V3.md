@@ -77,27 +77,28 @@ AndroidTerminal-V3/
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| `at-core/.../TerminalRuntime.kt`（one-shot facade） | one-shot 执行语义入口 | 迁/重构为 AT Engine public surface | INVENTORIED |
-| `at-core/.../TerminalResult.kt`（ShellOutcome/TerminalResult） | one-shot 结果语义 | 迁 | INVENTORIED |
-| `at-core/.../at_core/at_core.*`（exec 语义） | one-shot 执行内核 | 迁（consumes ADB Engine）| INVENTORIED |
-| `at-core/.../runtime/MinimalRuntime.*` | process-scoped 执行生命周期 | 迁（consumes ADB Engine）| INVENTORIED |
-| `at-runtime/.../AtExecutionResult.kt` / `AtExecutionOutcome.kt` | one-shot 结果（Runtime 面） | 迁 | INVENTORIED |
-| `at-runtime/.../AtRuntimeDiagnostic.kt`（诊断面） | 诊断 | 迁 | INVENTORIED |
-| `at-runtime/.../AtRuntime.kt`（execute 语义部分） | one-shot 执行语义 | 拆出（ADB 部分归 ADB Engine）| INVENTORIED |
-| （未来）TerminalSession / Emulator / Screen State | persistent terminal | **新建**（Canonical §24 AT.CONTRACT-0 / AT.EMULATOR-0）| NOT_STARTED |
+| （新建 contract domain）`ATExecution` / `ATSession` / `ATBackend` / `ATEngine` | one-shot + persistent 语义契约、backend capability、极薄 facade | 按 Canonical V1 + AT.CONTRACT-0 新建（PROVISIONAL）| **DRAFT（contract types landed；unit tests 6/6 PASS）** |
+| `at-core/.../TerminalRuntime.kt`（one-shot facade） | one-shot 执行语义入口 | 迁/重构为 AT Engine public surface（待 slice 验证后）| NOT_STARTED（runtime 未迁） |
+| `at-core/.../TerminalResult.kt`（ShellOutcome/TerminalResult） | one-shot 结果语义 | **语义保留在 `ATExecutionResult`**（新 shape；旧 Kotlin 不复制）| DRAFT（语义已表达，runtime 未迁） |
+| `at-core/.../at_core/at_core.*`（exec 语义） | one-shot 执行内核 | 迁（consumes ADB Engine）| NOT_STARTED（runtime 未迁） |
+| `at-core/.../runtime/MinimalRuntime.*` | process-scoped 执行生命周期 | 迁（consumes ADB Engine）| NOT_STARTED（runtime 未迁） |
+| `at-runtime/.../AtExecutionResult.kt` / `AtExecutionOutcome.kt` | one-shot 结果（Runtime 面） | **语义并入 `ATExecutionResult/Outcome`**（新 shape）| DRAFT（语义已表达，runtime 未迁） |
+| `at-runtime/.../AtRuntimeDiagnostic.kt`（诊断面） | 诊断 | 待 slice 验证后决定 | NOT_STARTED |
+| `at-runtime/.../AtRuntime.kt`（execute 语义部分） | one-shot 执行语义 | 拆出（ADB 部分归 ADB Engine；execute 语义待 slice）| NOT_STARTED |
+| （未来）TerminalSession / Emulator / Screen State | persistent terminal | **TerminalSession contract DRAFT 已落地**（`ATSession.kt`，无 Emulator/ScreenState 实现）| DRAFT（contract）/ NOT_STARTED（runtime） |
 
 ### 3.3 → `:at-backend-local`
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| `atsh/.../shell/LocalShellExecutor.kt` | Local one-shot | 按 backend contract 重写 | INVENTORIED |
-| `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY | 按 backend contract 重写（PROVISIONAL 不直接冻结）| INVENTORIED |
+| `atsh/.../shell/LocalShellExecutor.kt` | Local one-shot | 按 backend contract 重写 | INVENTORIED（runtime 未迁）；contract probe 已落地（STUB） |
+| `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY | 按 backend contract 重写（PROVISIONAL 不直接冻结）| INVENTORIED（runtime 未迁）；contract probe 已落地（STUB） |
 
 ### 3.4 → `:at-backend-adb`
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | 交互/one-shot backend | 新建 adapter | NOT_STARTED |
+| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | 交互/one-shot backend | 新建 adapter | NOT_STARTED（runtime 未接线）；contract probe 已落地（STUB，compile-only） |
 
 ### 3.5 → `:app`
 
@@ -161,7 +162,9 @@ CODE_MIGRATION       = ADB ENGINE EXTRACTION COMPLETE（AT.V3-1；native+JNI MIG
 ADB_ENGINE_INDEP     = VERIFIED（:adb-engine 零依赖 :at-engine/UI/AG）
 ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS；
                        pairing/discovery/recovery = COMPILED，真机待配对 UI/后续 slice）
-NEXT                 = AT.CONTRACT-0 / AT.PERSIST-*（按 Track B；AT.V3-1 已授权完成）
+AT_CONTRACT          = DRAFT（AT.CONTRACT-0；one-shot/persistent/backend 语义 + facade + unit tests 6/6）
+AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
+NEXT                 = AT.PERSIST-0（Local Persistent Vertical Slice；需 Controller 授权）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

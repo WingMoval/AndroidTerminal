@@ -34,4 +34,6 @@ android {
 dependencies {
     // AT Engine depends on NO concrete backend and NO Android UI.
     // It defines only the execution / terminal domain contracts.
+
+    testImplementation("junit:junit:4.13.2")
 }
