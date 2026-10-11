@@ -106,7 +106,7 @@ AndroidTerminal-V3/
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| `app/.../MainActivity.kt` | Human UI consumer | 重建（AT.HUMAN-*）| NOT_STARTED |
+| `app/.../MainActivity.kt` | Human UI consumer | 重建（Dev Preview：Local raw terminal preview）| **DEV_PREVIEW**（AT.DEVAPP-0；consumer→ATEngine→Local backend；正式 Human UI 仍 NOT_STARTED） |
 | `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
 
 ### 3.6 → `:test-host`
@@ -167,6 +167,8 @@ ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS�
 AT_CONTRACT          = REVISED_DRAFT（AT.CONTRACT-0 + AT.PERSIST-0 C1/C2/C3 修订）
 AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
 LOCAL_BACKEND        = MIGRATED（AT.PERSIST-0 真机 P1–P10 PASS）
+APP_PREVIEW          = DEV_PREVIEW（AT.DEVAPP-0：Local raw terminal preview APK，真机安装/启动 PASS；
+                       正式 Human UI 仍 NOT_STARTED）
 NEXT                 = AT.PERSIST-1（ADB Persistent，需 Controller 授权）
 ```
 
