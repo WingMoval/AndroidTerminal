@@ -91,8 +91,8 @@ AndroidTerminal-V3/
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| `atsh/.../shell/LocalShellExecutor.kt` + `ShellResult.kt` | Local one-shot（ProcessBuilder → sh -c） | 按 backend contract 重建为 `LocalOneShotBackend`（ATOneShotBackend）| **COMPILED / EXTRACTED**（实现完成；真机 parity 待 AT.PERSIST-0 设备验证） |
-| `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY persistent shell | native `local_pty.{h,cpp}` **迁入** `:at-backend-local/src/main/cpp/`（忠实迁移，非重写）；JNI 适配为 `LocalPtyNative`；`LocalPtySession` 适配 V3 package；`LocalPersistentBackend` + `LocalTerminalSession` 实现 | **COMPILED / EXTRACTED**（native+JNI+Kotlin 全编译；真机 parity 待 AT.PERSIST-0 设备验证） |
+| `atsh/.../shell/LocalShellExecutor.kt` + `ShellResult.kt` | Local one-shot（ProcessBuilder → sh -c） | 按 backend contract 重建为 `LocalOneShotBackend`（ATOneShotBackend）| **MIGRATED**（真机 PASS：stdout/stderr/exitCode、非零 exit ≠ failure） |
+| `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY persistent shell | native `local_pty.{h,cpp}` **迁入** `:at-backend-local/src/main/cpp/`（忠实迁移，非重写）；JNI 适配为 `LocalPtyNative`；`LocalPtySession` 适配 V3 package；`LocalPersistentBackend` + `LocalTerminalSession` 实现 | **MIGRATED**（真机 P1–P10 PASS：real PTY/principal/persistent I/O/cwd/env/stdin/Ctrl-C/resize/exit/close/cleanup） |
 
 > AT.PERSIST-0 实现落地；真机 P1–P10 验证待设备连接（当前 BLOCKED_BY_NO_DEVICE）。
 
@@ -166,8 +166,8 @@ ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS�
                        pairing/discovery/recovery = COMPILED，真机待配对 UI/后续 slice）
 AT_CONTRACT          = REVISED_DRAFT（AT.CONTRACT-0 + AT.PERSIST-0 C1/C2/C3 修订）
 AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
-LOCAL_BACKEND        = COMPILED / EXTRACTED（AT.PERSIST-0 实现；真机 P1-P10 待设备）
-NEXT                 = AT.PERSIST-0 真机验证 → AT.PERSIST-1（ADB Persistent，需 Controller 授权）
+LOCAL_BACKEND        = MIGRATED（AT.PERSIST-0 真机 P1–P10 PASS）
+NEXT                 = AT.PERSIST-1（ADB Persistent，需 Controller 授权）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

@@ -88,11 +88,11 @@ class LocalPersistentSliceTest {
         val engine = openEngine()
         val s = openSession(engine)
         write(s, "echo FIRST")
-        drain(s, 400)
+        val out1 = drain(s, 800)
+        assertTrue("should get FIRST on same session, got: $out1", out1.contains("FIRST"))
         write(s, "echo SECOND")
-        val out = drain(s, 800)
-        assertTrue("should get FIRST+SECOND on same session, got: $out",
-            out.contains("FIRST") && out.contains("SECOND"))
+        val out2 = drain(s, 800)
+        assertTrue("should get SECOND on same session (no respawn), got: $out2", out2.contains("SECOND"))
         s.close()
     }
 

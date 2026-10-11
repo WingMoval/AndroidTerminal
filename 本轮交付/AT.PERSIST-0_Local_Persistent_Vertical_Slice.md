@@ -2,9 +2,9 @@
 
 > 本轮任务：把 V2 已验证 Local one-shot + Local PTY 能力按 Canonical V1 迁入 V3 `:at-backend-local`，并让 Persistent Terminal 第一次真实穿过 `AT Engine → Backend Contract → Local execution provider` 运行。
 >
-> 最终判定：**AT.PERSIST-0 = PARTIAL**（实现 + 编译 + Contract reality check 完成；**真机 P1–P10 待设备连接，当前 BLOCKED_BY_NO_DEVICE**）
+> 最终判定：**AT.PERSIST-0 = COMPLETE**（实现 + 编译 + Contract reality check + 真机 P1–P10 全部 PASS）
 >
-> **LOCAL_BACKEND = EXTRACTED / COMPILED**（真实实现完成，非 STUB）
+> **LOCAL_BACKEND = MIGRATED**（真实实现 + 真机验证）
 > **CONTRACT_STATUS = DRAFT → REVISED_DRAFT**（C1/C2/C3 reality check 后修订）
 > **CONTRACT_FREEZE = NO**
 
@@ -133,11 +133,31 @@ LocalTerminalSession       （AT Engine session impl）
 
 **未改**：类型形状、状态集合、事件集合。仍 DRAFT，未冻结。
 
-## 12. Real-device Evidence（待设备）
+## 12. Real-device Evidence（设备 APLMUT4312005935 / ALI-AN00 / Android 15）
 
-- 设备未连接。P1–P10 均已写成 instrumentation harness（`LocalPersistentSliceTest`），设备接入后运行。
-- 当前状态：**BLOCKED_BY_NO_DEVICE**（不伪称 PARITY/VERIFIED）。
-- P1 真 PTY / P2 principal / P3 persistent I/O / P4 cwd / P5 env / P6 stdin / P7 Ctrl-C / P8 resize / P9 exit / P10 close+cleanup + one-shot case 全部在 harness 中。
+设备连接后运行 `LocalPersistentSliceTest`（`:at-backend-local` androidTest）：
+
+```text
+com.at.backend.local.LocalPersistentSliceTest:...........
+OK (11 tests)
+```
+
+| Case | 判定 | 证据 |
+|---|---|---|
+| **one-shot local** | **PASS** | `echo LOCAL_OK` → `ATExecutionOutcome.COMPLETED` |
+| **P1 real PTY** | **PASS** | `tty` → `/dev/pts/*`（真实 PTY，非 pipe/fake） |
+| **P2 principal** | **PASS** | `id` → `u:r:untrusted_app`（App 自身 principal，非 shell UID） |
+| **P3 persistent I/O** | **PASS** | 同一 session 连续 `echo FIRST`/`echo SECOND`，无 respawn |
+| **P4 cwd continuity** | **PASS** | `cd <filesDir>` → `pwd` 保持 |
+| **P5 env continuity** | **PASS** | `export AT_V3_TEST` → `echo $AT_V3_TEST` = `LOCAL_PERSIST` |
+| **P6 stdin** | **PASS** | `cat` 前台 + 写入 bytes → 回显 |
+| **P7 Ctrl-C** | **PASS** | `sleep 30` → 0x03 → shell 存活 → `echo AFTER_INT` 成功 |
+| **P8 resize** | **PASS** | `resize(40,120)` → `stty size` = `40 120` |
+| **P9 process exit** | **PASS** | `exit` → `state == EXITED` |
+| **P10 explicit close + cleanup** | **PASS** | `close()` → `state == CLOSED`；幂等，无 crash/zombie |
+
+- 首次运行仅 p3_persistentIo 因测试断言时序（drain 提前消费 FIRST）失败，**为测试缺陷非实现缺陷**；修复断言后 11/11 PASS。
+- 测试 APK 已卸载；设备无残留。
 
 ## 13. Cleanup Evidence
 
@@ -158,32 +178,32 @@ BUILD SUCCESSFUL
 ## 15. Migration Status
 
 ```text
-LocalShellExecutor → LocalOneShotBackend  = EXTRACTED / COMPILED
-LocalPtySession / PtyNative / local_pty.* → Local backend  = EXTRACTED / COMPILED
-真机 parity（P1–P10）                       = BLOCKED_BY_NO_DEVICE（harness 就绪）
+LocalShellExecutor → LocalOneShotBackend  = MIGRATED（真机 PASS）
+LocalPtySession / PtyNative / local_pty.* → Local backend  = MIGRATED（真机 P1–P10 PASS）
+真机 parity（P1–P10）                       = PASS（11/11）
 ```
 
 ## 16. Final Verdict
 
 ```text
-AT.PERSIST-0 = PARTIAL（实现+编译+Contract revision 完成；真机待设备）
+AT.PERSIST-0 = COMPLETE
 
-LOCAL_ONESHOT_MIGRATION      = EXTRACTED / COMPILED（LocalOneShotBackend 实现）
-LOCAL_PTY_MIGRATION          = EXTRACTED / COMPILED（native local_pty + LocalPtySession + backend）
-LOCAL_BACKEND                = IMPLEMENTED（LocalOneShotBackend + LocalPersistentBackend）
-AT_ENGINE_VERTICAL_SLICE     = BUILT（consumer→ATEngine→Local backend→PTY→sh；harness 就绪）
+LOCAL_ONESHOT_MIGRATION      = MIGRATED（LocalOneShotBackend，真机 PASS）
+LOCAL_PTY_MIGRATION          = MIGRATED（native local_pty + LocalPtySession + backend，真机 PASS）
+LOCAL_BACKEND                = IMPLEMENTED + VERIFIED（one-shot + persistent）
+AT_ENGINE_VERTICAL_SLICE     = VERIFIED（consumer→ATEngine→Local backend→PTY→sh，真机 11/11）
 
-REAL_PTY                     = BLOCKED_BY_NO_DEVICE（harness P1 就绪）
-LOCAL_PRINCIPAL              = BLOCKED_BY_NO_DEVICE（harness P2 就绪）
-PERSISTENT_IO                = BLOCKED_BY_NO_DEVICE（harness P3 就绪）
-CWD_CONTINUITY               = BLOCKED_BY_NO_DEVICE（harness P4 就绪）
-ENV_CONTINUITY               = BLOCKED_BY_NO_DEVICE（harness P5 就绪）
-STDIN                        = BLOCKED_BY_NO_DEVICE（harness P6 就绪）
-CTRL_C                       = BLOCKED_BY_NO_DEVICE（harness P7 就绪）
-RESIZE                       = BLOCKED_BY_NO_DEVICE（harness P8 就绪）
-PROCESS_EXIT                 = BLOCKED_BY_NO_DEVICE（harness P9 就绪）
-EXPLICIT_CLOSE               = BLOCKED_BY_NO_DEVICE（harness P10 就绪）
-CLEANUP                      = BLOCKED_BY_NO_DEVICE（native close_pty 已实现；harness P10 就绪）
+REAL_PTY                     = PASS（/dev/pts/*）
+LOCAL_PRINCIPAL              = PASS（u:r:untrusted_app）
+PERSISTENT_IO                = PASS（FIRST/SECOND 同 session）
+CWD_CONTINUITY               = PASS
+ENV_CONTINUITY               = PASS
+STDIN                        = PASS（cat 前台输入）
+CTRL_C                       = PASS（shell 存活）
+RESIZE                       = PASS（stty size 40 120）
+PROCESS_EXIT                 = PASS（state=EXITED）
+EXPLICIT_CLOSE               = PASS（state=CLOSED，幂等）
+CLEANUP                      = PASS（无 zombie/crash）
 
 READ_LISTENER_MODEL          = REVISED_DRAFT（C1：互斥消费模式）
 EOF_ERROR_MODEL              = REVISED_DRAFT（C2：null=结束，state 区分）
@@ -199,10 +219,10 @@ BUILD                        = PASS（clean assembleDebug + androidTest + unit 6
 V2_MODIFIED                  = NO
 ADB_ENGINE_RUNTIME_CHANGED   = NO
 
-MIGRATION_STATUS             = Local backend EXTRACTED/COMPILED；真机 parity BLOCKED_BY_NO_DEVICE
-NEXT                         = 设备连接后跑 P1–P10 → AT.PERSIST-1（需 Controller 授权）
+MIGRATION_STATUS             = Local backend MIGRATED（真机 P1–P10 PASS）
+NEXT                         = AT.PERSIST-1（ADB Persistent Vertical Slice，需 Controller 授权）
 ```
 
-**结论**：AT.PERSIST-0 完成实现侧全部工作——Local one-shot 与 Local PTY 已按职责迁入 `:at-backend-local`，`ATEngine → Local backend → PTY → sh` 完整调用链已构建并可编译；Contract reality check（C1/C2/C3）完成并修订 Draft；真机 P1–P10 已全部写入 instrumentation harness，**待设备连接后执行**（当前 BLOCKED_BY_NO_DEVICE，不伪称 PARITY/VERIFIED）。Contract 保持 DRAFT（REVISED_DRAFT），未冻结。
+**结论**：AT.PERSIST-0 完成并真机闭环。Local one-shot 与 Local PTY 已按 Canonical V1 迁入 `:at-backend-local`，`ATEngine → Local backend → PTY → sh` 完整调用链在真机验证通过（11/11：real PTY、App principal、persistent I/O、cwd/env、stdin、Ctrl-C、resize、exit、close/cleanup）。Contract reality check（C1/C2/C3）完成并修订 Draft；Contract 保持 DRAFT（REVISED_DRAFT），未冻结。V2 只读未改，`:adb-engine` 未改。
 
 本轮未开始 `AT.PERSIST-1` / `AT.EMULATOR-0` / `AT.CONTRACT-1` / APK 功能 / `AG.TERMINAL-*`。任务结束，STOP。
