@@ -43,7 +43,12 @@ class MainActivity : Activity() {
     private lateinit var rowsBox: EditText
     private lateinit var colsBox: EditText
     private lateinit var stateLabel: TextView
+    private lateinit var testOutputText: TextView
     private val outputBuilder = StringBuilder()
+    private val testOutputBuilder = StringBuilder()
+
+    // Debug-only test observation (AT.DEVAPP-0.1). Null unless attached.
+    private var attachedObserver: TestSessionObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +63,7 @@ class MainActivity : Activity() {
         rowsBox = findViewById(R.id.etRows)
         colsBox = findViewById(R.id.etCols)
         stateLabel = findViewById(R.id.tvState)
+        testOutputText = findViewById(R.id.tvTestOutput)
         rowsBox.setText(DEFAULT_ROWS.toString())
         colsBox.setText(DEFAULT_COLS.toString())
 
@@ -67,6 +73,46 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnResize).setOnClickListener { resize() }
         findViewById<Button>(R.id.btnClear).setOnClickListener { clearOutput() }
         findViewById<Button>(R.id.btnClose).setOnClickListener { closeSession() }
+        findViewById<Button>(R.id.btnTestObserve).setOnClickListener { toggleTestObservation() }
+    }
+
+    /**
+     * Debug-only (AT.DEVAPP-0.1): surface an independent Test Session into the
+     * UI's test observation area. The test creates its OWN AppTerminal and
+     * forwards its observer's lines here. Human session is untouched.
+     */
+    fun attachTestObserver(observer: TestSessionObserver) {
+        attachedObserver = observer
+        runOnUiThread {
+            testOutputText.visibility = android.view.View.VISIBLE
+            testOutputBuilder.clear()
+            testOutputText.text = ""
+        }
+    }
+
+    fun detachTestObserver() {
+        attachedObserver = null
+        runOnUiThread {
+            testOutputText.visibility = android.view.View.GONE
+        }
+    }
+
+    /** Debug-only: current test observation text (for UI assertions). */
+    fun testObservationText(): String = testOutputText.text?.toString() ?: ""
+
+    private fun toggleTestObservation() {
+        if (attachedObserver == null) {
+            testOutputText.visibility = if (testOutputText.visibility == android.view.View.VISIBLE)
+                android.view.View.GONE else android.view.View.VISIBLE
+        }
+    }
+
+    /** Debug-only: append a line to the test observation area. */
+    fun appendTestLine(s: String) {
+        mainHandler.post {
+            testOutputBuilder.append(s)
+            testOutputText.text = testOutputBuilder.toString()
+        }
     }
 
     private fun openSession() {

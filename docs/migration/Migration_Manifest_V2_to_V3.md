@@ -109,6 +109,7 @@ AndroidTerminal-V3/
 | `app/.../MainActivity.kt` | Human UI consumer | 重建（Dev Preview：Local raw terminal preview）| **DEV_PREVIEW**（AT.DEVAPP-0；consumer→ATEngine→Local backend；正式 Human UI 仍 NOT_STARTED） |
 | `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
 | （AT.CONTRACT-0.5 新增）`AppTerminal` + `AppDebugInputTest` | App consumer 组合 root + debug-only 自动化输入 | 复用同一 AT Engine→Local backend 路径；instrumentation | **DEV_PREVIEW / DEBUG_ONLY**（T1–T8 真机 PASS；非生产公开接口） |
+| （AT.DEVAPP-0.1 新增）`TestSessionObserver` + `AppDebugSessionVisibilityTest` + MainActivity 测试观察区 | 自动化测试 Session 输入/输出/状态界面可视化（debug-only） | 同进程 instrumentation 直接驱动真实 MainActivity；单一输出消费者 | **DEV_PREVIEW / DEBUG_ONLY**（UI-1..UI-7 真机 PASS + 7 张截图；Contract 未改） |
 
 ### 3.6 → `:test-host`
 
@@ -172,6 +173,8 @@ APP_PREVIEW          = DEV_PREVIEW（AT.DEVAPP-0：Local raw terminal preview AP
                        正式 Human UI 仍 NOT_STARTED）
 DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headless + Dev App 自动化输入
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
+DEBUG_UI_VISIBILITY  = CONFIRMED（AT.DEVAPP-0.1：自动化测试 Session 输入/输出/状态界面可视化，
+                       UI-1..UI-7 真机 PASS + 7 张截图；同进程 instrumentation，Contract 未改）
 NEXT                 = AT.V3-2.0（ADB Backend First Path，需 Controller 授权）
 ```
 

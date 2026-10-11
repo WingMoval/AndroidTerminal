@@ -29,6 +29,24 @@
             android:text="" />
     </ScrollView>
 
+    <TextView
+        android:id="@+id/tvTestOutput"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#1A1A2E"
+        android:fontFamily="monospace"
+        android:textColor="#7FE0A0"
+        android:textSize="11sp"
+        android:visibility="gone"
+        android:text="" />
+
+    <Button
+        android:id="@+id/btnTestObserve"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Toggle Test Observation" />
+
     <EditText
         android:id="@+id/etInput"
         android:layout_width="match_parent"

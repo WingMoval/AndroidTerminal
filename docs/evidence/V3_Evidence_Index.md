@@ -13,6 +13,12 @@
 | V2 职责盘点（ADB/AT/legacy） | `docs/migration/V2_Responsibility_Inventory.md` |
 | V3 骨架 clean build | 6 modules `assembleDebug` BUILD SUCCESSFUL（190 tasks） |
 
+## 后续阶段
+
+| 项 | 位置 |
+|---|---|
+| AT.DEVAPP-0.1 UI 截图证据（7 张，真机） | `docs/evidence/at_devapp_01/*.png` |
+
 ## V2 Evidence 索引（READ-ONLY 来源）
 
 | Evidence | V2 路径 |
