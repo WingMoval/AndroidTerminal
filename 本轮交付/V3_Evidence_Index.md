@@ -21,6 +21,7 @@
 | AT.DEVAPP-0.2 动态 Session 分页截图证据（9 张，真机） | `docs/evidence/at_devapp_02/*.png` |
 | AT.V3-2 ADB Backend 纵向切片证据（one-shot/persistent PASS + multi-session BLOCKED） | `docs/evidence/at_v3_2/EVIDENCE.md` |
 | AT.V3-2.1 concurrent ADB stream closure 证据（Gate C 关闭：1 conn / 1 TLS / 3 并发 stream / 整类 25 tests PASS） | `docs/evidence/at_v3_2_1/EVIDENCE.md` |
+| AT.V3-3 backend parity / execution contract closure 审计证据（one-shot O1–O5 双后端 / ADB 大输出 blocker / persistent p1–p8 / multi-session / cross-mode / transport-loss t1 / 回归 6 套） | `docs/evidence/at_v3_3/EVIDENCE.md` |
 
 ## V2 Evidence 索引（READ-ONLY 来源）
 

@@ -175,10 +175,20 @@ DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headle
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
 DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
                        ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
-ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1：one-shot + persistent
-                       + concurrent multi-session 真机 PASS；AT.V3-2 Gate C 已关闭；
-                       1 physical connection / 1 TLS / N concurrent ADB streams；AT Engine/Contract 未改）
-NEXT                 = AT BACKEND PARITY / CLOSURE AUDIT
+ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1 小输出域；one-shot + persistent
+                       + concurrent multi-session 真机 PASS；AT.V3-3 审计发现并确认
+                       ADB Engine one-shot 大输出 flow-control bug（blocker，见 AT_EXECUTION_CLOSURE）；
+                       AT Engine/Contract 未改）
+AT.V3-3              = COMPLETE（审计：public surface / dependency / parity matrix / one-shot /
+                       large-output / persistent / EOF-state / close / multi-session / cross-mode /
+                       read-listener / byte-stream / principal / transport-loss / taxonomy 全部完成；
+                       evidence: docs/evidence/at_v3_3/）
+AT_EXECUTION_CLOSURE = BLOCKED_BY_ADB_ENGINE_BUG（ADB one-shot >首个 WRTE 输出卡死；
+                       最小修复 = one-shot 逐 WRTE 回 OKAY；差分证据：persistent 路径 67931B 全量通过）
+BACKEND_PARITY       = VERIFIED（25 项 PARITY；1 ADB Engine bug；1 Local minor bug；2 Contract Gap 记录）
+AT_CONTRACT          = REVISED_DRAFT / EXECUTION_AUDITED（未 Frozen；见
+                       docs/architecture/AT_Execution_Contract_Parity_Matrix.md）
+NEXT                 = ADB one-shot flow-control 最小修复（AT.V3-2.2）→ AT.EMULATOR-0
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。
