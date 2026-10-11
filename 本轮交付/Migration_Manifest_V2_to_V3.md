@@ -98,7 +98,7 @@ AndroidTerminal-V3/
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | 交互/one-shot backend | 新建 adapter | NOT_STARTED（runtime 未接线）；contract probe 已落地（STUB，compile-only） |
+| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | one-shot / persistent backend | `AdbOneShotBackend` / `AdbPersistentBackend` / `AdbTerminalSession` 真实实现 | **IMPLEMENTED / PARTIAL**（AT.V3-2：one-shot + persistent 单会话真机 PASS；multi-session 并发 BLOCKED by ADB Engine 单连接 read 限制） |
 
 ### 3.5 → `:app`
 
@@ -174,7 +174,9 @@ DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headle
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
 DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
                        ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
-NEXT                 = AT.V3-2.0（ADB Backend First Path，需 Controller 授权）
+ADB_BACKEND          = IMPLEMENTED / PARTIAL（AT.V3-2：one-shot + persistent 单会话真机 PASS；
+                       multi-session BLOCKED by ADB Engine 单连接 read 限制；AT Engine/Contract 未改）
+NEXT                 = AT BACKEND PARITY / CLOSURE AUDIT（或先解决 ADB Engine 并发读）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

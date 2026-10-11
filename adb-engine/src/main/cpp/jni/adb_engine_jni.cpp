@@ -1,6 +1,6 @@
-// ADB Engine — JNI bridge (ADB-domain, canonical).
+﻿// ADB Engine 鈥?JNI bridge (ADB-domain, canonical).
 //
-// AT.V3-1 — wraps the migrated adb::AdbClient (connection + one-shot shell
+// AT.V3-1 鈥?wraps the migrated adb::AdbClient (connection + one-shot shell
 // transport) and exposes it to Kotlin via com.adb.engine.AdbEngine.
 //
 // Canonical ADB Engine boundary. Deliberately does NOT include:
@@ -31,21 +31,36 @@ namespace {
 
 std::mutex g_mutex;
 std::unique_ptr<adb::AdbClient> g_client;
+std::string g_client_key_dir;
 
 // Ensure a client for the given key dir exists (re-creates when key dir
 // changes). AdbClient's constructor owns the key store for that dir.
+//
+// AT.V3-2 fix (real integration bug found during ADB backend slice): the
+// previous implementation only created the client when null, so a second
+// connect with a DIFFERENT keyDir silently reused the stale client (and its
+// wrong identity), causing connect/key-load failures. Now the client is
+// rebuilt whenever key_dir changes. No protocol/TLS/connection behavior is
+// touched.
 adb::AdbClient& ClientFor(const std::string& key_dir) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!g_client) {
-        g_client = std::make_unique<adb::AdbClient>(key_dir);
+    if (g_client && g_client_key_dir == key_dir) {
+        return *g_client;
     }
+    g_client = std::make_unique<adb::AdbClient>(key_dir);
+    g_client_key_dir = key_dir;
     return *g_client;
 }
 
+// For operations that do not take a keyDir (executeShell / connectionState /
+// interactive), reuse the client already bound by the last connect. If none
+// exists, fall back to a default dir (test-only; production always connects
+// first).
 adb::AdbClient& ClientExisting() {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_client) {
         g_client = std::make_unique<adb::AdbClient>("/data/local/tmp/adbkeys");
+        g_client_key_dir = "/data/local/tmp/adbkeys";
     }
     return *g_client;
 }
@@ -73,7 +88,7 @@ jint ConnectionStateOrdinal(adb::ConnectionState s) {
 }
 
 // Build com.adb.engine.AdbShellResult(status, stdout, stderr, exitCode,
-// hasError, error) — matches the data class primary constructor order.
+// hasError, error) 鈥?matches the data class primary constructor order.
 jobject NewAdbShellResult(JNIEnv* env, const adb::ShellResult& r) {
     jclass clazz = env->FindClass("com/adb/engine/AdbShellResult");
     if (clazz == nullptr) return nullptr;
@@ -109,7 +124,7 @@ JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_connect(
     }
     LOGI("AdbNative.connect %s:%d keyDir=%s", host.c_str(), j_port,
          key_dir.c_str());
-    adb::AdbClient& client = ClientFor(key_dir);
+        adb::AdbClient& client = ClientFor(key_dir);
     return static_cast<jboolean>(client.connect(host, j_port));
 }
 
@@ -117,14 +132,14 @@ JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_connect(
 JNIEXPORT void JNICALL Java_com_adb_engine_internal_AdbNative_disconnect(
     JNIEnv* /* env */, jobject /* thiz */) {
     LOGI("AdbNative.disconnect");
-    adb::AdbClient& client = ClientExisting();
+        adb::AdbClient& client = ClientExisting();
     client.disconnect();
 }
 
 // com.adb.engine.internal.AdbNative.connectionState():int
 JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_connectionState(
     JNIEnv* /* env */, jobject /* thiz */) {
-    adb::AdbClient& client = ClientExisting();
+        adb::AdbClient& client = ClientExisting();
     return ConnectionStateOrdinal(client.connection_state());
 }
 
@@ -138,7 +153,7 @@ JNIEXPORT jobject JNICALL Java_com_adb_engine_internal_AdbNative_executeShell(
     }
     LOGI("AdbNative.executeShell: \"%s\" timeout_ms=%d", command.c_str(),
          j_timeout_ms);
-    adb::AdbClient& client = ClientExisting();
+        adb::AdbClient& client = ClientExisting();
     // timeout_ms is forwarded for interface parity; the ADB transport does not
     // implement a real exec timeout yet (same as V2 Core v0.1 semantics).
     (void)j_timeout_ms;
@@ -166,7 +181,7 @@ JNIEXPORT jlong JNICALL Java_com_adb_engine_internal_AdbNative_interactiveOpen(
         const char* c = env->GetStringUTFChars(j_service, nullptr);
         if (c) { service = c; env->ReleaseStringUTFChars(j_service, c); }
     }
-    adb::AdbClient& client = ClientExisting();
+        adb::AdbClient& client = ClientExisting();
     adb::AdbConnection* conn = client.connection();
     if (conn == nullptr || !conn->isOnline()) {
         LOGE("interactiveOpen: connection not ONLINE");
@@ -189,7 +204,7 @@ JNIEXPORT jlong JNICALL Java_com_adb_engine_internal_AdbNative_interactiveOpen(
 // com.adb.engine.internal.AdbNative.interactiveWrite(long, byte[]):int
 JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveWrite(
     JNIEnv* env, jobject /* thiz */, jlong j_handle, jbyteArray j_data) {
-    auto it = g_streams.find(j_handle);
+        auto it = g_streams.find(j_handle);
     if (it == g_streams.end()) return -1;
     jsize len = env->GetArrayLength(j_data);
     jbyte* buf = env->GetByteArrayElements(j_data, nullptr);
@@ -204,7 +219,7 @@ JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveWrite(
 JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveRead(
     JNIEnv* env, jobject /* thiz */, jlong j_handle, jbyteArray j_buf,
     jint j_timeout_ms) {
-    auto it = g_streams.find(j_handle);
+        auto it = g_streams.find(j_handle);
     if (it == g_streams.end()) return -1;
     jsize cap = env->GetArrayLength(j_buf);
     jbyte* buf = env->GetByteArrayElements(j_buf, nullptr);
@@ -220,7 +235,7 @@ JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveRead(
 // com.adb.engine.internal.AdbNative.interactiveResize(long,int,int):boolean
 JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveResize(
     JNIEnv* env, jobject /* thiz */, jlong j_handle, jint j_rows, jint j_cols) {
-    auto it = g_streams.find(j_handle);
+        auto it = g_streams.find(j_handle);
     if (it == g_streams.end()) return JNI_FALSE;
     std::string err;
     return static_cast<jboolean>(it->second->resize(j_rows, j_cols, &err));
@@ -229,7 +244,7 @@ JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveRes
 // com.adb.engine.internal.AdbNative.interactiveCloseStdin(long):boolean
 JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveCloseStdin(
     JNIEnv* env, jobject /* thiz */, jlong j_handle) {
-    auto it = g_streams.find(j_handle);
+        auto it = g_streams.find(j_handle);
     if (it == g_streams.end()) return JNI_FALSE;
     std::string err;
     return static_cast<jboolean>(it->second->closeStdin(&err));
@@ -238,7 +253,7 @@ JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveClo
 // com.adb.engine.internal.AdbNative.interactiveClose(long):void
 JNIEXPORT void JNICALL Java_com_adb_engine_internal_AdbNative_interactiveClose(
     JNIEnv* /* env */, jobject /* thiz */, jlong j_handle) {
-    auto it = g_streams.find(j_handle);
+        auto it = g_streams.find(j_handle);
     if (it != g_streams.end()) {
         it->second->close();
         delete it->second;
