@@ -263,6 +263,8 @@ void AdbConnection::disconnect() {
     state_ = ConnectionState::Disconnected;
 }
 
+void AdbConnection::shutdownSocket() { transport_->shutdownSocket(); }
+
 bool AdbConnection::readPacket(AdbPacket* packet, std::string* error) {
     if (!transport_->is_open()) {
         if (error) *error = "transport not open";
@@ -331,6 +333,11 @@ bool AdbConnection::readPacket(AdbPacket* packet, std::string* error) {
 }
 
 bool AdbConnection::writePacket(const AdbPacket& packet, std::string* error) {
+    // AT.V3-2.1 §15: connection-wide TX serialization. All post-ONLINE packet
+    // writes (OPEN/WRTE/OKAY/CLSE from any logical stream or the hub RX
+    // dispatcher) go through this mutex so complete packets never interleave.
+    std::lock_guard<std::mutex> tx_lock(tx_mutex_);
+
     // Post-TLS or version >= A_VERSION_SKIP_CHECKSUM: checksum = 0.
     bool skip_checksum = transport_->is_tls() ||
                          (protocol_version_ >= kAdbVersion && protocol_version_ != 0);

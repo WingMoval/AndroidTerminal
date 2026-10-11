@@ -1,7 +1,9 @@
 // ADB.I0 — minimal interactive ADB stream (PROVISIONAL).
 //
-// Reuses an existing ONLINE AdbConnection (same TCP/TLS/ADB transport, same
-// identity, no re-handshake) to open and drive ONE persistent shell stream.
+// AT.V3-2.1: rebased onto AdbStreamHub. The interactive stream no longer
+// reads the shared connection directly; it consumes its own logical stream
+// (queue + condvar) owned by the hub's single RX dispatcher. Reuses the same
+// ONLINE TCP/TLS/ADB connection, same identity, no re-handshake.
 //
 // Service: "shell,v2,pty:"  (AOSP services.cpp:86-123 — empty command => kPty;
 // "pty" forces PTY; "v2" selects shell v2 protocol).
@@ -17,13 +19,18 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "adb/service/shell_v2_protocol.h"
+
 namespace adb {
 
-class AdbConnection;
+class AdbStreamHub;
+class AdbStream;
 
 class AdbInteractiveStream {
 public:
@@ -33,15 +40,14 @@ public:
     AdbInteractiveStream(const AdbInteractiveStream&) = delete;
     AdbInteractiveStream& operator=(const AdbInteractiveStream&) = delete;
 
-    // OPEN the service stream on an already-ONLINE connection.
-    bool open(AdbConnection* conn, const std::string& service, std::string* error);
+    // OPEN the service stream on the hub's ONLINE connection.
+    bool open(AdbStreamHub* hub, const std::string& service, std::string* error);
 
-    // Write stdin bytes as a shell-v2 kIdStdin frame (blocking, waits credit).
+    // Write stdin bytes as a shell-v2 kIdStdin frame (WRTE, TX-serialized).
     bool writeStdin(const uint8_t* data, size_t len, std::string* error);
 
-    // Read and parse WRTE packets for this stream until some shell data
-    // (stdout+stderr combined into one byte stream) is available, a shell-v2
-    // exit frame arrives, CLSE is received, or timeout_ms elapses.
+    // Read shell data (stdout+stderr combined) from this stream's queue.
+    // Blocks up to timeout_ms; close/EOF/TX-failure wakes it immediately.
     // Returns bytes written to buf (>0), 0 on timeout, -1 on error/close.
     ssize_t read(uint8_t* buf, size_t max, int timeout_ms, std::string* error);
 
@@ -54,7 +60,7 @@ public:
     // CLSE the stream (does not close the ADB connection).
     void close();
 
-    bool isOpen() const { return open_; }
+    bool isOpen() const { return open_.load(); }
     uint32_t localId() const { return local_id_; }
     uint32_t remoteId() const { return remote_id_; }
     bool exitReceived() const { return exit_received_; }
@@ -64,20 +70,19 @@ private:
     static std::vector<uint8_t> encodeFrame(uint8_t id,
                                             const uint8_t* data, size_t len);
 
-    // Drain one ADB packet belonging to this stream. Returns:
-    //   1 = produced output (pending_data_ non-empty or exit/clse)
-    //   0 = no relevant data (timeout handled by caller loop)
-    //  -1 = error
-    int pumpPacket(std::string* error);
+    // Feed raw WRTE payload bytes into the persistent shell-v2 parser and
+    // accumulate stdout+stderr into pending_ / exit into exit_received_.
+    void parseFrames(const uint8_t* data, size_t len);
 
-    AdbConnection* conn_ = nullptr;
+    std::shared_ptr<AdbStream> stream_;
     uint32_t local_id_ = 0;
     uint32_t remote_id_ = 0;
-    bool open_ = false;
+    std::atomic<bool> open_{false};
     bool exit_received_ = false;
     int exit_code_ = -1;
     std::vector<uint8_t> pending_;  // combined stdout+stderr bytes
     size_t pending_off_ = 0;
+    shell_v2::ShellV2Protocol protocol_;
 };
 
 }  // namespace adb

@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -49,10 +50,19 @@ public:
 
     void disconnect();
 
+    // fd-level shutdown that wakes a thread blocked in readPacket() without
+    // closing the socket. Used by the stream hub to stop the single RX owner
+    // before disconnect() tears the transport down (AT.V3-2.1).
+    void shutdownSocket();
+
     ConnectionState state() const { return state_; }
     bool isOnline() const { return state_ == ConnectionState::Online; }
 
     // Generic packet I/O (24B header + payload).
+    // readPacket: ONE reader at a time. Before ONLINE this is the connect
+    // thread; after ONLINE only the AdbStreamHub RX thread may call it.
+    // writePacket: connection-wide serialized (TX mutex) — multiple logical
+    // streams may write full ADB packets concurrently.
     bool readPacket(AdbPacket* packet, std::string* error);
     bool writePacket(const AdbPacket& packet, std::string* error);
 
@@ -91,6 +101,11 @@ private:
 
     // Local ID allocation.
     uint32_t next_local_id_ = 1;
+
+    // Connection-wide TX serialization: guarantees complete ADB packets are
+    // never interleaved on the wire when multiple logical streams write
+    // concurrently (AT.V3-2.1 §15).
+    std::mutex tx_mutex_;
 
     // Diagnostic: packet sequence counter.
     mutable uint32_t packet_seq_ = 0;

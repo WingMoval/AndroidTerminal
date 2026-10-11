@@ -53,20 +53,33 @@ $key = "/data/user/0/com.androidterminal.testhost/files"
 
 用例列表（Gate A）：a1_echo / a2_principal / a3_pwd / a4_stderrNonZero / a5_connectionReuse
 （Gate B）：b1_openActive / b2_writeOutput / b3_cwdContinuity / b4_envContinuity / b5_stdin / b6_ctrlC / b7_ttyAndResize / b8_exitCloseReopen
-
-> **注意**：不要整类运行（`-e class AdbBackendHeadlessTest`）——多个 persistent 用例共享 AdbEngine 单例连接，前一个 reader 线程残留会导致后续崩溃。**每个用例单独运行**。
-
-## 4. 查看 transport / reuse 证据
+（Reader cleanup，AT.V3-2.1 新增）：b9_readerExitAfterClose / b10_blockedReadWakesOnClose
+（Gate C，AT.V3-2.1 新增）：c1_threeConcurrentSessionsActive / c2_cwdEnvIsolation / c3_stdinIsolation / c4_ctrlCIsolation / c5_resizeIsolation / c6_closeIsolation / c7_reopenWithOtherStreamsActive / c8_naturalExitIsolation
+（Stability，AT.V3-2.1 新增）：s1_sequentialLifecycle / s2_concurrentLifecycle
 
 ```powershell
-& $adb logcat -d | Select-String "ONLINE|OPEN service|state=Online tls=1|TLS_START|AdbClient::connect"
-# 期望：多次 one-shot 显示同一 Online connection、每次新 OPEN、无重 TLS
+# 整类运行（AT.V3-2.1 起安全：single RX owner + per-stream queue，实测 25 tests 同进程 PASS）
+& $adb shell am instrument -w -e class "com.androidterminal.testhost.AdbBackendHeadlessTest" -e port $port -e keyDir $key com.androidterminal.testhost.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+> **AT.V3-2.1 更新**：此前「不要整类运行」（reader 残留导致后续崩溃）的限制已修复并真机证伪。
+> 整类运行现在会复用同一条物理连接（1 connect / 1 TLS / 1 RX owner），当前 25 个用例全 PASS。
+> 单用例运行（`#caseName`）仍可用于定位。
+
+## 4. 查看 transport / reuse / multiplexing 证据
+
+```powershell
+& $adb logcat -d -s AndroidTerminalADB | Select-String "CONNECT_START|TLS_START|C13|HUB0|STREAM_ACTIVE"
+# 期望（Gate C）：1x CONNECT_START / 1x TLS_START / 1x [HUB01] RX_OWNER_START /
+#                  3x [HUB03] STREAM_ACTIVE（local=1/2/3，remote 各不相同）
+& $adb logcat -d -s ATV31   # b9/b10 reader cleanup 计时（close() returned in 1ms 等）
 ```
 
 ## 5. 结果判断
 
-- `OK (1 test)` = PASS；`FAILURES!!!` + AssertionError = 失败；`Process crashed` = ADB Engine 崩溃（多会话并发限制，见报告）。
+- `OK (N test)` = PASS；`FAILURES!!!` + AssertionError = 失败；`Process crashed` = 崩溃（应已不复现）。
 - a2 应输出 `uid=2000(shell)`（ADB shell principal）。
+- Gate C 期望：c1 中 3 个 session 同时 ACTIVE，且 logcat 中 `RX_OWNER_START` 仅 1 次。
 
 ## 6. 清理
 
@@ -76,8 +89,12 @@ $key = "/data/user/0/com.androidterminal.testhost/files"
 # AndroidTerminal Dev（com.androidterminal.app）保留
 ```
 
-## 7. 已知限制（本轮记录）
+## 7. 已知限制（AT.V3-2.1 后更新）
 
-- **多会话并发**：ADB Engine 单连接一次只允许一个活跃 reader；第二个并发 interactive open 失败并可能崩溃（BoringSSL SIGABRT）。多会话 ADB 验证被阻塞，需先解决 ADB Engine 并发读。
-- persistent read 无超时：reader 线程在 close 时 join 超时，残留线程会占用连接。
-- pairing / discovery / recovery / Human adb CLI = OUT_OF_SCOPE（本轮未实现）。
+- ~~多会话并发：第二个并发 interactive open 失败并可能崩溃~~ → **已修复**（AdbStreamHub
+  单 RX owner；c1–c8 真机 PASS，AT.V3-2 Gate C = CLOSED）。
+- ~~persistent read 无超时，close 后 reader 残留~~ → **已修复**（per-stream queue condvar，
+  close 1ms 内唤醒；b9/b10 PASS）。
+- 遗留（非阻塞）：transport 失联后 `AdbEngine.connectionState()` 可能仍投影 Online 直到显式
+  disconnect（`AdbConnection` 状态机未改）；自动重连/recovery 未做。
+- pairing / discovery / recovery / Human adb CLI = OUT_OF_SCOPE（未真机）。

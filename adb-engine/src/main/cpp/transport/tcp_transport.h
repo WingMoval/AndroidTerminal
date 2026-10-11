@@ -29,6 +29,14 @@ public:
     ssize_t receive(uint8_t* buffer, size_t length) override;
     void close() override;
 
+    // Half-close the socket in both directions WITHOUT closing the fd.
+    // Wakes any thread blocked in recv()/SSL_read() on this fd (recv
+    // returns 0 / SSL_read returns EOF). Used by the ADB stream hub to
+    // stop the single connection RX owner before the transport is torn
+    // down. Safe to call multiple times. Unlike close(), the fd stays
+    // valid, so the owner thread can still observe a clean failure.
+    void shutdown();
+
     // Read exactly `length` bytes (loops over partial reads, retries EINTR).
     // Returns true on success; false on EOF/error (see last_error()).
     bool readExact(uint8_t* buffer, size_t length);

@@ -18,6 +18,7 @@ namespace adb {
 
 class TlsTransport;
 class AdbKeyStore;
+class AdbStreamHub;
 
 // Transport-level classification of a one-shot shell execution.
 //
@@ -69,14 +70,16 @@ public:
     // AT Core) can project a real state instead of guessing from a bool.
     ConnectionState connection_state() const;
 
-    // Access the underlying AdbConnection (for interactive stream primitives
-    // that reuse the same ONLINE connection, e.g. AdbInteractiveStream).
+    // Access the underlying AdbConnection (for state projection).
     // ADB Engine internal use only. May be null when never connected.
     AdbConnection* connection();
 
+    // The post-ONLINE stream multiplexer (single RX owner for the connection).
+    // Null before connect() succeeds / after disconnect(). This is the entry
+    // point for interactive streams (AT.V3-2.1).
+    AdbStreamHub* streamHub();
+
 private:
-    bool sendOpen(const std::string& service, uint32_t& local_id);
-    bool sendClse(uint32_t local_id, uint32_t remote_id);
     ShellResult runShell(const std::string& command);
 
     struct Impl;

@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "adb/connection/adb_connection.h"
+#include "adb/connection/adb_stream_hub.h"
 #include "adb/client/adb_key_store.h"
 #include "adb/service/shell_v2_protocol.h"
 #include "adb_protocol/adb_message.h"
@@ -32,6 +33,8 @@ struct AdbClient::Impl {
     AdbKeyStore keys;
     TlsTransport transport;
     AdbConnection connection;
+    // AT.V3-2.1: post-ONLINE stream multiplexer (single RX owner).
+    std::unique_ptr<AdbStreamHub> hub;
 };
 
 AdbClient::AdbClient(std::string key_dir) : impl_(new Impl(std::move(key_dir))) {}
@@ -43,6 +46,9 @@ AdbClient::~AdbClient() {
 
 bool AdbClient::connect(const std::string& host, int port) {
     LOGI("AdbClient::connect: %s:%d", host.c_str(), port);
+
+    // Defensive: drop any previous session (stops its RX owner first).
+    impl_->hub.reset();
 
     // 1. Load or create the RSA key.
     if (!impl_->keys.loadOrCreate()) {
@@ -57,7 +63,20 @@ bool AdbClient::connect(const std::string& host, int port) {
         return false;
     }
 
-    LOGI("AdbClient::connect: ADB session established (online, TLS active)");
+    // 3. AT.V3-2.1: spawn the single post-ONLINE RX owner. All logical
+    // streams (one-shot + interactive) multiplex over this connection.
+    impl_->hub = std::make_unique<AdbStreamHub>(&impl_->connection);
+    std::string hub_error;
+    if (!impl_->hub->start(&hub_error)) {
+        LOGE("AdbClient::connect: stream hub start failed: %s",
+             hub_error.c_str());
+        impl_->hub.reset();
+        impl_->connection.disconnect();
+        return false;
+    }
+
+    LOGI("AdbClient::connect: ADB session established (online, TLS active, "
+         "stream hub RX owner running)");
     return true;
 }
 
@@ -73,6 +92,8 @@ adb::AdbConnection* AdbClient::connection() {
     return &impl_->connection;
 }
 
+adb::AdbStreamHub* AdbClient::streamHub() { return impl_->hub.get(); }
+
 ShellResult AdbClient::shell(const std::string& command) {
     if (!impl_->connection.isOnline()) {
         LOGE("AdbClient::shell: not connected");
@@ -86,46 +107,6 @@ ShellResult AdbClient::shell(const std::string& command) {
     return runShell(command);
 }
 
-bool AdbClient::sendOpen(const std::string& service, uint32_t& local_id) {
-    local_id = impl_->connection.allocateLocalId();
-
-    AdbPacket open;
-    open.msg.command = static_cast<uint32_t>(AdbCommand::kOpen);
-    open.msg.arg0 = local_id;
-    // AOSP sockets.cpp:571-577: arg1 = send buffer for delayed ack.
-    // 0 when delayed_ack feature is not negotiated (default).
-    open.msg.arg1 = 0;
-    open.payload.assign(service.begin(), service.end());
-    open.payload.push_back(0);  // null-terminate (AOSP backward compat)
-    open.msg.data_length = static_cast<uint32_t>(open.payload.size());
-
-    LOGI("TX OPEN service=\"%s\" local_id=%u", service.c_str(), local_id);
-
-    std::string err;
-    bool ok = impl_->connection.writePacket(open, &err);
-    if (!ok) {
-        LOGE("sendOpen: writePacket failed: %s", err.c_str());
-        return false;
-    }
-    return true;
-}
-
-bool AdbClient::sendClse(uint32_t local_id, uint32_t remote_id) {
-    AdbPacket clse;
-    clse.msg.command = static_cast<uint32_t>(AdbCommand::kClse);
-    clse.msg.arg0 = local_id;
-    clse.msg.arg1 = remote_id;
-
-    LOGI("TX CLSE local_id=%u remote_id=%u", local_id, remote_id);
-
-    std::string err;
-    if (!impl_->connection.writePacket(clse, &err)) {
-        LOGE("sendClse: writePacket failed: %s", err.c_str());
-        return false;
-    }
-    return true;
-}
-
 ShellResult AdbClient::runShell(const std::string& command) {
     ShellResult result;
 
@@ -133,134 +114,109 @@ ShellResult AdbClient::runShell(const std::string& command) {
     // decide whether to use shell v2 or fall back to plain shell.
     std::string service = "shell,v2,raw:" + command;
 
-    uint32_t local_id = 0;
-    if (!sendOpen(service, local_id)) {
+    if (!impl_->hub) {
         // Core-layer failure: MUST NOT be reported as device stderr (Step 4B.R2).
         result.status = ShellStatus::TransportError;
         result.has_error = true;
-        result.error = "failed to OPEN shell service";
+        result.error = "no online session (call connect() first)";
         return result;
     }
 
-    // Read packets until CLSE.
-    uint32_t remote_id = 0;
-    bool got_remote_id = false;
+    // AT.V3-2.1: one-shot shells are ordinary logical streams on the single
+    // RX owner. ack_writes=false preserves the v1 one-shot WRTE behavior.
+    std::string open_err;
+    std::shared_ptr<AdbStream> stream =
+        impl_->hub->openStream(service, /*ack_writes=*/false, 5000, &open_err);
+    if (!stream) {
+        // Core-layer failure, not device stderr (Step 4B.R2).
+        result.status = ShellStatus::TransportError;
+        result.has_error = true;
+        result.error = "failed to OPEN shell service: " + open_err;
+        return result;
+    }
+    LOGI("runShell: stream open local=%u remote=%u", stream->localId(),
+         stream->remoteId());
 
     // Shell v2 protocol parser (persistent buffer, independent of ADB packets).
     shell_v2::ShellV2Protocol protocol;
 
-    // Diagnostic: 5-second timeout for OPEN response (Step 2B.2.2 only).
-    auto open_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    bool got_first_packet = false;
-
-    for (int i = 0; i < 1000; ++i) {
-        // Check timeout after OPEN if we haven't received any response.
-        if (!got_first_packet &&
-            std::chrono::steady_clock::now() > open_deadline) {
-            LOGE("WAIT_OPEN_TIMEOUT: no response after OPEN (5s)");
-            // Core-layer failure, not device stderr (Step 4B.R2).
-            result.status = ShellStatus::TransportError;
-            result.has_error = true;
-            result.error = "no response from device after OPEN (5s)";
-            break;
-        }
-
-        AdbPacket rx;
-        std::string err;
-        if (!impl_->connection.readPacket(&rx, &err)) {
-            LOGE("runShell: readPacket failed: %s", err.c_str());
-            result.status = ShellStatus::TransportError;
-            result.has_error = true;
-            result.error = "read error: " + err;
-            break;
-        }
-        got_first_packet = true;
-
-        if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kOkay)) {
-            if (rx.msg.arg1 == local_id) {
-                remote_id = rx.msg.arg0;
-                got_remote_id = true;
-                LOGI("RX OKAY remote_id=%u local_id=%u", remote_id, local_id);
+    uint8_t buf[4096];
+    int consecutive_timeouts = 0;
+    for (;;) {
+        std::string rerr;
+        ssize_t n = stream->read(buf, sizeof(buf), 5000, &rerr);
+        if (n < 0) {
+            if (stream->failed()) {
+                // Core-layer failure, not device stderr (Step 4B.R2).
+                result.status = ShellStatus::TransportError;
+                result.has_error = true;
+                result.error = stream->closeReason().empty() ? rerr
+                                                             : stream->closeReason();
+                LOGE("runShell: stream failed: %s", result.error.c_str());
             }
-            continue;
+            break;  // remote CLSE / local close: normal termination
         }
-
-        if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kWrte)) {
-            if (rx.msg.arg1 == local_id) {
-                if (!got_remote_id) remote_id = rx.msg.arg0;
-                LOGI("RX WRTE remote_id=%u local_id=%u len=%zu",
-                     remote_id, local_id, rx.payload.size());
-                std::vector<shell_v2::Frame> frames;
-                std::string parse_error;
-                if (!protocol.feed(rx.payload.data(), rx.payload.size(),
-                                   &frames, &parse_error)) {
-                    LOGE("runShell: shell v2 parse error: %s", parse_error.c_str());
-                    // Core-layer protocol failure, not device stderr (Step 4B.R2).
-                    result.status = ShellStatus::ProtocolError;
-                    result.has_error = true;
-                    result.error = "protocol error: " + parse_error;
-                    break;
-                }
-                for (const auto& frame : frames) {
-                    switch (static_cast<shell_v2::Id>(frame.id)) {
-                        case shell_v2::Id::kStdout:
-                            result.stdout_data.append(
-                                reinterpret_cast<const char*>(frame.payload.data()),
-                                frame.payload.size());
-                            LOGI("shell v2: stdout +%zu bytes (total %zu)",
-                                 frame.payload.size(), result.stdout_data.size());
-                            break;
-                        case shell_v2::Id::kStderr:
-                            result.stderr_data.append(
-                                reinterpret_cast<const char*>(frame.payload.data()),
-                                frame.payload.size());
-                            LOGI("shell v2: stderr +%zu bytes (total %zu)",
-                                 frame.payload.size(), result.stderr_data.size());
-                            break;
-                        case shell_v2::Id::kExit: {
-                            int code;
-                            if (shell_v2::ShellV2Protocol::exitCode(frame, &code)) {
-                                result.exit_code = code;
-                                LOGI("shell v2: exit_code=%d", code);
-                            } else {
-                                LOGE("shell v2: invalid EXIT frame (payload=%zu)",
-                                     frame.payload.size());
-                            }
-                            break;
-                        }
-                        default:
-                            LOGI("shell v2: id=%u ignored (%zu bytes)",
-                                 frame.id, frame.payload.size());
-                            break;
-                    }
-                }
-            }
-            continue;
-        }
-
-        if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kClse)) {
-            if (rx.msg.arg1 == local_id) {
-                remote_id = rx.msg.arg0;
-                LOGI("RX CLSE remote_id=%u local_id=%u", remote_id, local_id);
+        if (n == 0) {
+            // Still active, no data within the read window. Keep waiting:
+            // one-shot semantics = block until CLSE / failure (v1 parity).
+            if (++consecutive_timeouts > 240) {  // ~20 min safeguard
+                result.status = ShellStatus::ProtocolError;
+                result.has_error = true;
+                result.error =
+                    "stream terminated without CLSE (no data for 20 min)";
                 break;
             }
             continue;
         }
+        consecutive_timeouts = 0;
 
-        LOGI("runShell: ignoring unexpected packet %s arg0=0x%08x arg1=0x%08x",
-             CommandToString(rx.msg.command), rx.msg.arg0, rx.msg.arg1);
+        std::vector<shell_v2::Frame> frames;
+        std::string parse_error;
+        if (!protocol.feed(buf, static_cast<size_t>(n), &frames, &parse_error)) {
+            LOGE("runShell: shell v2 parse error: %s", parse_error.c_str());
+            // Core-layer protocol failure, not device stderr (Step 4B.R2).
+            result.status = ShellStatus::ProtocolError;
+            result.has_error = true;
+            result.error = "protocol error: " + parse_error;
+            break;
+        }
+        for (const auto& frame : frames) {
+            switch (static_cast<shell_v2::Id>(frame.id)) {
+                case shell_v2::Id::kStdout:
+                    result.stdout_data.append(
+                        reinterpret_cast<const char*>(frame.payload.data()),
+                        frame.payload.size());
+                    LOGI("shell v2: stdout +%zu bytes (total %zu)",
+                         frame.payload.size(), result.stdout_data.size());
+                    break;
+                case shell_v2::Id::kStderr:
+                    result.stderr_data.append(
+                        reinterpret_cast<const char*>(frame.payload.data()),
+                        frame.payload.size());
+                    LOGI("shell v2: stderr +%zu bytes (total %zu)",
+                         frame.payload.size(), result.stderr_data.size());
+                    break;
+                case shell_v2::Id::kExit: {
+                    int code;
+                    if (shell_v2::ShellV2Protocol::exitCode(frame, &code)) {
+                        result.exit_code = code;
+                        LOGI("shell v2: exit_code=%d", code);
+                    } else {
+                        LOGE("shell v2: invalid EXIT frame (payload=%zu)",
+                             frame.payload.size());
+                    }
+                    break;
+                }
+                default:
+                    LOGI("shell v2: id=%u ignored (%zu bytes)", frame.id,
+                         frame.payload.size());
+                    break;
+            }
+        }
     }
 
-    // Loop budget exhausted without a terminal CLSE for this stream: the ADB
-    // stream never completed. This is a core-layer protocol failure, distinct
-    // from a device command that merely exits non-zero (Step 4B.R2).
-    if (!result.has_error && !got_remote_id) {
-        result.status = ShellStatus::ProtocolError;
-        result.has_error = true;
-        result.error = "stream terminated without CLSE (packet budget exhausted)";
-    }
-
-    sendClse(local_id, remote_id);
+    // CLSE the stream (skipped when the peer closed first).
+    stream->close();
 
     LOGI("runShell: done exit_code=%d stdout=%zu bytes stderr=%zu bytes",
          result.exit_code, result.stdout_data.size(), result.stderr_data.size());
@@ -268,6 +224,13 @@ ShellResult AdbClient::runShell(const std::string& command) {
 }
 
 void AdbClient::disconnect() {
+    // AT.V3-2.1 teardown order: stop the RX owner + fail/wake all streams
+    // FIRST (this also shutdown(2)s the socket so a blocked SSL_read wakes),
+    // then tear the TLS/TCP transport down with no concurrent reader.
+    if (impl_->hub) {
+        impl_->hub->shutdown();
+        impl_->hub.reset();
+    }
     impl_->connection.disconnect();
 }
 

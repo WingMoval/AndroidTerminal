@@ -119,6 +119,13 @@ std::vector<uint8_t> TlsTransport::exportKeyingMaterial(size_t length) {
     return out;
 }
 
+void TlsTransport::shutdownSocket() {
+    // fd-level shutdown only: do NOT touch tls_ (the RX owner thread may be
+    // blocked inside SSL_read on this SSL object; concurrent SSL_* calls are
+    // undefined behavior). SHUT_RDWR wakes recv()/SSL_read() with EOF.
+    tcp_.shutdown();
+}
+
 void TlsTransport::close() {
     if (tls_) {
         LOGI("TlsTransport::close: closing TLS connection");

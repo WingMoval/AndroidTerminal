@@ -56,6 +56,9 @@ add_library(
     # --- Batch D: Interactive Stream Primitive ---
     adb/client/adb_interactive_stream.cpp
 
+    # --- AT.V3-2.1: post-ONLINE stream multiplexer (single RX owner) ---
+    adb/connection/adb_stream_hub.cpp
+
     # --- Batch E: Pairing ---
     adb/pairing/pairing_aes_gcm.cpp
     adb/pairing/pairing_auth.cpp

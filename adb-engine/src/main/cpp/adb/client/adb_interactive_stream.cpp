@@ -1,14 +1,18 @@
 // ADB.I0 — minimal interactive ADB stream implementation (PROVISIONAL).
+//
+// AT.V3-2.1: consumes a hub-managed logical stream. All transport reads are
+// owned by the hub RX dispatcher; this class only parses shell-v2 frames from
+// its own stream queue and encodes stdin/winsize/close-stdin frames.
 
 #include "adb/client/adb_interactive_stream.h"
 
 #include <android/log.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 
-#include "adb/connection/adb_connection.h"
-#include "adb_protocol/adb_message.h"
+#include "adb/connection/adb_stream_hub.h"
 
 #define LOG_TAG "AndroidTerminalADB"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -48,9 +52,9 @@ std::vector<uint8_t> AdbInteractiveStream::encodeFrame(uint8_t id,
     return frameWithId(id, data, len);
 }
 
-bool AdbInteractiveStream::open(AdbConnection* conn, const std::string& service,
+bool AdbInteractiveStream::open(AdbStreamHub* hub, const std::string& service,
                                 std::string* error) {
-    if (!conn || !conn->isOnline()) {
+    if (!hub) {
         if (error) *error = "connection not online";
         return false;
     }
@@ -59,86 +63,39 @@ bool AdbInteractiveStream::open(AdbConnection* conn, const std::string& service,
         return false;
     }
 
-    conn_ = conn;
-    local_id_ = conn_->allocateLocalId();
+    // Interactive streams acknowledge incoming WRTE packets with OKAY credits
+    // (AOSP shell client behavior), as verified in AT.V3-2 Gate B.
+    stream_ = hub->openStream(service, /*ack_writes=*/true, 5000, error);
+    if (!stream_) return false;
 
-    AdbPacket open_pkt;
-    open_pkt.msg.command = static_cast<uint32_t>(AdbCommand::kOpen);
-    open_pkt.msg.arg0 = local_id_;
-    open_pkt.msg.arg1 = 0;
-    open_pkt.payload.assign(service.begin(), service.end());
-    open_pkt.payload.push_back(0);  // null-terminated service string
-    open_pkt.msg.data_length = static_cast<uint32_t>(open_pkt.payload.size());
-    open_pkt.SetMagic();
-
-    if (!conn_->writePacket(open_pkt, error)) {
-        if (error) *error = "OPEN write failed: " + *error;
-        return false;
-    }
-    LOGI("[I0] TX OPEN service=\"%s\" local_id=%u", service.c_str(), local_id_);
-
-    // Wait for OKAY to learn remote_id.
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while (std::chrono::steady_clock::now() < deadline) {
-        AdbPacket rx;
-        std::string err;
-        if (!conn_->readPacket(&rx, &err)) {
-            if (error) *error = "OPEN read failed: " + err;
-            return false;
-        }
-        if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kOkay) &&
-            rx.msg.arg1 == local_id_) {
-            remote_id_ = rx.msg.arg0;
-            open_ = true;
-            LOGI("[I0] RX OKAY remote_id=%u local_id=%u stream OPEN",
-                 remote_id_, local_id_);
-            return true;
-        }
-        if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kClse) &&
-            rx.msg.arg1 == local_id_) {
-            if (error) *error = "OPEN rejected (CLSE before OKAY)";
-            return false;
-        }
-    }
-    if (error) *error = "OPEN timeout waiting for OKAY";
-    return false;
+    local_id_ = stream_->localId();
+    remote_id_ = stream_->remoteId();
+    open_ = true;
+    LOGI("[I0] OPEN service=\"%s\" local_id=%u remote_id=%u", service.c_str(),
+         local_id_, remote_id_);
+    return true;
 }
 
 bool AdbInteractiveStream::writeStdin(const uint8_t* data, size_t len,
                                       std::string* error) {
-    if (!open_) {
+    if (!open_ || !stream_) {
         if (error) *error = "stream not open";
         return false;
     }
     std::vector<uint8_t> frame = encodeFrame(kIdStdin, data, len);
-
-    AdbPacket wrte;
-    wrte.msg.command = static_cast<uint32_t>(AdbCommand::kWrte);
-    // AOSP adb.cpp:616 — WRITE(local-id, remote-id, <data>). Host sends its
-    // own stream id in arg0 and the peer's id in arg1.
-    wrte.msg.arg0 = local_id_;
-    wrte.msg.arg1 = remote_id_;
-    wrte.payload = frame;
-    wrte.msg.data_length = static_cast<uint32_t>(frame.size());
-    wrte.SetMagic();
-
-    if (!conn_->writePacket(wrte, error)) {
-        if (error) *error = "WRTE(stdin) write failed: " + *error;
+    std::string werr;
+    if (!stream_->writeRaw(frame.data(), frame.size(), &werr)) {
+        if (error) *error = "WRTE(stdin) write failed: " + werr;
         return false;
     }
     LOGI("[I0] TX WRTE stdin local=%u remote=%u bytes=%zu", local_id_,
          remote_id_, len);
-
-    // Classic flow control: the peer credits each WRTE with an OKAY. We do
-    // NOT block here waiting for it (readPacket is blocking and has no true
-    // timeout); the credit OKAY is consumed by the read loop (pumpPacket).
-    // The probe always reads between writes, so one in-flight write is safe.
     return true;
 }
 
 ssize_t AdbInteractiveStream::read(uint8_t* buf, size_t max, int timeout_ms,
                                    std::string* error) {
-    if (!open_) {
+    if (!open_ || !stream_) {
         if (error) *error = "stream not open";
         return -1;
     }
@@ -166,22 +123,59 @@ ssize_t AdbInteractiveStream::read(uint8_t* buf, size_t max, int timeout_ms,
             return 0;  // timeout
         }
 
-        // One blocking-ish packet read with bounded timeout via poll is not
-        // exposed by AdbConnection; readPacket blocks on TLS. We therefore
-        // rely on per-read timeouts at a higher layer. Here we do a plain
-        // blocking read; callers use bounded windows.
-        (void)remaining;
-        int rc = pumpPacket(error);
-        if (rc < 0) return -1;
-        if (rc == 0) {
-            // No data produced; loop again (exit/clse handled above).
-            if (exit_received_ || !open_) return -1;
+        // Blocking wait on THIS stream's queue only (AT.V3-2.1): the hub's
+        // single RX owner delivers chunks; close/failure wakes immediately.
+        uint8_t chunk[4096];
+        std::string rerr;
+        ssize_t n = stream_->read(chunk, sizeof(chunk), remaining, &rerr);
+        if (n < 0) {
+            open_ = false;
+            if (error) *error = rerr.empty() ? "stream closed" : rerr;
+            return -1;
+        }
+        if (n == 0) {
+            continue;  // read window elapsed; loop recomputes remaining
+        }
+        parseFrames(chunk, static_cast<size_t>(n));
+    }
+}
+
+void AdbInteractiveStream::parseFrames(const uint8_t* data, size_t len) {
+    std::vector<shell_v2::Frame> frames;
+    std::string perr;
+    if (!protocol_.feed(data, len, &frames, &perr)) {
+        LOGE("[I0] shell-v2 parse error: %s", perr.c_str());
+        return;
+    }
+    for (const auto& frame : frames) {
+        switch (static_cast<shell_v2::Id>(frame.id)) {
+            case shell_v2::Id::kStdout:
+            case shell_v2::Id::kStderr:
+                pending_.insert(pending_.end(), frame.payload.begin(),
+                                frame.payload.end());
+                break;
+            case shell_v2::Id::kExit: {
+                int code = -1;
+                if (shell_v2::ShellV2Protocol::exitCode(frame, &code)) {
+                    exit_code_ = code;
+                    exit_received_ = true;
+                    LOGI("[I0] RX shell-v2 EXIT code=%d", code);
+                } else {
+                    LOGE("[I0] invalid EXIT frame (payload=%zu)",
+                         frame.payload.size());
+                }
+                break;
+            }
+            default:
+                LOGI("[I0] RX shell-v2 frame id=%u len=%zu", frame.id,
+                     frame.payload.size());
+                break;
         }
     }
 }
 
 bool AdbInteractiveStream::resize(int rows, int cols, std::string* error) {
-    if (!open_) {
+    if (!open_ || !stream_) {
         if (error) *error = "stream not open";
         return false;
     }
@@ -193,42 +187,25 @@ bool AdbInteractiveStream::resize(int rows, int cols, std::string* error) {
         encodeFrame(kIdWindowSizeChange,
                     reinterpret_cast<const uint8_t*>(ascii), len);
 
-    AdbPacket wrte;
-    wrte.msg.command = static_cast<uint32_t>(AdbCommand::kWrte);
-    // AOSP: WRITE(local-id, remote-id).
-    wrte.msg.arg0 = local_id_;
-    wrte.msg.arg1 = remote_id_;
-    wrte.payload = frame;
-    wrte.msg.data_length = static_cast<uint32_t>(frame.size());
-    wrte.SetMagic();
-
-    if (!conn_->writePacket(wrte, error)) {
-        if (error) *error = "WRTE(winsize) write failed: " + *error;
+    std::string werr;
+    if (!stream_->writeRaw(frame.data(), frame.size(), &werr)) {
+        if (error) *error = "WRTE(winsize) write failed: " + werr;
         return false;
     }
     LOGI("[I0] TX WRTE winsize \"%s\"", ascii);
-    // Do not block waiting for the OKAY credit here (readPacket is blocking
-    // with no true timeout); the credit is consumed by read()/pumpPacket.
     return true;
 }
 
 bool AdbInteractiveStream::closeStdin(std::string* error) {
-    if (!open_) {
+    if (!open_ || !stream_) {
         if (error) *error = "stream not open";
         return false;
     }
     std::vector<uint8_t> frame = encodeFrame(kIdCloseStdin, nullptr, 0);
 
-    AdbPacket wrte;
-    wrte.msg.command = static_cast<uint32_t>(AdbCommand::kWrte);
-    // AOSP: WRITE(local-id, remote-id).
-    wrte.msg.arg0 = local_id_;
-    wrte.msg.arg1 = remote_id_;
-    wrte.payload = frame;
-    wrte.msg.data_length = static_cast<uint32_t>(frame.size());
-    wrte.SetMagic();
-    if (!conn_->writePacket(wrte, error)) {
-        if (error) *error = "WRTE(closeStdin) write failed: " + *error;
+    std::string werr;
+    if (!stream_->writeRaw(frame.data(), frame.size(), &werr)) {
+        if (error) *error = "WRTE(closeStdin) write failed: " + werr;
         return false;
     }
     LOGI("[I0] TX WRTE closeStdin");
@@ -236,83 +213,10 @@ bool AdbInteractiveStream::closeStdin(std::string* error) {
 }
 
 void AdbInteractiveStream::close() {
-    if (!open_ || !conn_) return;
-    AdbPacket clse;
-    clse.msg.command = static_cast<uint32_t>(AdbCommand::kClse);
-    clse.msg.arg0 = local_id_;
-    clse.msg.arg1 = remote_id_;
-    clse.SetMagic();
-    std::string err;
-    if (!conn_->writePacket(clse, &err)) {
-        LOGE("[I0] CLSE write failed: %s", err.c_str());
+    if (stream_) {
+        stream_->close();  // wakes a blocked read() on this stream
     }
-    LOGI("[I0] TX CLSE local=%u remote=%u", local_id_, remote_id_);
     open_ = false;
-}
-
-int AdbInteractiveStream::pumpPacket(std::string* error) {
-    AdbPacket rx;
-    if (!conn_->readPacket(&rx, error)) {
-        if (error) *error = "readPacket failed: " + *error;
-        return -1;
-    }
-
-    if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kOkay)) {
-        // credit ack; nothing to surface
-        return 0;
-    }
-
-    if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kWrte) &&
-        rx.msg.arg1 == local_id_) {
-        // Parse shell v2 frame(s) in the payload.
-        const uint8_t* p = rx.payload.data();
-        size_t remain = rx.payload.size();
-        size_t off = 0;
-        while (remain - off >= 5) {
-            uint8_t id = p[off];
-            uint32_t len = static_cast<uint32_t>(p[off + 1]) |
-                           (static_cast<uint32_t>(p[off + 2]) << 8) |
-                           (static_cast<uint32_t>(p[off + 3]) << 16) |
-                           (static_cast<uint32_t>(p[off + 4]) << 24);
-            off += 5;
-            if (len > remain - off) break;  // partial; keep rest for next read
-            const uint8_t* data = p + off;
-            if (id == kIdStdout || id == kIdStderr) {
-                pending_.insert(pending_.end(), data, data + len);
-            } else if (id == kIdExit) {
-                exit_received_ = true;
-                if (len >= 1) exit_code_ = static_cast<int8_t>(data[0]);
-                LOGI("[I0] RX shell-v2 EXIT code=%d", exit_code_);
-            } else {
-                LOGI("[I0] RX shell-v2 frame id=%u len=%u", id, len);
-            }
-            off += len;
-        }
-
-        // Acknowledge the WRTE (required to keep the stream flowing).
-        AdbPacket okay;
-        okay.msg.command = static_cast<uint32_t>(AdbCommand::kOkay);
-        okay.msg.arg0 = local_id_;
-        okay.msg.arg1 = remote_id_;
-        okay.SetMagic();
-        std::string err;
-        if (!conn_->writePacket(okay, &err)) {
-            if (error) *error = "OKAY(wrte) write failed: " + err;
-            return -1;
-        }
-        return pending_.size() > pending_off_ || exit_received_ ? 1 : 0;
-    }
-
-    if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kClse) &&
-        rx.msg.arg1 == local_id_) {
-        open_ = false;
-        LOGI("[I0] RX CLSE remote=%u local=%u", rx.msg.arg0, local_id_);
-        return 1;
-    }
-
-    LOGI("[I0] ignoring packet %s arg0=%08x arg1=%08x",
-         CommandToString(rx.msg.command), rx.msg.arg0, rx.msg.arg1);
-    return 0;
 }
 
 }  // namespace adb

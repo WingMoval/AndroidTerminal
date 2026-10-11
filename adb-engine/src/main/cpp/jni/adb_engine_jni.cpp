@@ -17,10 +17,12 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "adb/client/adb_client.h"
 #include "adb/client/adb_interactive_stream.h"
 #include "adb/client/adb_key_store.h"
+#include "adb/connection/adb_stream_hub.h"
 #include "adb/pairing/pairing_client.h"
 
 #define LOG_TAG "AdbEngineJNI"
@@ -163,15 +165,23 @@ JNIEXPORT jobject JNICALL Java_com_adb_engine_internal_AdbNative_executeShell(
 
 // ---------------------------------------------------------------------------
 // Interactive stream primitive (ADB Engine, Batch D).
+//
+// AT.V3-2.1: handles are shared_ptr so that a blocking interactiveRead() on
+// one thread stays memory-safe when interactiveClose() runs on another thread.
+// close() wakes the blocked read via the stream slot condvar.
 // ---------------------------------------------------------------------------
 
-// Track open interactive streams by native handle (map handle -> stream*).
-#include <unordered_map>
-
 namespace {
-std::unordered_map<jlong, adb::AdbInteractiveStream*> g_streams;
+std::mutex g_streams_mutex;
+std::unordered_map<jlong, std::shared_ptr<adb::AdbInteractiveStream>> g_streams;
 jlong g_next_handle = 1;
+
+std::shared_ptr<adb::AdbInteractiveStream> FindStream(jlong handle) {
+    std::lock_guard<std::mutex> lock(g_streams_mutex);
+    auto it = g_streams.find(handle);
+    return it == g_streams.end() ? nullptr : it->second;
 }
+}  // namespace
 
 // com.adb.engine.internal.AdbNative.interactiveOpen(String):long
 JNIEXPORT jlong JNICALL Java_com_adb_engine_internal_AdbNative_interactiveOpen(
@@ -181,35 +191,39 @@ JNIEXPORT jlong JNICALL Java_com_adb_engine_internal_AdbNative_interactiveOpen(
         const char* c = env->GetStringUTFChars(j_service, nullptr);
         if (c) { service = c; env->ReleaseStringUTFChars(j_service, c); }
     }
-        adb::AdbClient& client = ClientExisting();
-    adb::AdbConnection* conn = client.connection();
-    if (conn == nullptr || !conn->isOnline()) {
-        LOGE("interactiveOpen: connection not ONLINE");
+    adb::AdbClient& client = ClientExisting();
+    adb::AdbStreamHub* hub = client.streamHub();
+    if (hub == nullptr) {
+        LOGE("interactiveOpen: connection not ONLINE (no stream hub)");
         return 0;
     }
-    auto* stream = new adb::AdbInteractiveStream();
+    auto stream = std::make_shared<adb::AdbInteractiveStream>();
     std::string err;
-    if (!stream->open(conn, service, &err)) {
+    if (!stream->open(hub, service, &err)) {
         LOGE("interactiveOpen: open failed: %s", err.c_str());
-        delete stream;
         return 0;
     }
-    jlong handle = g_next_handle++;
-    g_streams[handle] = stream;
-    LOGI("interactiveOpen: handle=%lld service=%s", (long long)handle,
-         service.c_str());
+    jlong handle = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_streams_mutex);
+        handle = g_next_handle++;
+        g_streams[handle] = stream;
+    }
+    LOGI("interactiveOpen: handle=%lld service=%s local=%u remote=%u",
+         (long long)handle, service.c_str(), stream->localId(),
+         stream->remoteId());
     return handle;
 }
 
 // com.adb.engine.internal.AdbNative.interactiveWrite(long, byte[]):int
 JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveWrite(
     JNIEnv* env, jobject /* thiz */, jlong j_handle, jbyteArray j_data) {
-        auto it = g_streams.find(j_handle);
-    if (it == g_streams.end()) return -1;
+    auto stream = FindStream(j_handle);
+    if (!stream) return -1;
     jsize len = env->GetArrayLength(j_data);
     jbyte* buf = env->GetByteArrayElements(j_data, nullptr);
     std::string err;
-    bool ok = it->second->writeStdin(
+    bool ok = stream->writeStdin(
         reinterpret_cast<const uint8_t*>(buf), static_cast<size_t>(len), &err);
     env->ReleaseByteArrayElements(j_data, buf, JNI_ABORT);
     return ok ? static_cast<jint>(len) : -1;
@@ -219,12 +233,12 @@ JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveWrite(
 JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveRead(
     JNIEnv* env, jobject /* thiz */, jlong j_handle, jbyteArray j_buf,
     jint j_timeout_ms) {
-        auto it = g_streams.find(j_handle);
-    if (it == g_streams.end()) return -1;
+    auto stream = FindStream(j_handle);
+    if (!stream) return -1;
     jsize cap = env->GetArrayLength(j_buf);
     jbyte* buf = env->GetByteArrayElements(j_buf, nullptr);
     std::string err;
-    ssize_t n = it->second->read(
+    ssize_t n = stream->read(
         reinterpret_cast<uint8_t*>(buf), static_cast<size_t>(cap),
         static_cast<int>(j_timeout_ms), &err);
     env->ReleaseByteArrayElements(j_buf, buf,
@@ -234,30 +248,38 @@ JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_interactiveRead(
 
 // com.adb.engine.internal.AdbNative.interactiveResize(long,int,int):boolean
 JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveResize(
-    JNIEnv* env, jobject /* thiz */, jlong j_handle, jint j_rows, jint j_cols) {
-        auto it = g_streams.find(j_handle);
-    if (it == g_streams.end()) return JNI_FALSE;
+    JNIEnv* /* env */, jobject /* thiz */, jlong j_handle, jint j_rows, jint j_cols) {
+    auto stream = FindStream(j_handle);
+    if (!stream) return JNI_FALSE;
     std::string err;
-    return static_cast<jboolean>(it->second->resize(j_rows, j_cols, &err));
+    return static_cast<jboolean>(stream->resize(j_rows, j_cols, &err));
 }
 
 // com.adb.engine.internal.AdbNative.interactiveCloseStdin(long):boolean
 JNIEXPORT jboolean JNICALL Java_com_adb_engine_internal_AdbNative_interactiveCloseStdin(
-    JNIEnv* env, jobject /* thiz */, jlong j_handle) {
-        auto it = g_streams.find(j_handle);
-    if (it == g_streams.end()) return JNI_FALSE;
+    JNIEnv* /* env */, jobject /* thiz */, jlong j_handle) {
+    auto stream = FindStream(j_handle);
+    if (!stream) return JNI_FALSE;
     std::string err;
-    return static_cast<jboolean>(it->second->closeStdin(&err));
+    return static_cast<jboolean>(stream->closeStdin(&err));
 }
 
 // com.adb.engine.internal.AdbNative.interactiveClose(long):void
 JNIEXPORT void JNICALL Java_com_adb_engine_internal_AdbNative_interactiveClose(
     JNIEnv* /* env */, jobject /* thiz */, jlong j_handle) {
+    std::shared_ptr<adb::AdbInteractiveStream> stream;
+    {
+        std::lock_guard<std::mutex> lock(g_streams_mutex);
         auto it = g_streams.find(j_handle);
-    if (it != g_streams.end()) {
-        it->second->close();
-        delete it->second;
-        g_streams.erase(it);
+        if (it != g_streams.end()) {
+            stream = it->second;
+            g_streams.erase(it);
+        }
+    }
+    if (stream) {
+        // Wakes any in-flight interactiveRead() on this stream; the object
+        // stays alive until that call releases its shared_ptr.
+        stream->close();
     }
 }
 

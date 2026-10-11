@@ -53,10 +53,10 @@ AndroidTerminal-V3/
 | `at-core/.../adb/crypto/*` | RSA-2048 + X.509 + android_pubkey | 迁 native 源码 | **MIGRATED**（编译+链接；identity 真机 parity PASS） |
 | `at-core/.../adb/tls/*` | TLS 1.3 client + EKM | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
 | `at-core/.../adb/transport/*` | TCP + TLS transport | 迁 native | **MIGRATED**（编译+链接；connect 真机 PASS） |
-| `at-core/.../adb/connection/*` | CNXN/STLS/packet/stream + feature | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
+| `at-core/.../adb/connection/*` | CNXN/STLS/packet/stream + feature | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS；AT.V3-2.1 增 single transport RX owner + connection-wide TX 串行化） |
 | `at-core/.../adb/client/adb_key_store.*` | 持久身份 | 迁 native | **MIGRATED**（编译+链接；identity/key load 真机 PASS） |
 | `at-core/.../adb/client/adb_client.*` | one-shot shell + connect | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；connect/one-shot/reuse 真机 PASS） |
-| `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；interactive primitive 真机 PASS；加 `connection()` accessor） |
+| `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；interactive primitive 真机 PASS；AT.V3-2.1 改为经 `AdbStreamHub` 单 RX owner 消费，不再直读连接） |
 | `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | **COMPILED**（编译+链接+JNI 暴露；真机 pairing 需配对 UI，未跑） |
 | `at-core/.../adb/service/shell_v2_protocol.*` | shell-v2 帧 | 迁 native | **MIGRATED**（编译+链接；one-shot stdout/stderr/exit 真机 PASS） |
 | `at-core/.../adb_protocol/*` | packet framing | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
@@ -98,7 +98,7 @@ AndroidTerminal-V3/
 
 | V2 来源 | 职责 | 方式 | 状态 |
 |---|---|---|---|
-| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | one-shot / persistent backend | `AdbOneShotBackend` / `AdbPersistentBackend` / `AdbTerminalSession` 真实实现 | **IMPLEMENTED / PARTIAL**（AT.V3-2：one-shot + persistent 单会话真机 PASS；multi-session 并发 BLOCKED by ADB Engine 单连接 read 限制） |
+| （ADB Backend 由 :at-engine 契约 + :adb-engine 能力组装） | one-shot / persistent backend | `AdbOneShotBackend` / `AdbPersistentBackend` / `AdbTerminalSession` 真实实现 | **VERIFIED / COMPLETE**（AT.V3-2 + AT.V3-2.1：one-shot + persistent + concurrent multi-session 真机 PASS） |
 
 ### 3.5 → `:app`
 
@@ -164,6 +164,7 @@ V3_SKELETON          = COMPILED（6 modules assembleDebug BUILD SUCCESSFUL）
 CODE_MIGRATION       = ADB ENGINE EXTRACTION COMPLETE（AT.V3-1；native+JNI MIGRATED/COMPILED）
 ADB_ENGINE_INDEP     = VERIFIED（:adb-engine 零依赖 :at-engine/UI/AG）
 ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS；
+                       AT.V3-2.1：单连接 concurrent multi-stream multiplexing 真机 PASS；
                        pairing/discovery/recovery = COMPILED，真机待配对 UI/后续 slice）
 AT_CONTRACT          = REVISED_DRAFT（AT.CONTRACT-0 + AT.PERSIST-0 C1/C2/C3 修订）
 AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
@@ -174,9 +175,10 @@ DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headle
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
 DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
                        ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
-ADB_BACKEND          = IMPLEMENTED / PARTIAL（AT.V3-2：one-shot + persistent 单会话真机 PASS；
-                       multi-session BLOCKED by ADB Engine 单连接 read 限制；AT Engine/Contract 未改）
-NEXT                 = AT BACKEND PARITY / CLOSURE AUDIT（或先解决 ADB Engine 并发读）
+ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1：one-shot + persistent
+                       + concurrent multi-session 真机 PASS；AT.V3-2 Gate C 已关闭；
+                       1 physical connection / 1 TLS / N concurrent ADB streams；AT Engine/Contract 未改）
+NEXT                 = AT BACKEND PARITY / CLOSURE AUDIT
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

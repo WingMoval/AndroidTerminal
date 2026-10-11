@@ -194,9 +194,20 @@ ssize_t TcpTransport::receive(uint8_t* buffer, size_t length) {
 
 void TcpTransport::close() {
     if (fd_ != -1) {
+        ::shutdown(fd_, SHUT_RDWR);
         ::close(fd_);
         fd_ = -1;
         LOGI("TCP socket closed");
+    }
+}
+
+void TcpTransport::shutdown() {
+    if (fd_ != -1) {
+        // SHUT_RDWR makes a blocked recv() return 0 and a blocked SSL_read()
+        // observe a clean EOF, without releasing the fd (AT.V3-2.1: needed so
+        // the hub's RX owner thread wakes before the transport is destroyed).
+        ::shutdown(fd_, SHUT_RDWR);
+        LOGI("TCP socket shutdown(SHUT_RDWR)");
     }
 }
 

@@ -12,6 +12,7 @@ package com.androidterminal.testhost
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.adb.engine.AdbConnectionRequest
+import com.adb.engine.AdbEngine
 import com.at.backend.adb.AdbOneShotBackend
 import com.at.backend.adb.AdbPersistentBackend
 import com.at.engine.ATExecutionOutcome
@@ -226,47 +227,314 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Gate C — multi-session
+    // Reader cleanup (AT.V3-2.1 §11 / §24)
     // ------------------------------------------------------------------
 
     @Test
-    @org.junit.Ignore(
-        "AT.V3-2: ADB Engine single-connection concurrency limit evidence. " +
-            "Opening a second concurrent interactive stream while the first session's reader " +
-            "owns the shared connection FAILS and crashes the process (BoringSSL SIGABRT). " +
-            "This documents the ADB Engine transport limit (one active reader per connection), " +
-            "not an AT Contract issue. See report AT.V3-2_ADB_Backend_Vertical_Slice.md.",
-    )
-    fun c1_multiSessionIsolation() {
-        // AT.V3-2: document the REAL ADB Engine single-connection read-ownership
-        // limit. Opening a SECOND concurrent interactive stream while the first
-        // session's reader thread is actively reading the shared connection
-        // FAILS ("ADB interactive open failed"). This is an ADB Engine transport
-        // limitation (one active reader per connection), not an AT Contract issue.
-        // Local backend (per-session independent PTY) has no such limit.
+    fun b9_readerExitAfterClose() {
+        val b = AdbPersistentBackend(conn())
+        val (s, cap) = openSession(b)
+        write(s, "echo READY_B9")
+        assertTrue(await(3000) { cap.out.contains("READY_B9") })
+
+        // close() must return within a bounded time (reader join(1000) must
+        // succeed because the hub wakes the blocked stream read).
+        val t0 = System.currentTimeMillis()
+        s.close()
+        val elapsed = System.currentTimeMillis() - t0
+        android.util.Log.i("ATV31", "b9: close() returned in ${elapsed}ms")
+        assertTrue("close bounded (took ${elapsed}ms)", elapsed < 2000)
+        assertEquals(ATSessionState.CLOSED, s.state)
+
+        // No stale reader may own the shared connection: an immediate reopen
+        // on the SAME connection must work.
+        val (s2, cap2) = openSession(b)
+        write(s2, "echo AFTER_CLOSE_OK")
+        assertTrue(await(4000) { cap2.out.contains("AFTER_CLOSE_OK") })
+        s2.close()
+    }
+
+    @Test
+    fun b10_blockedReadWakesOnClose() {
+        // ADB-Engine-level focused case: a thread blocked inside read() must
+        // wake promptly (with -1) when the stream is closed from another
+        // thread. The reader loops so it consumes any queued PTY prompt data
+        // first and then genuinely blocks on the empty stream queue.
+        assertTrue(AdbEngine.connect(host, port, keyDir))
+        val st = AdbEngine.openInteractive("shell,v2,pty:")
+        assertTrue("interactive stream open", st != null)
+
+        val sawMinusOne = java.util.concurrent.atomic.AtomicBoolean(false)
+        val exited = java.util.concurrent.CountDownLatch(1)
+        val t = Thread({
+            val buf = ByteArray(512)
+            while (true) {
+                val n = st!!.read(buf, 5000) // blocks up to 5s on the slot queue
+                if (n < 0) {
+                    sawMinusOne.set(true)
+                    exited.countDown()
+                    break
+                }
+            }
+        }, "b10-blocked-reader")
+        t.start()
+        Thread.sleep(500) // prompt consumed; reader now blocked in read
+
+        val t0 = System.currentTimeMillis()
+        st!!.close()
+        assertTrue("reader woke after close",
+            exited.await(2, java.util.concurrent.TimeUnit.SECONDS))
+        val dt = System.currentTimeMillis() - t0
+        android.util.Log.i("ATV31", "b10: read woke after ${dt}ms, minusOne=${sawMinusOne.get()}")
+        assertTrue("woke quickly (took ${dt}ms)", dt < 1500)
+        assertTrue("blocked read returns -1 after close", sawMinusOne.get())
+        t.join(1000)
+    }
+
+    // ------------------------------------------------------------------
+    // Gate C — concurrent multi-session (AT.V3-2.1)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun c1_threeConcurrentSessionsActive() {
         val b = AdbPersistentBackend(conn())
         val (a, capA) = openSession(b)
-        android.util.Log.i("ATV32", "c1: A open OK")
+        val (bb, capB) = openSession(b)
+        val (c, capC) = openSession(b)
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, bb.state)
+        assertEquals(ATSessionState.ACTIVE, c.state)
 
-        val second = b.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80))
-        android.util.Log.i("ATV32", "c1: second concurrent open result = $second")
+        // All three run concurrently on the ONE connection. Arithmetic hides
+        // the result from the PTY echo (echo shows "$((1+1))", not "2").
+        write(a, "echo MARKA=\$((1+1))")
+        write(bb, "echo MARKB=\$((2+2))")
+        write(c, "echo MARKC=\$((3+3))")
+        assertTrue("A output", await(5000) { capA.out.contains("MARKA=2") })
+        assertTrue("B output", await(5000) { capB.out.contains("MARKB=4") })
+        assertTrue("C output", await(5000) { capC.out.contains("MARKC=6") })
 
-        // Single-session A still works after the failed second open.
-        write(a, "export AT_REMOTE=ONE")
-        write(a, "cd /data/local/tmp")
-        Thread.sleep(500)
-        write(a, "echo \$AT_REMOTE")
-        assertTrue("A env ONE", await(4000) { capA.out.contains("ONE") })
-        write(a, "pwd")
-        assertTrue("A cwd /data/local/tmp", await(3000) { capA.out.contains("/data/local/tmp") })
+        // No stream cross-talk.
+        assertTrue("A not see B", !capA.out.contains("MARKB="))
+        assertTrue("A not see C", !capA.out.contains("MARKC="))
+        assertTrue("B not see A", !capB.out.contains("MARKA="))
+        assertTrue("B not see C", !capB.out.contains("MARKC="))
+        assertTrue("C not see A", !capC.out.contains("MARKA="))
+        assertTrue("C not see B", !capC.out.contains("MARKB="))
 
-        capA.out.setLength(0)
-        a.resize(40, 120)
-        write(a, "stty size")
-        assertTrue("A resize", await(3000) { capA.out.contains("40") && capA.out.contains("120") })
-
-        a.close()
+        a.close(); bb.close(); c.close()
         assertEquals(ATSessionState.CLOSED, a.state)
-        // Note: second session result documented, not asserted.
+        assertEquals(ATSessionState.CLOSED, bb.state)
+        assertEquals(ATSessionState.CLOSED, c.state)
+    }
+
+    @Test
+    fun c2_cwdEnvIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, capB) = openSession(b)
+        val (c, capC) = openSession(b)
+
+        write(a, "export AT_REMOTE=11")
+        write(a, "cd /data/local/tmp")
+        write(bb, "export AT_REMOTE=22")
+        write(bb, "cd /system")
+        Thread.sleep(500)
+
+        write(a, "echo ENVA=\$((AT_REMOTE+0))")
+        write(a, "echo CWDA=\$(pwd | cut -c1-15)")
+        write(bb, "echo ENVB=\$((AT_REMOTE+0))")
+        write(bb, "echo CWDB=\$(pwd | cut -c1-11)")
+        write(c, "echo ENVC=[\$AT_REMOTE]")
+
+        assertTrue("A env", await(5000) { capA.out.contains("ENVA=11") })
+        assertTrue("A cwd", await(5000) { capA.out.contains("CWDA=/data/local/tmp") })
+        assertTrue("B env", await(5000) { capB.out.contains("ENVB=22") })
+        assertTrue("B cwd", await(5000) { capB.out.contains("CWDB=/system") })
+        assertTrue("C env untouched", await(5000) { capC.out.contains("ENVC=[]") })
+
+        // Isolation: no session sees another's env/cwd.
+        assertTrue("A not see B env", !capA.out.contains("ENVB="))
+        assertTrue("B not see A env", !capB.out.contains("ENVA="))
+        assertTrue("C not see A env", !capC.out.contains("ENVA="))
+        assertTrue("C not see B env", !capC.out.contains("ENVB="))
+        assertTrue("A not see B cwd", !capA.out.contains("CWDB="))
+        assertTrue("B not see A cwd", !capB.out.contains("CWDA="))
+
+        a.close(); bb.close(); c.close()
+    }
+
+    @Test
+    fun c3_stdinIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, capB) = openSession(b)
+        val (c, capC) = openSession(b)
+
+        write(c, "cat")
+        Thread.sleep(400)
+        write(c, "CATSTDIN_MARK")
+        assertTrue("C got its stdin", await(4000) { capC.out.contains("CATSTDIN_MARK") })
+        c.write(byteArrayOf(0x04)) // Ctrl-D ends cat
+
+        write(a, "echo AA=\$((5+5))")
+        write(bb, "echo BB=\$((6+6))")
+        assertTrue("A alive", await(4000) { capA.out.contains("AA=10") })
+        assertTrue("B alive", await(4000) { capB.out.contains("BB=12") })
+
+        assertTrue("A not see C stdin", !capA.out.contains("CATSTDIN_MARK"))
+        assertTrue("B not see C stdin", !capB.out.contains("CATSTDIN_MARK"))
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, bb.state)
+        assertEquals(ATSessionState.ACTIVE, c.state)
+        a.close(); bb.close(); c.close()
+    }
+
+    @Test
+    fun c4_ctrlCIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, capB) = openSession(b)
+        val (c, capC) = openSession(b)
+
+        write(c, "sleep 30")
+        Thread.sleep(600)
+        c.write(byteArrayOf(0x03)) // Ctrl-C -> C
+        Thread.sleep(400)
+        write(c, "echo ACC=\$((7+7))")
+        write(a, "echo AAL=\$((8+8))")
+        write(bb, "echo BBL=\$((9+9))")
+
+        assertTrue("C recovered after Ctrl-C", await(5000) { capC.out.contains("ACC=14") })
+        assertTrue("A alive", await(5000) { capA.out.contains("AAL=16") })
+        assertTrue("B alive", await(5000) { capB.out.contains("BBL=18") })
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, bb.state)
+        assertEquals(ATSessionState.ACTIVE, c.state)
+        a.close(); bb.close(); c.close()
+    }
+
+    @Test
+    fun c5_resizeIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, capB) = openSession(b)
+        val (c, _) = openSession(b)
+
+        assertTrue(a.resize(40, 120))
+        assertTrue(bb.resize(24, 80))
+        Thread.sleep(300)
+
+        write(a, "echo SIZEA=\$(stty size)")
+        write(bb, "echo SIZEB=\$(stty size)")
+        assertTrue("A keeps 40x120", await(5000) { capA.out.contains("SIZEA=40 120") })
+        assertTrue("B keeps 24x80", await(5000) { capB.out.contains("SIZEB=24 80") })
+        assertEquals(ATSessionState.ACTIVE, c.state)
+        a.close(); bb.close(); c.close()
+    }
+
+    @Test
+    fun c6_closeIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, _) = openSession(b)
+        val (c, capC) = openSession(b)
+
+        bb.close()
+        assertEquals(ATSessionState.CLOSED, bb.state)
+
+        write(a, "echo ACB=\$((2+3))")
+        write(c, "echo CCB=\$((3+4))")
+        assertTrue("A survives B close", await(5000) { capA.out.contains("ACB=5") })
+        assertTrue("C survives B close", await(5000) { capC.out.contains("CCB=7") })
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, c.state)
+        assertTrue("transport still ONLINE", AdbEngine.connectionState().isOnline)
+        a.close(); c.close()
+    }
+
+    @Test
+    fun c7_reopenWithOtherStreamsActive() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, _) = openSession(b)
+        bb.close()
+
+        // Reopen a new stream while A is still ACTIVE (registry cleanup).
+        val (d, capD) = openSession(b)
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, d.state)
+        write(a, "echo A7=\$((4+4))")
+        write(d, "echo D7=\$((5+5))")
+        assertTrue("A still alive", await(5000) { capA.out.contains("A7=8") })
+        assertTrue("D new stream works", await(5000) { capD.out.contains("D7=10") })
+        a.close(); d.close()
+    }
+
+    @Test
+    fun c8_naturalExitIsolation() {
+        val b = AdbPersistentBackend(conn())
+        val (a, capA) = openSession(b)
+        val (bb, capB) = openSession(b)
+        val (c, _) = openSession(b)
+
+        write(c, "exit")
+        assertTrue("C exits naturally",
+            await(4000) { c.state == ATSessionState.EXITED || c.state == ATSessionState.CLOSED })
+
+        write(a, "echo A8=\$((6+6))")
+        write(bb, "echo B8=\$((7+7))")
+        assertTrue("A alive after C exit", await(5000) { capA.out.contains("A8=12") })
+        assertTrue("B alive after C exit", await(5000) { capB.out.contains("B8=14") })
+        assertEquals(ATSessionState.ACTIVE, a.state)
+        assertEquals(ATSessionState.ACTIVE, bb.state)
+        a.close(); bb.close(); c.close()
+    }
+
+    // ------------------------------------------------------------------
+    // Stability (AT.V3-2.1 §34)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun s1_sequentialLifecycle() {
+        val b = AdbPersistentBackend(conn())
+        repeat(10) { i ->
+            val (s, cap) = openSession(b)
+            write(s, "echo SEQ$i=\$(($i+100))")
+            assertTrue("iteration $i output",
+                await(5000) { cap.out.contains("SEQ$i=${i + 100}") })
+            s.close()
+            assertEquals(ATSessionState.CLOSED, s.state)
+        }
+        assertTrue(AdbEngine.connectionState().isOnline)
+        android.util.Log.i("ATV31", "s1: 10 sequential open/exec/close cycles OK")
+    }
+
+    @Test
+    fun s2_concurrentLifecycle() {
+        val b = AdbPersistentBackend(conn())
+        val orders = listOf(listOf(0, 1, 2), listOf(2, 0, 1), listOf(1, 2, 0))
+        orders.forEachIndexed { round, order ->
+            val sessions = (0 until 3).map { idx ->
+                val (s, cap) = openSession(b)
+                s to cap
+            }
+            sessions.forEachIndexed { idx, (s, cap) ->
+                write(s, "echo R${round}S$idx=\$((10+$idx))")
+                assertTrue("round $round session $idx",
+                    await(5000) { cap.out.contains("R${round}S$idx=${10 + idx}") })
+            }
+            order.forEach { idx ->
+                sessions[idx].first.close()
+                assertEquals(ATSessionState.CLOSED, sessions[idx].first.state)
+            }
+        }
+        assertTrue(AdbEngine.connectionState().isOnline)
+        // one more open proves no residual resources after 3 concurrent rounds
+        val (s, cap) = openSession(b)
+        write(s, "echo STRESS_DONE")
+        assertTrue(await(4000) { cap.out.contains("STRESS_DONE") })
+        s.close()
+        android.util.Log.i("ATV31", "s2: 3 concurrent rounds (varied close order) OK")
     }
 }

@@ -263,3 +263,19 @@ NEXT = AT BACKEND PARITY / CLOSURE AUDIT（或先解决 ADB Engine 并发读）
 **结论**：AT.V3-2 PARTIAL。ADB Backend 作为 AT Engine 第二 Execution Provider 的 **one-shot + persistent 单会话** 链路在真机验证通过（remote PTY、shell principal、cwd/env/stdin/Ctrl-C/resize/exit/close/reopen 全 PASS）；**multi-session 并发受 ADB Engine 单连接 read 限制阻塞**（真实传输层发现，非 AT Contract 问题）。AT Engine / Contract 未改。Local 全部回归不退化。
 
 本轮未开始 `AT.CONTRACT-1` / `AT.EMULATOR-0` / ADB runtime closure / Pairing/Discovery/Recovery / AG integration / SSH / Human adb CLI。任务结束，STOP。
+---
+
+## Closure Addendum（AT.V3-2.1，2026-10-11）
+
+本报告的 PARTIAL 结论为**当时真实结果，原样保留**。AT.V3-2.1 已完成本报告唯一剩余阻塞项
+（Gate C multi-session）的修复与闭环：
+
+- 修复：ADB Engine 引入 single transport RX owner（AdbStreamHub）+ packet dispatcher +
+  per-stream queue；connection-wide TX 串行化；close/失败可唤醒阻塞 reader。
+- 结果：Gate A 5/5、Gate B 8/8（+reader cleanup b9/b10 PASS）、Gate C c1–c8 全 PASS；
+  1 physical connection / 1 TLS / 3 concurrent ADB streams 真机验证；整类 25 tests 同进程 PASS。
+- 状态更新：**AT.V3-2 Gate C = CLOSED**；ADB_BACKEND = VERIFIED / COMPLETE；
+  MULTI_SESSION 由 BLOCKED 变为 PASS。AT Engine / Contract 仍为零修改。
+
+详见 docs/implementation/AT.V3-2.1_ADB_Engine_Concurrent_Stream_Closure.md 与
+docs/evidence/at_v3_2_1/EVIDENCE.md。原文其余内容不修改。

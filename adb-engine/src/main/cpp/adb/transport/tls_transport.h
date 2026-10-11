@@ -46,6 +46,13 @@ public:
     // Write exactly `length` bytes.
     bool writeExact(const uint8_t* data, size_t length);
 
+    // Wake a thread blocked in readExact()/SSL_read() WITHOUT touching the
+    // TLS state machine (shutdown(2) on the underlying fd only). The reader
+    // observes a clean EOF. Required before destroying the transport while
+    // the stream hub RX owner may still be blocked on this socket
+    // (AT.V3-2.1). Safe to call multiple times.
+    void shutdownSocket();
+
     // Export TLS keying material (SPAKE2 binding). Only valid after startTls.
     // Returns empty if TLS is not active or export fails.
     std::vector<uint8_t> exportKeyingMaterial(size_t length);
