@@ -22,6 +22,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.3.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -41,4 +43,9 @@ dependencies {
     implementation(project(":at-backend-adb"))
     // The App does NOT depend on :adb-engine directly — ADB reaches it only
     // through the ADB Backend (Canonical V1 §7.1 consumer-provider rule).
+
+    // AT.CONTRACT-0.5: debug-only automated input test (AppDebugInputTest).
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }

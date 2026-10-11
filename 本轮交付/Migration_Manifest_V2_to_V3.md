@@ -108,6 +108,7 @@ AndroidTerminal-V3/
 |---|---|---|---|
 | `app/.../MainActivity.kt` | Human UI consumer | 重建（Dev Preview：Local raw terminal preview）| **DEV_PREVIEW**（AT.DEVAPP-0；consumer→ATEngine→Local backend；正式 Human UI 仍 NOT_STARTED） |
 | `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
+| （AT.CONTRACT-0.5 新增）`AppTerminal` + `AppDebugInputTest` | App consumer 组合 root + debug-only 自动化输入 | 复用同一 AT Engine→Local backend 路径；instrumentation | **DEV_PREVIEW / DEBUG_ONLY**（T1–T8 真机 PASS；非生产公开接口） |
 
 ### 3.6 → `:test-host`
 
@@ -169,7 +170,9 @@ AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
 LOCAL_BACKEND        = MIGRATED（AT.PERSIST-0 真机 P1–P10 PASS）
 APP_PREVIEW          = DEV_PREVIEW（AT.DEVAPP-0：Local raw terminal preview APK，真机安装/启动 PASS；
                        正式 Human UI 仍 NOT_STARTED）
-NEXT                 = AT.PERSIST-1（ADB Persistent，需 Controller 授权）
+DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headless + Dev App 自动化输入
+                       instrumentation，T1–T8 真机 PASS；Contract 未改）
+NEXT                 = AT.V3-2.0（ADB Backend First Path，需 Controller 授权）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

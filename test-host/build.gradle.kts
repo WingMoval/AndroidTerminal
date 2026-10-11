@@ -21,6 +21,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.3.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -38,4 +40,9 @@ dependencies {
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))
+
+    // AT.CONTRACT-0.5: headless input regression (T2).
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
