@@ -457,7 +457,7 @@ AT_CONTRACT_FREEZE_READINESS = BLOCKED_BY_BACKEND_BUG
 REAL_DEVICE_VALIDATION = PASS（审计执行面）
 EVIDENCE = docs/evidence/at_v3_3/EVIDENCE.md
 
-GIT_COMMIT = <本次 commit>
+GIT_COMMIT = 3453ec9（AT.V3-3 audit commit）
 GIT_WORKTREE = CLEAN
 
 NEXT = <blocker 修复阶段：AT.V3-2.2 — ADB one-shot WRTE/OKAY credit fix>
