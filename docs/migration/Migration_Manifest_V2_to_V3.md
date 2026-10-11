@@ -94,8 +94,6 @@ AndroidTerminal-V3/
 | `atsh/.../shell/LocalShellExecutor.kt` + `ShellResult.kt` | Local one-shot（ProcessBuilder → sh -c） | 按 backend contract 重建为 `LocalOneShotBackend`（ATOneShotBackend）| **MIGRATED**（真机 PASS：stdout/stderr/exitCode、非零 exit ≠ failure） |
 | `atsh/.../pty/LocalPtySession.kt` / `PtyNative.kt` / `local_pty.*` | Local PTY persistent shell | native `local_pty.{h,cpp}` **迁入** `:at-backend-local/src/main/cpp/`（忠实迁移，非重写）；JNI 适配为 `LocalPtyNative`；`LocalPtySession` 适配 V3 package；`LocalPersistentBackend` + `LocalTerminalSession` 实现 | **MIGRATED**（真机 P1–P10 PASS：real PTY/principal/persistent I/O/cwd/env/stdin/Ctrl-C/resize/exit/close/cleanup） |
 
-> AT.PERSIST-0 实现落地；真机 P1–P10 验证待设备连接（当前 BLOCKED_BY_NO_DEVICE）。
-
 ### 3.4 → `:at-backend-adb`
 
 | V2 来源 | 职责 | 方式 | 状态 |
@@ -109,7 +107,8 @@ AndroidTerminal-V3/
 | `app/.../MainActivity.kt` | Human UI consumer | 重建（Dev Preview：Local raw terminal preview）| **DEV_PREVIEW**（AT.DEVAPP-0；consumer→ATEngine→Local backend；正式 Human UI 仍 NOT_STARTED） |
 | `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
 | （AT.CONTRACT-0.5 新增）`AppTerminal` + `AppDebugInputTest` | App consumer 组合 root + debug-only 自动化输入 | 复用同一 AT Engine→Local backend 路径；instrumentation | **DEV_PREVIEW / DEBUG_ONLY**（T1–T8 真机 PASS；非生产公开接口） |
-| （AT.DEVAPP-0.1 新增）`TestSessionObserver` + `AppDebugSessionVisibilityTest` + MainActivity 测试观察区 | 自动化测试 Session 输入/输出/状态界面可视化（debug-only） | 同进程 instrumentation 直接驱动真实 MainActivity；单一输出消费者 | **DEV_PREVIEW / DEBUG_ONLY**（UI-1..UI-7 真机 PASS + 7 张截图；Contract 未改） |
+| （AT.DEVAPP-0.2 新增）`SessionPage` + `SessionPageController` + `DynamicSessionPagesTest` | 动态 Session 分页（App/UI 层）| 每页独立 AppTerminal→ATTerminalSession；操作作用于 active page | **DEV_PREVIEW / DEBUG_ONLY**（ds1–ds9 真机 PASS + 9 张截图；Contract 未改） |
+| （已退役）AT.DEVAPP-0.1 `TestSessionObserver` / 测试观察区 | 旧特殊 Debug UI | 由普通 SessionPage 替代 | **REMOVED**（0.2 后不再特殊化） |
 
 ### 3.6 → `:test-host`
 
@@ -173,8 +172,8 @@ APP_PREVIEW          = DEV_PREVIEW（AT.DEVAPP-0：Local raw terminal preview AP
                        正式 Human UI 仍 NOT_STARTED）
 DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headless + Dev App 自动化输入
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
-DEBUG_UI_VISIBILITY  = CONFIRMED（AT.DEVAPP-0.1：自动化测试 Session 输入/输出/状态界面可视化，
-                       UI-1..UI-7 真机 PASS + 7 张截图；同进程 instrumentation，Contract 未改）
+DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
+                       ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
 NEXT                 = AT.V3-2.0（ADB Backend First Path，需 Controller 授权）
 ```
 

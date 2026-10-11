@@ -1,19 +1,22 @@
-// AndroidTerminal V3 — Local Terminal Dev Preview.
+// AndroidTerminal V3 — Dynamic Session Pages Dev UI.
 //
-// AT.DEVAPP-0 / AT.CONTRACT-0.5. Developer Preview / Consumer Validation slice.
+// AT.DEVAPP-0.2. Dev Preview / Consumer Validation slice.
 //
-// The App is a CONSUMER of the AT Engine public boundary. After composition
-// (via AppTerminal), the UI only talks to:
-//   ATEngine / ATTerminalSession / ATSessionEvent / ATSessionState
-// It NEVER touches LocalPtyNative / LocalPtySession / JNI / fd / pid.
+// The App is a CONSUMER of the AT Engine public boundary. MainActivity owns an
+// App-layer SessionPageController that dynamically creates / switches / closes
+// independent session pages. Each page wraps an AppTerminal -> ATTerminalSession.
+//
+// All terminal operations (Send / Ctrl-C / Resize / Clear / Close) act on the
+// ACTIVE page only. Switching pages never closes/recreates/resets sessions.
+//
+// Debug automation reuses the SAME normal session pages (no special debug UI).
 //
 // This is a RAW terminal preview (no Terminal Emulator / Screen State).
-// escape sequences are shown approximately; vim/top full-screen behavior is
-// expected to be wrong and is NOT fixed here.
 
 package com.androidterminal.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -34,171 +37,177 @@ class MainActivity : Activity() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private lateinit var terminal: AppTerminal
+    private val pages = SessionPageController()
 
     // UI
     private lateinit var outputText: TextView
     private lateinit var scroll: ScrollView
     private lateinit var inputBox: EditText
-    private lateinit var rowsBox: EditText
-    private lateinit var colsBox: EditText
     private lateinit var stateLabel: TextView
-    private lateinit var testOutputText: TextView
-    private val outputBuilder = StringBuilder()
-    private val testOutputBuilder = StringBuilder()
-
-    // Debug-only test observation (AT.DEVAPP-0.1). Null unless attached.
-    private var attachedObserver: TestSessionObserver? = null
+    private lateinit var pageLabel: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Composition root: AppTerminal builds Local backend + AT Engine.
-        terminal = AppTerminal(eventListener = { ev -> onSessionEvent(ev) })
-
         outputText = findViewById(R.id.tvOutput)
         scroll = findViewById(R.id.scrollOutput)
         inputBox = findViewById(R.id.etInput)
-        rowsBox = findViewById(R.id.etRows)
-        colsBox = findViewById(R.id.etCols)
         stateLabel = findViewById(R.id.tvState)
-        testOutputText = findViewById(R.id.tvTestOutput)
-        rowsBox.setText(DEFAULT_ROWS.toString())
-        colsBox.setText(DEFAULT_COLS.toString())
+        pageLabel = findViewById(R.id.tvPage)
 
-        findViewById<Button>(R.id.btnOpen).setOnClickListener { openSession() }
+        findViewById<Button>(R.id.btnPrev).setOnClickListener { pages.prev(); renderPage() }
+        findViewById<Button>(R.id.btnNext).setOnClickListener { pages.next(); renderPage() }
+        findViewById<Button>(R.id.btnAddPage).setOnClickListener { addPage() }
+        findViewById<Button>(R.id.btnClosePage).setOnClickListener { closeActivePage() }
         findViewById<Button>(R.id.btnSend).setOnClickListener { sendInput() }
         findViewById<Button>(R.id.btnCtrlC).setOnClickListener { sendCtrlC() }
-        findViewById<Button>(R.id.btnResize).setOnClickListener { resize() }
+        findViewById<Button>(R.id.btnResize).setOnClickListener { showResizeDialog() }
         findViewById<Button>(R.id.btnClear).setOnClickListener { clearOutput() }
-        findViewById<Button>(R.id.btnClose).setOnClickListener { closeSession() }
-        findViewById<Button>(R.id.btnTestObserve).setOnClickListener { toggleTestObservation() }
+
+        renderPage()
     }
+
+    // ------------------------------------------------------------------
+    // Page operations (App-layer)
+    // ------------------------------------------------------------------
 
     /**
-     * Debug-only (AT.DEVAPP-0.1): surface an independent Test Session into the
-     * UI's test observation area. The test creates its OWN AppTerminal and
-     * forwards its observer's lines here. Human session is untouched.
+     * Debug-only (AT.DEVAPP-0.2): create a NEW independent normal session page
+     * and make it active. Used by instrumentation to drive a normal page.
+     * @return the created page.
      */
-    fun attachTestObserver(observer: TestSessionObserver) {
-        attachedObserver = observer
-        runOnUiThread {
-            testOutputText.visibility = android.view.View.VISIBLE
-            testOutputBuilder.clear()
-            testOutputText.text = ""
-        }
+    fun createPage(): SessionPage {
+        val page = pages.add()
+        // Wire this page's output into the shared renderer (only when active).
+        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) })
+        renderPage()
+        return page
     }
 
-    fun detachTestObserver() {
-        attachedObserver = null
-        runOnUiThread {
-            testOutputText.visibility = android.view.View.GONE
+    /** Debug-only: open the active page's session (call after [createPage]). */
+    fun openActiveSession(rows: Int = DEFAULT_ROWS, cols: Int = DEFAULT_COLS): Boolean {
+        val page = pages.activePage ?: return false
+        page.rows = rows
+        page.cols = cols
+        val ok = page.terminal.open(rows, cols)
+        if (ok) {
+            // Apply the requested initial size (PTY starts at 0x0 per T1 evidence).
+            page.terminal.resize(rows, cols)
+            page.terminal.session?.write(
+                "echo === AT V3 LOCAL SESSION (page ${page.pageId}) ===; id; tty\n"
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
         }
+        renderPage()
+        return ok
     }
 
-    /** Debug-only: current test observation text (for UI assertions). */
-    fun testObservationText(): String = testOutputText.text?.toString() ?: ""
+    /** Debug-only: the active page's session, if open. */
+    fun activeSession(): com.at.engine.ATTerminalSession? = pages.activePage?.terminal?.session
 
-    private fun toggleTestObservation() {
-        if (attachedObserver == null) {
-            testOutputText.visibility = if (testOutputText.visibility == android.view.View.VISIBLE)
-                android.view.View.GONE else android.view.View.VISIBLE
-        }
+    private fun addPage() {
+        val page = pages.add()
+        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) })
+        openActiveSession()
+        renderPage()
     }
 
-    /** Debug-only: append a line to the test observation area. */
-    fun appendTestLine(s: String) {
-        mainHandler.post {
-            testOutputBuilder.append(s)
-            testOutputText.text = testOutputBuilder.toString()
-        }
+    private fun closeActivePage() {
+        pages.closeActive()
+        renderPage()
     }
 
-    private fun openSession() {
-        val current = terminal.session
-        if (current != null && current.state == ATSessionState.ACTIVE) {
-            appendState("already ACTIVE")
+    private fun renderPage() {
+        val page = pages.activePage
+        if (page == null) {
+            pageLabel.text = "- / -"
+            stateLabel.text = "State: -   | no session (tap +)"
+            outputText.text = ""
             return
         }
-        appendState("OPENING ...")
-        val ok = terminal.open(DEFAULT_ROWS, DEFAULT_COLS)
-        if (ok) {
-            appendState("ACTIVE")
-            terminal.session?.write(
-                "echo === AT V3 LOCAL SESSION ===; id; tty\n".toByteArray(StandardCharsets.UTF_8),
-            )
-        } else {
-            appendState("FAILED: open failed")
-        }
+        pageLabel.text = "${pages.size} page(s)  #${page.pageId} (${page.state.name})"
+        stateLabel.text = "State: ${page.state.name}"
+        outputText.text = page.outputBuffer.toString()
+        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
     }
 
+    // ------------------------------------------------------------------
+    // Terminal operations (act on ACTIVE page only)
+    // ------------------------------------------------------------------
+
     private fun sendInput() {
-        if (terminal.state() != ATSessionState.ACTIVE) return
+        val page = pages.activePage ?: return
+        if (page.state != ATSessionState.ACTIVE) return
         val text = inputBox.text?.toString() ?: ""
         if (text.isEmpty()) return
-        // UTF-8 bytes + explicit newline (byte-stream semantics, AT.CONTRACT-0.5 §5).
-        terminal.write((text + "\n").toByteArray(StandardCharsets.UTF_8))
+        page.terminal.write((text + "\n").toByteArray(StandardCharsets.UTF_8))
         inputBox.setText("")
     }
 
     private fun sendCtrlC() {
-        if (terminal.state() != ATSessionState.ACTIVE) return
-        terminal.ctrlC() // 0x03 -> SIGINT to foreground
-        appendState("CTRL-C sent")
+        val page = pages.activePage ?: return
+        if (page.state != ATSessionState.ACTIVE) return
+        page.terminal.ctrlC() // 0x03 -> SIGINT to foreground
+        stateLabel.text = "State: ${page.state.name}   | Ctrl-C sent"
     }
 
-    private fun resize() {
-        val rows = rowsBox.text?.toString()?.toIntOrNull() ?: return
-        val cols = colsBox.text?.toString()?.toIntOrNull() ?: return
-        val ok = terminal.resize(rows, cols)
-        appendState(if (ok) "RESIZED ${rows}x$cols" else "resize failed")
+    private fun showResizeDialog() {
+        val page = pages.activePage ?: return
+        val rows = EditText(this).apply { setText(page.rows.toString()); inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        val cols = EditText(this).apply { setText(page.cols.toString()); inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(rows)
+            addView(cols)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Resize Session")
+            .setView(container)
+            .setPositiveButton("Apply") { _, _ ->
+                val r = rows.text?.toString()?.toIntOrNull() ?: return@setPositiveButton
+                val c = cols.text?.toString()?.toIntOrNull() ?: return@setPositiveButton
+                page.rows = r
+                page.cols = c
+                page.terminal.resize(r, c)
+                stateLabel.text = "State: ${page.state.name}   | RESIZED ${r}x$c"
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun clearOutput() {
-        // UI-only clear; NOT a terminal clear sequence (§12).
-        mainHandler.post {
-            outputBuilder.clear()
-            outputText.text = ""
-        }
+        val page = pages.activePage ?: return
+        page.outputBuffer.clear()
+        outputText.text = ""
     }
 
-    private fun closeSession() {
-        terminal.close()
-        appendState("CLOSED")
-    }
+    // ------------------------------------------------------------------
+    // Event handling: buffer output on its own page, render when active
+    // ------------------------------------------------------------------
 
-    private fun onSessionEvent(ev: ATSessionEvent) {
+    private fun onPageEvent(page: SessionPage, ev: ATSessionEvent) {
         when (ev) {
             is ATSessionEvent.Data -> {
                 val s = String(ev.bytes, StandardCharsets.UTF_8)
-                mainHandler.post { appendOutput(s) }
+                page.outputBuffer.append(s)
+                if (pages.activePage === page) {
+                    mainHandler.post { renderPage() }
+                }
+                // Inactive pages: just buffered; visible on switch-back.
             }
-            is ATSessionEvent.Resized -> appendState("RESIZED ${ev.rows}x${ev.cols}")
-            is ATSessionEvent.Exited -> appendState("EXITED ${ev.exitCode}")
-            is ATSessionEvent.Eof -> appendState("EOF")
-            is ATSessionEvent.Failed -> appendState("FAILED ${ev.error}")
-            is ATSessionEvent.Closed -> appendState("CLOSED")
-        }
-    }
-
-    private fun appendOutput(s: String) {
-        outputBuilder.append(s)
-        outputText.text = outputBuilder.toString()
-        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
-    }
-
-    private fun appendState(s: String) {
-        mainHandler.post {
-            val state = terminal.state().name
-            stateLabel.text = "State: $state   | $s"
+            else -> {
+                // state events only update the label when this page is active
+                if (pages.activePage === page) {
+                    mainHandler.post { renderPage() }
+                }
+            }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Dev preview policy: close session on Activity destroy to avoid orphan
-        // child shells. Rotation retention / process recreation = DEFERRED.
-        terminal.close()
+        // Close ALL sessions (PTY/fd/shell cleanup). Retention = DEFERRED.
+        pages.closeAll()
     }
 }
