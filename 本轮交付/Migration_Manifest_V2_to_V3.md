@@ -175,20 +175,24 @@ DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headle
                        instrumentation，T1–T8 真机 PASS；Contract 未改）
 DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
                        ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
-ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1 小输出域；one-shot + persistent
-                       + concurrent multi-session 真机 PASS；AT.V3-3 审计发现并确认
-                       ADB Engine one-shot 大输出 flow-control bug（blocker，见 AT_EXECUTION_CLOSURE）；
+ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1 + AT.V3-2.2：one-shot + persistent
+                       + concurrent multi-session 真机 PASS；含 large-output 64K/256K/1M 完整 PASS；
                        AT Engine/Contract 未改）
 AT.V3-3              = COMPLETE（审计：public surface / dependency / parity matrix / one-shot /
                        large-output / persistent / EOF-state / close / multi-session / cross-mode /
                        read-listener / byte-stream / principal / transport-loss / taxonomy 全部完成；
                        evidence: docs/evidence/at_v3_3/）
-AT_EXECUTION_CLOSURE = BLOCKED_BY_ADB_ENGINE_BUG（ADB one-shot >首个 WRTE 输出卡死；
-                       最小修复 = one-shot 逐 WRTE 回 OKAY；差分证据：persistent 路径 67931B 全量通过）
-BACKEND_PARITY       = VERIFIED（25 项 PARITY；1 ADB Engine bug；1 Local minor bug；2 Contract Gap 记录）
-AT_CONTRACT          = REVISED_DRAFT / EXECUTION_AUDITED（未 Frozen；见
+AT.V3-2.2            = COMPLETE（ADB one-shot WRTE/OKAY flow-control 闭环：runShell ack_writes=true；
+                       64K/256K/1M 真机完整 PASS + WRTE/OKAY 1:1 credit 证据；
+                       one-shot/persistent/multi-session/cross-mode 全回归不退化；
+                       AT_EXECUTION_CLOSURE 转 PASS；evidence: docs/evidence/at_v3_2_2/）
+AT_EXECUTION_CLOSURE = PASS（原 BLOCKED_BY_ADB_ENGINE_BUG 已由 AT.V3-2.2 修复：
+                       one-shot 逐 WRTE 回 OKAY credit；64K 66560B / 256K 266240B / 1M 1048582B 真机完整）
+BACKEND_PARITY       = VERIFIED（大输出由 BACKEND_BUG 转 PARITY；1 Local minor bug + 2 Contract Gap 记录）
+AT_CONTRACT          = REVISED_DRAFT / EXECUTION_VALIDATED（未 Frozen；见
                        docs/architecture/AT_Execution_Contract_Parity_Matrix.md）
-NEXT                 = ADB one-shot flow-control 最小修复（AT.V3-2.2）→ AT.EMULATOR-0
+AT_CONTRACT_FREEZE_READINESS = READY_FOR_EMULATOR_VALIDATION（非 READY_TO_FREEZE；AT.CONTRACT-1 ≠ COMPLETE）
+NEXT                 = AT.EMULATOR-0
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

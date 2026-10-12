@@ -18,6 +18,7 @@ package com.androidterminal.testhost
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.adb.engine.AdbConnectionRequest
+import com.adb.engine.AdbEngine
 import com.at.backend.adb.AdbOneShotBackend
 import com.at.backend.adb.AdbPersistentBackend
 import com.at.backend.local.LocalOneShotBackend
@@ -183,14 +184,82 @@ class BackendParityAuditTest {
 
     @Test fun l1_localLargeOutputBaseline64k() { largeOutputCheck("LOCAL", localEngine(), 1024) }
 
-    @Test(timeout = 300_000)
+    // AT.V3-2.2: bounded timeouts (flow-control fixed; the old 300s windows
+    // existed to wait out the stall and are no longer appropriate).
+    @Test(timeout = 60_000)
     fun l2_adbLargeOutput64k() { largeOutputCheck("ADB", adbEngine(), 1024) }
 
-    @Test(timeout = 300_000)
+    @Test(timeout = 180_000)
     fun l3_adbLargeOutput256k() { largeOutputCheck("ADB", adbEngine(), 4096) }
 
-    @Test(timeout = 300_000)
+    // 1 MiB: the device's adbd delivers ~70B per WRTE with a per-WRTE credit
+    // round trip of ~19ms (measured), so 16384 lines take ~5 min. The timeout
+    // is the device's normal bounded completion time, not a deadlock wait.
+    @Test(timeout = 600_000)
     fun l4_adbLargeOutput1m() { largeOutputCheck("ADB", adbEngine(), 16384) }
+
+    // Mixed large stdout + non-empty stderr + non-zero exit: the flow-control
+    // fix must not disturb shell-v2 frame mapping (stdout/stderr/exit frames).
+    @Test(timeout = 90_000)
+    fun l6_adbMixedLargeStdoutStderrNonzero() {
+        val e = adbEngine()
+        val n = 512
+        val expectedBytes = n * 65
+        val lastLine = (n - 1).toString().padStart(64, '0')
+        val r = e.execute(ATExecutionRequest(
+            command = gen(n) + "; printf ERRLARGE 1>&2; exit 5"))
+        assertEquals("L6 outcome", ATExecutionOutcome.COMPLETED, r.outcome)
+        assertEquals("L6 stdout bytes", expectedBytes, r.stdout.length)
+        assertEquals("L6 stdout lines", n, r.stdout.count { it == '\n' })
+        assertTrue("L6 tail intact", r.stdout.endsWith(lastLine + "\n"))
+        assertEquals("L6 stderr", "ERRLARGE", r.stderr)
+        assertEquals("L6 exit", 5, r.exitCode)
+        assertTrue("L6 non-zero exit != transport failure", !r.hasError)
+    }
+
+    // Connection reuse across interleaved small/large one-shots: must stay on
+    // ONE physical connection / ONE TLS handshake (counted from logcat).
+    @Test(timeout = 300_000)
+    fun l7_adbConnectionReuseWithLargeOutput() {
+        val e = adbEngine()
+        val seq: List<Pair<String, Int>> = listOf(
+            "S1" to 0, "large" to 1024, "S2" to 0, "large" to 4096, "S3" to 0)
+        for ((name, n) in seq) {
+            if (n == 0) {
+                val r = e.execute(ATExecutionRequest(command = "echo $name"))
+                assertEquals("L7 $name outcome", ATExecutionOutcome.COMPLETED, r.outcome)
+                assertTrue("L7 $name stdout", r.stdout.contains(name))
+            } else {
+                val expectedBytes = n * 65
+                val lastLine = (n - 1).toString().padStart(64, '0')
+                val r = e.execute(ATExecutionRequest(command = gen(n)))
+                assertEquals("L7 large($n) outcome", ATExecutionOutcome.COMPLETED, r.outcome)
+                assertEquals("L7 large($n) bytes", expectedBytes, r.stdout.length)
+                assertTrue("L7 large($n) tail", r.stdout.endsWith(lastLine + "\n"))
+            }
+        }
+        assertTrue("L7 connection still ONLINE", AdbEngine.connectionState().isOnline)
+    }
+
+    // 1 MiB via a single pipe stream (large WRTE chunks). The line-based 1 MiB
+    // (16384 lines) is bounded by the device's wireless debugging session
+    // lifetime (~2-4 min) at ~19ms/line credit round trip (~5-6 min needed) —
+    // an environmental limit recorded in evidence. This chunked variant
+    // delivers 1 MiB in ~16 large WRTE and proves the credit flow at 1 MiB
+    // scale with full completeness checks.
+    @Test(timeout = 120_000)
+    fun l9_adbLargeOutput1mChunked() {
+        val e = adbEngine()
+        val r = e.execute(ATExecutionRequest(
+            command = "dd if=/dev/zero bs=1048576 count=1 2>/dev/null | tr '\\000' 'A'; printf TAIL1M"))
+        assertEquals("L9 outcome", ATExecutionOutcome.COMPLETED, r.outcome)
+        assertEquals("L9 bytes", 1048582, r.stdout.length)
+        assertTrue("L9 tail marker", r.stdout.endsWith("TAIL1M"))
+        assertEquals("L9 exit", 0, r.exitCode)
+        val again = e.execute(ATExecutionRequest(command = "echo after_1m_chunked"))
+        assertEquals("L9 reuse outcome", ATExecutionOutcome.COMPLETED, again.outcome)
+        assertTrue("L9 reuse stdout", again.stdout.contains("after_1m_chunked"))
+    }
 
     // Differential control for the one-shot stall: the SAME device command is
     // executed through the PERSISTENT path (interactive stream, ack_writes=true).
@@ -585,6 +654,30 @@ class BackendParityAuditTest {
         s.close()
     }
 
+    // AT.V3-2.2 cross-mode with a LARGE one-shot: persistent session A stays
+    // ACTIVE while one-shot B streams 64 KiB, then A keeps executing. Proves
+    // the credit path does not disturb the shared connection / RX owner.
+    @Test(timeout = 120_000)
+    fun x3_adbCrossModeLargeOneShot() {
+        val engine = adbEngine()
+        val (s, cap, _) = openWithListener(adbSpec().copy(engine = { engine }))
+        write(s, "echo PERSIST_X3=\$((1+2))")
+        assertTrue("X3 persistent before", await(5000) { cap.out.contains("PERSIST_X3=3") })
+
+        val n = 1024
+        val expectedBytes = n * 65
+        val lastLine = (n - 1).toString().padStart(64, '0')
+        val one = engine.execute(ATExecutionRequest(command = gen(n)))
+        assertEquals("X3 one-shot outcome", ATExecutionOutcome.COMPLETED, one.outcome)
+        assertEquals("X3 one-shot bytes", expectedBytes, one.stdout.length)
+        assertTrue("X3 one-shot tail", one.stdout.endsWith(lastLine + "\n"))
+
+        assertEquals("X3 session still ACTIVE", ATSessionState.ACTIVE, s.state)
+        write(s, "echo PERSIST_AFTER_X3=\$((2+3))")
+        assertTrue("X3 persistent after", await(5000) { cap.out.contains("PERSIST_AFTER_X3=5") })
+        s.close()
+    }
+
     // ==================================================================
     // read() / listener consumption invariant — r1/r2
     // ==================================================================
@@ -659,5 +752,31 @@ class BackendParityAuditTest {
         assertTrue("LOCAL principal = app/untrusted_app",
             local.stdout.contains("untrusted_app") || local.stdout.contains("uid=1"))
         assertTrue("ADB principal = shell uid 2000", adb.stdout.contains("uid=2000(shell)"))
+    }
+
+    // ==================================================================
+    // AT.V3-2.2 — one-shot mid-stream abnormal close (failure path)
+    // ==================================================================
+
+    // Device closes its stdout/stderr while the command is still running
+    // (adbd sees EOF on the shell socketpair and closes the stream before the
+    // process exits). Purpose: bounded failure, no hang, no crash, no stale
+    // reader, connection stays usable. Not a recovery test.
+    @Test(timeout = 30_000)
+    fun f1_adbOneShotMidStreamClose() {
+        val e = adbEngine()
+        val t0 = System.currentTimeMillis()
+        val r = e.execute(ATExecutionRequest(command = "echo PARTIAL; exec 1>&- 2>&-; sleep 2"))
+        val dt = System.currentTimeMillis() - t0
+        android.util.Log.i("ATV322", "f1: returned in ${dt}ms outcome=${r.outcome} " +
+            "exit=${r.exitCode} stdout=${r.stdout.trim()} stderr=${r.stderr.trim()} " +
+            "hasError=${r.hasError} err=${r.error}")
+        assertTrue("f1 bounded (${dt}ms)", dt < 15_000)
+        assertEquals("f1 outcome (peer CLSE = normal termination)", ATExecutionOutcome.COMPLETED, r.outcome)
+        assertTrue("f1 partial stdout delivered", r.stdout.contains("PARTIAL"))
+        // connection remains usable after the abnormal close
+        val again = e.execute(ATExecutionRequest(command = "echo AFTER_F1"))
+        assertEquals("f1 reuse outcome", ATExecutionOutcome.COMPLETED, again.outcome)
+        assertTrue("f1 reuse stdout", again.stdout.contains("AFTER_F1"))
     }
 }

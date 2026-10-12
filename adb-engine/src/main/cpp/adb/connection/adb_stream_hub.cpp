@@ -142,6 +142,8 @@ void AdbStreamHub::dispatch(const AdbPacket& pkt) {
             okay.msg.arg0 = slot->local_id;
             okay.msg.arg1 = slot->remote_id;
             okay.SetMagic();
+            LOGI("[HUB07] RX_WRTE local=%u remote=%u bytes=%zu -> TX_OKAY_CREDIT",
+                 slot->local_id, slot->remote_id, pkt.payload.size());
             std::string werr;
             if (!conn_->writePacket(okay, &werr)) {
                 LOGE("[HUB] TX OKAY(wrte credit) failed: %s", werr.c_str());
@@ -195,6 +197,8 @@ void AdbStreamHub::failAll(const std::string& reason) {
 void AdbStreamHub::unregister(uint32_t local_id) {
     std::lock_guard<std::mutex> lock(mu_);
     slots_.erase(local_id);
+    LOGI("[HUB07] STREAM_UNREGISTER local=%u registry=%zu", local_id,
+         slots_.size());
 }
 
 size_t AdbStreamHub::registeredStreamCount() const {
@@ -223,6 +227,8 @@ std::shared_ptr<AdbStream> AdbStreamHub::openStream(const std::string& service,
         }
         slot->local_id = conn_->allocateLocalId();
         slots_[slot->local_id] = slot;
+        LOGI("[HUB07] STREAM_REGISTER local=%u registry=%zu", slot->local_id,
+             slots_.size());
     }
 
     AdbPacket open_pkt;

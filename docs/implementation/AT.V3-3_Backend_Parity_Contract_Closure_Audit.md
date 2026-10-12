@@ -463,3 +463,56 @@ GIT_WORKTREE = CLEAN
 NEXT = <blocker 修复阶段：AT.V3-2.2 — ADB one-shot WRTE/OKAY credit fix>
        → 之后 AT.EMULATOR-0
 ```
+
+---
+
+# Closure Addendum — AT.V3-2.2
+
+> 本文档 AT.V3-3 的历史结论（`AT_EXECUTION_CLOSURE = BLOCKED` 等）**原样保留，未篡改**。
+> 以下记录 AT.V3-2.2 对该 blocker 的修复闭环。
+
+- 日期：2026-10-12
+- 修复：`AT.V3-2.2_ADB_OneShot_Flow_Control_Closure.md`（完整报告）
+- 证据：`docs/evidence/at_v3_2_2/EVIDENCE.md`
+
+## 原审计 blocker → 本轮修复
+
+```text
+AT.V3-3 结论（保留）:  ADB_ONESHOT_FLOW_CONTROL_BUG = YES（CONFIRMED）
+                        one-shot（ack_writes=false）首个 WRTE（70B）后无 OKAY → adbd 停发 → 64KiB 卡死
+
+AT.V3-2.2 修复:         AdbClient::runShell one-shot ack_writes=false → true
+                        逐 WRTE 由 hub dispatcher 回 OKAY credit（与 persistent 一致）
+
+AT.V3-2.2 验证:         64K = 66560B 精确 PASS（同命令差分，与 USB 基线一致）
+                        256K = 266240B 精确 PASS
+                        1M = 1048582B 精确 PASS（分块命令；逐行 1M 受无线会话寿命限制，见报告 §19）
+                        WRTE/OKAY 1:1 credit 证实（WRTE_COUNT=1025）
+                        mixed stdout/stderr/nonzero PASS
+                        one-shot a1-a5 5/5；persistent b1-b10 10/10；multi-session c1-c8 8/8
+                        cross-mode x2/x3 PASS；reuse l7 PASS
+                        整类：AdbBackendHeadlessTest 25/25、BackendParityAuditTest 34/34
+                        Local 11/11、AT unit 6/6、App 7/7、Headless 1/1、Dynamic 9/9
+
+AT_EXECUTION_CLOSURE     →  PASS（AT.V3-2.2）
+AT_CONTRACT_FREEZE_READINESS → READY_FOR_EMULATOR_VALIDATION
+```
+
+## 更新映射（相对 §23 分类）
+
+```text
+E. ADB_ENGINE_BUG
+   - E-1（原 BLOCKER）：one-shot WRTE/OKAY flow-control  →  已修复（AT.V3-2.2）
+     证据：64K/256K/1M 真机完整 PASS；WRTE/OKAY 1:1 credit
+   - E-2（registry 极端路径）：保持 NON_BLOCKING_TECH_DEBT，未处理
+```
+
+其余分类（GAP-1/2/3、LOCAL-P8、ADB_RUNTIME_FOLLOWUP、EMULATOR_FOLLOWUP、
+EXPECTED_PROVIDER_DIFFERENCE、NON_BLOCKING_TECH_DEBT）**保持原样**。
+
+## 环境备注（非代码问题）
+
+本 HONOR 设备无线调试会话寿命 ~2-4 min（框架侧写回 `adb_wifi_enabled=0` →
+adbd `kick_all_tcp_tls_transports()` → `SSL_read err=5`）。AOSP adbd 代码无自动中断机制
+（`research/ADB/daemon/adb_wifi.cpp`）；属 OEM/框架行为。稳定网络 + 保屏后整类稳定完成。
+逐行 1M 因此以分块命令验证（大 WRTE 路径）。

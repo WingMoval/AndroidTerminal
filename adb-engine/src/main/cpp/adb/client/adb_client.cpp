@@ -122,11 +122,15 @@ ShellResult AdbClient::runShell(const std::string& command) {
         return result;
     }
 
-    // AT.V3-2.1: one-shot shells are ordinary logical streams on the single
-    // RX owner. ack_writes=false preserves the v1 one-shot WRTE behavior.
+    // AT.V3-2.2: one-shot shells are ordinary logical streams on the single
+    // RX owner and MUST obey the same WRTE/OKAY credit protocol as persistent
+    // streams (ack_writes=true): adbd stops sending after the first WRTE that
+    // is not credited, which stalled one-shot large outputs (AT.V3-3 blocker).
+    // The OKAY credit is sent by the hub dispatcher through the connection-wide
+    // TX mutex, exactly like the validated interactive path.
     std::string open_err;
     std::shared_ptr<AdbStream> stream =
-        impl_->hub->openStream(service, /*ack_writes=*/false, 5000, &open_err);
+        impl_->hub->openStream(service, /*ack_writes=*/true, 5000, &open_err);
     if (!stream) {
         // Core-layer failure, not device stderr (Step 4B.R2).
         result.status = ShellStatus::TransportError;

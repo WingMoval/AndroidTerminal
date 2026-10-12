@@ -1,10 +1,12 @@
 # AT Execution Contract — Backend Parity Matrix
 
-> 状态：**CURRENT ACTUAL（verified by AT.V3-3 real-device audit）** — 本文件不是 Frozen 文档，
+> 状态：**CURRENT ACTUAL（verified by AT.V3-3 audit + AT.V3-2.2 closure real-device tests）** — 本文件不是 Frozen 文档，
 > 是后续 **AT.CONTRACT-1** 的直接输入。只记录已实测语义、已知 gap 与 deferred 语义。
 >
-> 基线：V3 `a6113f4` + AT.V3-3 审计（2026-10-11，设备 APLMUT4312005935）。
-> 证据：`docs/evidence/at_v3_3/EVIDENCE.md`；报告：`docs/implementation/AT.V3-3_Backend_Parity_Contract_Closure_Audit.md`。
+> 基线：V3 `a6113f4`（AT.V3-3）+ `1311750→AT.V3-2.2`（flow-control closure，2026-10-12，设备 APLMUT4312005935）。
+> 证据：`docs/evidence/at_v3_3/EVIDENCE.md`（审计）、`docs/evidence/at_v3_2_2/EVIDENCE.md`（flow-control 闭环）；
+> 报告：`docs/implementation/AT.V3-3_Backend_Parity_Contract_Closure_Audit.md`、
+> `docs/implementation/AT.V3-2.2_ADB_OneShot_Flow_Control_Closure.md`。
 
 ## 0. 图例
 
@@ -28,7 +30,7 @@ UNVERIFIED                    尚无真机证据
 | no-output success | 空/空/0/COMPLETED | 同左 | 同左 | PARITY |
 | infrastructure failure | `TRANSPORT_ERROR` + hasError + error；不可混入 stderr | spawn fail → TRANSPORT_ERROR | connect/OPEN fail → TRANSPORT_ERROR | PARITY |
 | connection reuse | 无 Contract 语义（provider 内部） | 无连接概念 | 3 连发 1 conn/1 TLS | EXPECTED_PROVIDER_DIFFERENCE（provider 内部优化，对 AT 不可见） |
-| **大输出（>首个 WRTE）** | 结果不因输出量改变 | 64 KiB PASS（66560B/1024 行） | **64 KiB 卡死（ADB_ENGINE_BUG-E1）** | BACKEND_BUG |
+| **大输出（>首个 WRTE）** | 结果不因输出量改变 | 64 KiB PASS（66560B/1024 行） | **AT.V3-2.2 修复后：64K 66560B / 256K 266240B / 1M（分块）1048582B 真机完整 PASS** | PARITY（原 ADB_ENGINE_BUG-E1 已闭环） |
 | timeoutMs | capability（0=不限；是否支持由 backend 定） | 未实现（无限等待） | 未实现 | PARITY（=均不支持；Contract 已声明为 capability） |
 | UNSUPPORTED | 未接线 backend → UNSUPPORTED | facade 行为 | facade 行为 | PARITY |
 
@@ -103,8 +105,11 @@ Human adb CLI / SSH / AG integration                          → OUT_OF_SCOPE (
 
 ## 8. 本矩阵对应的实测清单
 
-- One-shot O1–O5（双后端）+ l1/l5（大输出对照）+ l2/l3/l4（ADB 大输出档位）
+- One-shot O1–O5（双后端）+ l1/l5（大输出对照）+ l2/l3/l4/l6/l7/l9（ADB 大输出档位 + mixed + reuse）
 - Persistent p1–p8（双后端）
-- EOF/close：e1/e2；多会话：m1/m2/m3；跨模式：x1/x2；消费：r1/r2；字节流：b1；principal：c1
-- Transport loss：t1（+恢复验证）；回归 6 套
-- 全部原始结果与 logcat 摘录：`docs/evidence/at_v3_3/EVIDENCE.md`
+- EOF/close：e1/e2；多会话：m1/m2/m3；跨模式：x1/x2/x3；消费：r1/r2；字节流：b1；principal：c1
+- Transport loss：t1（+恢复验证）；失败路径：f1（ADB mid-stream close）
+- AT.V3-2.2 整类：BackendParityAuditTest 34/34、AdbBackendHeadlessTest 25/25；
+  回归：Local 11/11、AT unit 6/6、App 7/7、Headless 1/1、Dynamic 9/9
+- 全部原始结果与 logcat 摘录：
+  `docs/evidence/at_v3_3/EVIDENCE.md`（审计）、`docs/evidence/at_v3_2_2/EVIDENCE.md`（flow-control 闭环）

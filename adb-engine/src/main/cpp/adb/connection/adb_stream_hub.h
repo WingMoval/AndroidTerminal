@@ -135,8 +135,10 @@ public:
     void shutdown();
 
     // Register a slot, send OPEN, and wait (bounded) for OKAY/CLSE.
-    // `ack_writes` selects whether incoming WRTE packets get OKAY credit
-    // (interactive shell: true; one-shot shell: false — v1 behavior parity).
+    // `ack_writes` selects whether incoming WRTE packets get OKAY credit.
+    // AT.V3-2.2: ALL logical streams (one-shot + interactive) use the credit
+    // protocol (true); the historical one-shot false (no credit) stalled
+    // adbd after the first WRTE on large outputs.
     std::shared_ptr<AdbStream> openStream(const std::string& service,
                                           bool ack_writes, int timeout_ms,
                                           std::string* error);

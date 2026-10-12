@@ -22,6 +22,7 @@
 | AT.V3-2 ADB Backend 纵向切片证据（one-shot/persistent PASS + multi-session BLOCKED） | `docs/evidence/at_v3_2/EVIDENCE.md` |
 | AT.V3-2.1 concurrent ADB stream closure 证据（Gate C 关闭：1 conn / 1 TLS / 3 并发 stream / 整类 25 tests PASS） | `docs/evidence/at_v3_2_1/EVIDENCE.md` |
 | AT.V3-3 backend parity / execution contract closure 审计证据（one-shot O1–O5 双后端 / ADB 大输出 blocker / persistent p1–p8 / multi-session / cross-mode / transport-loss t1 / 回归 6 套） | `docs/evidence/at_v3_3/EVIDENCE.md` |
+| AT.V3-2.2 ADB one-shot flow-control closure 证据（WRTE/OKAY 1:1 credit / 64K 66560B / 256K 266240B / 1M 分块 1048582B / mixed stdout+stderr+nonzero / reuse / cross-mode large / failure-path f1 / 整类 25+34 / 回归 Local 11 / AT 6 / App 7 / Headless 1 / Dynamic 9） | `docs/evidence/at_v3_2_2/EVIDENCE.md` |
 
 ## V2 Evidence 索引（READ-ONLY 来源）
 
