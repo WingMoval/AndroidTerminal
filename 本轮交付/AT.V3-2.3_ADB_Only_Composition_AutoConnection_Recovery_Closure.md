@@ -534,7 +534,7 @@ REAL_DEVICE_VALIDATION = PASS
 
 EVIDENCE = docs/evidence/at_v3_2_3/
 
-GIT_COMMIT = （commit 后回填）
+GIT_COMMIT = ccf9e80（AT.V3-2.3 closure commit）
 GIT_WORKTREE = CLEAN
 V2_WRITES = 0
 
