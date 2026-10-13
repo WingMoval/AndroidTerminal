@@ -290,8 +290,11 @@ WD DISABLED → USER_ACTION_REQUIRED（立即停，不 scan/不重连）
 ```text
 CONNECTION_RECOVERY_RETRY != COMMAND_REPLAY
 允许：连接恢复多次 attempt（有界）
-TRANSPARENT_UNKNOWN_OUTCOME_REPLAY = 0（远端执行状态未知的 operation 底层不透明重放）
-OPERATION_RETRY_POLICY = DEFERRED（本轮不冻结“永远禁 retry”，也不实现“自动重放”）
+FAILED_OPERATION_TRANSPARENT_REPLAY = 0（V3-2.3 证明：连接已失效、op A 得 TRANSPORT_ERROR、
+  guard TOKEN=0 未到达设备 —— 失败 operation 未被透明重放）
+UNKNOWN_OUTCOME_RETRY_POLICY = DEFERRED（未构造"remote 已执行、host 未知结果"的 ambiguous
+  outcome；该策略是后续独立 concern，本轮不设计）
+OPERATION_RETRY_POLICY = DEFERRED（本轮不冻结"永远禁 retry"，也不实现"自动重放"）
 失败 operation 原样返回（FAILED_OPERATION_RESULT_PRESERVED = PASS）
 ```
 

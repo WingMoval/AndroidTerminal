@@ -176,6 +176,9 @@ PC adbkey 仅经 run-as 注入 app files/（adbonlyhost + testhost），未写�
 ```text
 本机网络波动导致一次 BackendParityAuditTest 中断（USB 连接仍在；WD 会话随 WiFi 断）。
 重跑后 34/34 PASS（781.5s）。无代码问题。
-AOSP adbd 无自动中断机制；WD 会话寿命受 OEM 框架（HONOR）影响（约 2-4 分钟不活动会回 0）。
+AOSP adbd 无自动中断机制。
+关于 WD 会话寿命：早期不稳定网络环境曾观察到 Wireless Debugging drop；
+稳定 Wi-Fi / hotspot 下已完成较长时间连续运行（本 evidence 的 BackendParityAuditTest
+781.5s 全程稳定）；当前没有足够证据证明存在固定 2–4 分钟 MagicOS lifetime。
 本证全部在稳定网络下完成。
 ```

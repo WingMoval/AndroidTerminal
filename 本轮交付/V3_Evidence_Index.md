@@ -24,12 +24,14 @@
 | AT.V3-3 backend parity / execution contract closure 审计证据（one-shot O1–O5 双后端 / ADB 大输出 blocker / persistent p1–p8 / multi-session / cross-mode / transport-loss t1 / 回归 6 套） | `docs/evidence/at_v3_3/EVIDENCE.md` |
 | AT.V3-2.2 ADB one-shot flow-control closure 证据（WRTE/OKAY 1:1 credit / 64K 66560B / 256K 266240B / 1M 分块 1048582B / mixed stdout+stderr+nonzero / reuse / cross-mode large / failure-path f1 / 整类 25+34 / 回归 Local 11 / AT 6 / App 7 / Headless 1 / Dynamic 9） | `docs/evidence/at_v3_2_2/EVIDENCE.md` |
 | AT.V3-2.3 ADB-only composition & auto-connection / recovery closure 证据（ADB-only artifact isolation Gradle/dex/native / deterministic lifecycle 12/12 / 真机 G-gates：cold-start connectAuto / reuse / persistent+multi / dynamic endpoint recovery 42713→40437 / no transparent replay / post-recovery command+session / WD OFF / error observability / 回归 Local 11 + AT 6 + App 16 + Headless 1 + ADB 25 + Parity 34） | `docs/evidence/at_v3_2_3/EVIDENCE.md` |
+| AT.V3-DEBT-0 V2 verified debt inventory & first-run closure plan 证据（V2 pairing E4 = VERIFIED/CLOSED；V2 pairing/crypto native 与 V3 逐字节 IDENTICAL 10/10；V2 E1 pairing-discovery / E2 Accessibility / E3 auto-WD mechanism = VERIFIED；V3 缺口：pairing parity / pairing-discovery / Accessibility / WRITE_SECURE_SETTINGS / auto-WD；reconnect migration debt = 0） | `docs/audit/AT.V3-DEBT-0_V2_Verified_Debt_Inventory_and_First_Run_Closure_Plan.md` |
 
 ## V2 Evidence 索引（READ-ONLY 来源）
 
 | Evidence | V2 路径 |
 |---|---|
 | Wireless pairing 原语（VERIFIED） | `AndroidTerminal-V2/docs/implementation/v2/AT.C-1_Core_Pairing_Primitive.md` |
+| First-run wireless bootstrap（E1 pairing-discovery / E2 Accessibility / E3 auto-WD mechanism VERIFIED） | `AndroidTerminal-V2/docs/AT_FIRST_RUN_WIRELESS_BOOTSTRAP_AUDIT.md` |
 | Local one-shot（VERIFIED） | `.../ATsh.T0_Local_Shell_OneShot.md` |
 | Local 能力边界 / MODEL_2（VERIFIED） | `.../ATsh.T0.5_Local_Shell_Capability_Boundary_Audit.md` |
 | Local PTY persistent shell（VERIFIED） | `.../ATsh.T1_Local_PTY_Feasibility_Proof.md` |
