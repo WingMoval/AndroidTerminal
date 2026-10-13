@@ -142,6 +142,29 @@ object AdbRuntime {
         return backend.query()
     }
 
+    /**
+     * ADB-domain pairing endpoint discovery (AT.V3-DEBT-1).
+     *
+     * Scans `_adb-tls-pairing._tcp.` through the SAME NSD backend used for the
+     * connect service — no duplicated discovery implementation. Returns the
+     * discovered pairing endpoints (host/port), or empty when the pairing
+     * dialog is not open (the pairing service is transient: it only exists
+     * while the user keeps the system pairing screen foreground).
+     *
+     * This is a mechanism-level primitive for parity/validation; it does NOT
+     * implement a PairingCoordinator / state machine (deferred to ADB Engine
+     * Completion).
+     */
+    fun discoverPairing(timeoutMs: Long = 10_000L): List<AdbDiscoveredService> {
+        val backend = discoveryBackend ?: return emptyList()
+        return try {
+            backend.scan(timeoutMs, AdbDiscoveryServiceType.PAIRING)
+        } catch (t: Throwable) {
+            Log.w(TAG, "discoverPairing scan threw", t)
+            emptyList()
+        }
+    }
+
     // ---- connection lifecycle ---------------------------------------------
 
     /**

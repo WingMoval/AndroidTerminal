@@ -28,6 +28,7 @@ import com.adb.engine.AdbConnectionIntent
 import com.adb.engine.AdbDiscoveredService
 import com.adb.engine.AdbDiscoveryBackend
 import com.adb.engine.AdbRecoveryPolicy
+import com.adb.engine.AdbDiscoveryServiceType
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeState
 import com.adb.engine.AdbWirelessDebuggingReadinessBackend
@@ -55,7 +56,10 @@ class AdbRuntimeLifecycleTest {
     private class FakeDiscovery(private var services: List<AdbDiscoveredService>) :
         AdbDiscoveryBackend {
         var scanCount = 0
-        override fun scan(timeoutMs: Long): List<AdbDiscoveredService> {
+        override fun scan(
+            timeoutMs: Long,
+            serviceType: AdbDiscoveryServiceType,
+        ): List<AdbDiscoveredService> {
             scanCount++
             return services
         }

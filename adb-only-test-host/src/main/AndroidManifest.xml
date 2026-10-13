@@ -1,16 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  ADB-only Test Host manifest (AT.V3-2.3). TEST / VALIDATION ONLY.
+  ADB-only Test Host manifest (AT.V3-2.3 + AT.V3-DEBT-1). TEST / VALIDATION ONLY.
 
   No Activity / launcher / service / binder / database. Instrumentation does
   not require an Activity. Discovery permissions are merged from :adb-engine.
+
+  AT.V3-DEBT-1 (Gate 3): a DEBUG-ONLY AccessibilityService (PairingCodeProbeService)
+  reproduces the V2 E2 pairing-code acquisition probe. It performs NO pairing
+  logic and is NOT a product onboarding component.
+  AT.V3-DEBT-1 (Gate 4): WRITE_SECURE_SETTINGS is declared so the validation
+  harness can reproduce the V2 E3 mechanism (shell `pm grant` then app-process
+  Settings.Global.putInt("adb_wifi_enabled", 0/1)). This is a VALIDATION HOST
+  only — NOT a production app; no production auto-WD policy is implemented here.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
 
     <application
         android:label="AndroidTerminal ADB-only TestHost"
         android:supportsRtl="true"
         android:allowBackup="false">
+
+        <!-- DEBUG-ONLY Accessibility probe (Gate 3). Enabled via shell for
+             validation; not a product component. -->
+        <service
+            android:name=".PairingCodeProbeService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_probe_config" />
+        </service>
     </application>
 
 </manifest>

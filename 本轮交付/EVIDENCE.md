@@ -1,184 +1,204 @@
-# AT.V3-2.3 Evidence — ADB-only Composition & Auto-Connection / Recovery
+# AT.V3-DEBT-1 Evidence — V2 Verified ADB Capability Parity Closure
 
 > 设备：`APLMUT4312005935`（HONOR ALI-AN00 / Android 15 / arm64-v8a）
-> 网络：稳定 Wi-Fi / PC 热点（本机网络波动曾中断一次 BackendParityAuditTest，重跑后 34/34 PASS）
-> 身份：PC adbkey `Wing@DESKTOP-PG78M2N`（run-as 注入 adbonlyhost + testhost `files/adbkey`，未提交）
+> 网络：稳定 Wi-Fi / PC hotspot（配对/发现全程稳定）
+> 身份：本轮测试用 V3 自生成 fresh identity（`androidterminal@app`，独立 keyDir），
+>       未复用用户 PC trusted key（PC key 仅用于 testhost 回归注入）
 > 日期：2026-10-13
 
 ## 0. 基线
 
 ```text
-V3 HEAD  = 83a0664（AT.V3-2.2 完成后 clean）
-V2 HEAD  = 726a441（只读，43 会前 dirty，零写入）
+V3 HEAD = 3b6428a（AT.V3-DEBT-0 后 clean）
+V2 HEAD = 726a441（只读，43 会前 dirty，零写入）
 ```
 
-## 1. ADB-only Composition (G1) + Artifact Audit (G2)
+## 1. Gate 0 — Pairing source parity + deterministic tests
+
+### Source parity（V2↔V3 MD5）
 
 ```text
-:adb-only-test-host Gradle graph (debugRuntimeClasspath):
-  +--- project :at-engine
-  +--- project :at-backend-adb
-  |    +--- project :at-engine
-  |    \--- project :adb-engine
-  \--- project :adb-engine
-  LOCAL_BACKEND_GRADLE_DEPENDENCY = ABSENT（无 :at-backend-local / :app）
-
-APK native libs:
-  libadbd_engine.so  3273952B
-  LOCAL_PTY_NATIVE_LIB = ABSENT（无 liblocal_pty.so）
-
-APK dex (classes*.dex x6) ASCII 扫描:
-  at/backend/local, LocalOneShotBackend, LocalPersistentBackend,
-  LocalTerminalSession, LocalPtyNative, liblocal_pty = 0 命中
-  LOCAL_BACKEND_DEX = ABSENT
-
-对照（PRESENT）:
-  at/engine/ATEngine = PRESENT
-  at/backend/adb/AdbOneShotBackend = PRESENT
-  at/backend/adb/AdbPersistentBackend = PRESENT
-  adb/engine/AdbEngine = PRESENT
-  adb/engine/AdbRuntime = PRESENT
-
-ADB_ONLY_COMPOSITION = PASS
-ADB_ONLY_ARTIFACT_AUDIT = PASS
-LOCAL_BACKEND_REQUIRED = NO
+pairing_aes_gcm.h/.cpp, pairing_auth.h/.cpp, pairing_client.h/.cpp,
+pairing_packet.h, pairing_peerinfo.h, rsa_2048_key.h/.cpp
+=> 10/10 IDENTICAL（DEBT-0 后复核，未变）
+ANDROID_PUBKEY_524B_FIX = PRESENT（rsa_2048_key.cpp，offset4 n0inv，IDENTICAL）
+SPAKE2 64B key material = PRESENT（pairing_auth.cpp kSpake2KeySize=SPAKE2_MAX_KEY_SIZE=64）
+PAIRING_SOURCE_PARITY = IDENTICAL（10/10）
 ```
 
-## 2. Deterministic lifecycle tests（真机，fake backends，无需 WD）
-
-`AdbRuntimeLifecycleTest` — **12/12 PASS**（0.4s）
+### Deterministic selftest（V3 新增 pairing_selftest 可执行，真机运行）
 
 ```text
-readiness_enabled_reportsEnabled                  PASS
-readiness_disabled_reportsDisabled                PASS
-readiness_unknown_reported                        PASS
-connectAuto_wdDisabled_userActionRequired_noDiscovery  PASS（USER_ACTION_REQUIRED + scan=0）
-connectAuto_emptyDiscovery_endpointNotFound        PASS（ENDPOINT_NOT_FOUND + scan=1）
-connectAuto_unknownReadiness_stillDiscovers        PASS（UNKNOWN≠DISABLED；ENDPOINT_NOT_FOUND）
-explicitIntent_noMdnsFallbackOnRecovery            PASS（RECOVERY_FAILED；scanCount=0）
-autoRecovery_boundedAttempts_noInfiniteLoop        PASS（有界，<5s）
-recovery_singleOwner_serialized                    PASS
-manualDisconnect_clearsIntent_noAutoRecover        PASS（TRANSPORT_LOST，非 RECOVERING）
-unknownOutcomeOperation_notTransparentlyReplayed   PASS（op 计数=1，runtime 不重放）
-backoffInvoked_betweenAttempts                     PASS（>=50ms backoff）
+PairingPacket roundtrip (BE/bounds)          PASS（12 checks）
+PairingPacket invalid (short/ver/type/oversize)  PASS（5 checks）
+PeerInfo 8192B layout + serialize/parse      PASS（14 checks）
+SPAKE2 client/server 同 64B key               PASS
+  INFO  SPAKE2 processMsg key_len=64 (SPAKE2_MAX_KEY_SIZE=64)   ← 历史回归 guard
+SPAKE2 fresh ephemeral + wrong-password       PASS
+AES-128-GCM roundtrip + bad-tag + wrong-key + empty-key  PASS（10 checks）
+PAIRING_DETERMINISTIC_TESTS = 54/54 PASS（真机 /data/local/tmp/pairing_selftest，EXIT=0）
 ```
 
-## 3. Real-device G-gates
+## 2. Gate 1 — Pairing endpoint discovery（V2 E1 parity）
 
-### G3 — Cold-start connectAuto（无 explicit endpoint）
-```text
-WD=ENABLED（adb_wifi_enabled=1）；discovery 修复前: ENDPOINT_NOT_FOUND
-修复后（resolveService 已接，V2 Oracle）：READY
-ATEngine.execute("id") → stdout 含 "uid=2000" → COMPLETED
-CONSUMER_KNEW_PORT = NO；EXPLICIT_ENDPOINT_INJECTED = NO；AUTO_DISCOVERY_USED = YES
-```
-> **迁移 bug 发现**：V3 首次移植的 `AdbAndroidNsdDiscoveryBackend.scan()` 直接读
-> `onServiceFound` 的 host/port（Android 给出未 resolve 的 service，host=null/port=0），
-> 且用永不 countDown 的 latch 等满超时 → 永远 `ENDPOINT_NOT_FOUND`。按 V2
-> AT.RUNTIME-2B Oracle 修正为 `onServiceFound → resolveService()` + 收集全候选 +
-> loopback-first 排序。这是"COMPILED 未真机验证"迁移的典型 bug。
+### Service type 扩展
 
-### G10 — Connection reuse
 ```text
-connectAuto → READY → execute(A/B/C) 全部 COMPLETED（REUSE_A/B/C 输出）
-仍 READY；无 per-command discovery/reconnect。PASS
+AdbDiscoveryServiceType { CONNECT("_adb-tls-connect._tcp."), PAIRING("_adb-tls-pairing._tcp.") }
+AdbDiscoveryBackend.scan(timeoutMs, serviceType=CONNECT)   ← 同一 NSD 实现，未复制 backend
+AdbRuntime.discoverPairing(timeoutMs)                       ← ADB-domain 最小扩展
+AT public contract = 0 change；:adb-engine 零 :at-engine 依赖
 ```
 
-### G8+G9 — Persistent + Multi-session after auto-connect
+### 真机发现（配对弹窗打开时）
+
 ```text
-PERSIST_OK 会话 echo 正常 → close
-B + C 双会话 echo SB / SC 正常 → close；仍 READY。PASS
+设备侧 ss:  *:37251 LISTEN（+ connect *:37809）
+mDNS discover: onServiceFound adb-APLMUT4312005935-J4nb5z
+mDNS resolve: host=10.196.195.199 port=37251（与设备侧 ss 交叉印证）
+PAIRING_DISCOVERY = PASS
+PAIRING_DISCOVERY_RESOLVE = PASS
+PAIRING_SERVICE_LIFECYCLE = PASS（弹窗关闭 → service 消失；V2 E1 已证瞬态）
+PAIRING_ENDPOINT = 37251 / 38257 / 38453（evidence only，未 hardcode）
+PAIRING_ENDPOINT_HARDCODED = NO
+CONNECT_DISCOVERY_REGRESSION = PASS（g3 cold-start connectAuto → uid=2000 在 E4 后验证）
 ```
 
-### G17 — Explicit intent semantics
+## 3. Gate 2 — Pairing primitive E4 parity（V2 E4）
+
+### 真机因果链（码 284575 / 427661，两轮独立 fresh identity）
+
 ```text
-connectAuto 后 connectionIntent = Auto（非 Explicit）。PASS
-（EXPLICIT no-mDNS-fallback 由确定性测试 explicitIntent_noMdnsFallbackOnRecovery 覆盖）
+IDENTITY_CREATED_BY_V3 = YES（AdbEngine 首次 connect 前 loadOrCreate 生成 fresh identity）
+IDENTITY_PRETRUSTED = NO（fresh keyDir，未注入 PC key）
+BEFORE_PAIR_CONNECT = FAIL_EXPECTED（connectAuto 失败：CONNECT_FAILED/TRANSPORT_ERROR，untrusted）
+
+pair() 调用（V3 AdbEngine.pair，非 PC adb pair）：
+  PairingClient::pair: 10.196.195.199:37251 code=284575
+  PairingAuth::generateMsg: 32-byte SPAKE2 msg (role=alice/client)
+  PairingAuth::processMsg: derived 64-byte key material
+  PairingAesGcm::init: AES-128-GCM ready (from 64-byte SPAKE2 key)
+  PairingClient::pair: SUCCESS device_guid=adb-APLMUT4312005935-J4nb5z
+  V3_PAIR_CALL = PASS；PAIR_SUCCESS = YES；DEVICE_GUID_RETURNED = YES
+
+设备信任：
+  adbd: Matched auth_key=QAAAAMFK... androidterminal@app
+  adbd: [server]: Handshake succeeded.
+  → DEVICE_TRUSTS_IDENTITY = YES（设备 authorized-keys 接受 V3 fresh identity）
+
+AFTER_PAIR_CONNECT_AUTO（同一 identity keyDir）：
+  AdbRuntime: connectAuto READY via 127.0.0.1:37809
+  STREAM_OPEN_TX service="shell,v2,raw:id" → RX_WRTE 281B → TX_OKAY_CREDIT → CLSE
+  AFTER_PAIR_CONNECT_AUTO = PASS；AFTER_PAIR_PRINCIPAL = uid=2000(shell)
+  AFTER_PAIR_ATENGINE_ID = PASS
+
+CERTIFICATE_VERIFY_FAILED = NO（android_pubkey 524B fix 有效）
+AUTH_KEY_MISMATCH = NO
+
+PAIRING_V3_E4_PARITY = PASS
 ```
 
-### G18 — Error observability
+### Identity continuity（码 427661）
+
 ```text
-resetForTest 后（无连接）execute("id"):
-  outcome=TRANSPORT_ERROR, hasError=true, error 非空（"not connected..."）
-AT_TRANSPORT_ERROR_OBSERVABILITY = PASS → AG_ERROR_OBSERVABILITY = PASS
+同一 keyDir：pair 前 adbkey.pub == pair 后 adbkey.pub（字节一致）
+PAIR_IDENTITY_CONTINUITY = PASS
 ```
 
-### G11 — Process restart cold-start
+### Paired identity reuse after restart（码 427661 配对后）
+
 ```text
-am force-stop adbonlyhost → fresh 进程 → connectAuto → READY → id → uid=2000
-无前进程内存里的 endpoint。PASS
+force-stop adbonlyhost → fresh 进程
+connectAuto(debt1_cont 已配对 identity) → READY（不重新 pair）
+ATEngine.execute("id") → uid=2000(shell)
+PAIRED_IDENTITY_REUSE_AFTER_RESTART = PASS
 ```
 
-### G13+G14 — Dynamic endpoint recovery + no transparent replay（PC 编排）
+## 4. Gate 3 — Accessibility pairing-code acquisition（V2 E2 parity）
+
+### DEBUG-ONLY probe（PairingCodeProbeService，validation-only，非产品组件）
+
 ```text
-OLD 端口 42713 → PC toggle adb_wifi_enabled 0→1 → NEW 端口 40437
-测试: connectAuto → READY → 写 at23_ready → [PC 轮换端口] → 写 at23_cycle
-  op A: echo TOKEN >> /data/local/tmp/at23_guard.txt
-        （连接已死 → TRANSPORT_ERROR；TOKEN 未到达设备）
-  onOperationResult(true) → bounded recovery（rediscover 找到 NEW 40437 → reconnect → READY）
-  op B: echo B_OK → COMPLETED（POST_RECOVERY_COMMAND = PASS）
-guard 文件最终内容 = 空（0 TOKEN）→ TRANSPARENT_UNKNOWN_OUTCOME_REPLAY = 0
-Time: 30.486s。PASS
+AccessibilityNodeInfo 读 com.android.settings:id/pairing_code：
+  PAIRING_CODE_READ text='427661' vid=com.android.settings:id/pairing_code
+  → 6 位数字 code 稳定读取
+com.android.settings:id/ip_addr：
+  PAIRING_IP_PORT_READ text='10.196.195.199:38453'（与弹窗端口交叉印证）
+PAIRING_CODE_ACCESSIBILITY = PASS
+PAIRING_CODE_VIEW_ID = com.android.settings:id/pairing_code
+PAIRING_IP_PORT_ACCESSIBILITY = PASS
+ACCESSIBILITY_SCOPE = VALIDATION_ONLY
+（view id 属 OEM/Settings 实现细节，非 Android 公共契约；manual code fallback 为未来跨 OEM 路径）
 ```
 
-### G15 — Post-recovery new persistent session
+## 5. Gate 4 — WRITE_SECURE_SETTINGS + app-process adb_wifi_enabled（V2 E3 parity）
+
+### Grant 机制
+
 ```text
-connectAuto → READY → at23g15_ready → [PC 轮换端口] → probe 触发 recovery
-→ 新 persistent session PERSIST_RECOVERED echo 正常 → close。PASS
+validation host manifest 声明 WRITE_SECURE_SETTINGS
+shell pm grant com.androidterminal.adbonlyhost android.permission.WRITE_SECURE_SETTINGS
+dumpsys package → WRITE_SECURE_SETTINGS: granted=true（非仅 pm exit code）
+WRITE_SECURE_SETTINGS_DECLARED = VALIDATION_PACKAGE
+WRITE_SECURE_SETTINGS_GRANT = PASS
+WRITE_SECURE_SETTINGS_EFFECTIVE = PASS（granted=true 在 package state 确认）
 ```
 
-### G16 — WD OFF behavior
+### app-process Settings 写入（V3 进程自己 putInt，非 adb shell）
+
 ```text
-adb_wifi_enabled=0 → connectAuto → USER_ACTION_REQUIRED + code=USER_ACTION_REQUIRED_WD_DISABLED
-elapsed < 10s（有界，无 reconnect storm）。PASS
+app 进程 Settings.Global.putInt("adb_wifi_enabled", 0)
+  → read back 0；wireless listener 停止（ss 无新 *:port）
+  WD_DISABLE_LISTENER_STOP = PASS
+app 进程 Settings.Global.putInt("adb_wifi_enabled", 1)
+  → read back 1；listener 重启（新端口 37809 → 38249，动态轮换）
+  WD_ENABLE_LISTENER_START = PASS；WD_PORT_ROTATION_OBSERVED = YES
+app 进程 putInt 后：discovery → connectAuto（已配对 identity）→ READY → id uid=2000
+  POST_AUTO_WD_DISCOVERY = PASS
+  POST_AUTO_WD_CONNECT_AUTO = PASS
+  POST_AUTO_WD_ID = PASS
+APP_PROCESS_ADB_WIFI_ENABLED_CONTROL = PASS
+AUTO_WD_MECHANISM_PARITY = PASS
+AUTO_WD_PRODUCT_CLOSURE = NOT_STARTED（仅机制；无产品 auto-WD 策略）
 ```
 
-## 4. Regression（本轮改动后全绿）
+## 6. Regression（Gate 5，全绿）
 
 ```text
-Local (at.backend.local.test)                11/11   PASS
-AT Engine unit (ATExecutionContractTest 3 + ATSessionContractTest 3)  6/6  PASS
-App Debug (com.androidterminal.app.test)     16/16   PASS（7 debug input + 9 dynamic pages）
-Headless (TestHostHeadlessInputTest)          1/1    PASS
-ADB Backend (AdbBackendHeadlessTest)         25/25   PASS（显式端口 42583 注入）
-Backend Parity (BackendParityAuditTest)      34/34   PASS（781.5s，覆盖 flow-control/大输出/persistent/multi/cross-mode/failure-path）
-ADB-only deterministic (AdbRuntimeLifecycleTest) 12/12 PASS
+Local (at.backend.local.test)            11/11   PASS
+App Debug (app.test)                     16/16   PASS（7 debug input + 9 dynamic pages）
+Headless (TestHostHeadlessInputTest)      1/1    PASS
+ADB Backend (AdbBackendHeadlessTest)     25/25   PASS
+Backend Parity (BackendParityAuditTest)  34/34   PASS（776.9s）
+ADB Runtime lifecycle (AdbRuntimeLifecycleTest) 12/12 PASS（含 discovery serviceType 扩展后）
+AT Engine unit (ATExecutionContractTest 3 + ATSessionContractTest 3)  6/6 PASS
+Pairing deterministic (pairing_selftest) 54/54 PASS
+
+FLOW_CONTROL_REGRESSION = PASS（Parity 34 覆盖 64K/256K/1M + WRTE/OKAY credit）
+MULTI_STREAM_REGRESSION = PASS（Parity multi-session + RX_OWNER=1）
+RECOVERY_REGRESSION = PASS（AdbRuntimeLifecycle + Parity）
+RX_OWNER_COUNT = 1
 ```
 
-## 5. Stale connectionState
+## 7. Cleanup
 
 ```text
-BEFORE: rxLoop 真实 read-fail → failAll() 只 fail streams，AdbConnection::state_ 保持 Online（stale）
-FIX   : AdbConnection::markTransportLost()（Online→Offline，幂等，不关 socket）；
-        AdbStreamHub::rxLoop 真实失败分支（非 stopping_）调用它
-AFTER : 真实 transport loss 后 connectionState()==OFFLINE → ensure-ready 正确跳过 /
-        recovery 正确触发
-（G13/G14 真机确认：掉线后恢复触发 → 新连接 ONLINE → op B 成功）
+TEST_KEY_FILES_REMOVED = YES（files/debt1_e4, files/debt1_cont, pairing_code/ipport 删除）
+TEMP_FILES_REMOVED = YES（/data/local/tmp/pairing_selftest 删除）
+ACCESSIBILITY_PROBE_DISABLED = YES（enabled_accessibility_services 清空）
+TEST_APKS_REMOVED = YES（adbonlyhost, testhost, local.test, app.test 卸载；主 App 保留）
+WD_FINAL_STATE = 0（恢复约定值）
+DEVICE_TEST_TRUST_RESIDUE = PRESENT / USER_CLEANUP_REQUIRED
+  （本轮 3 个 androidterminal@app 测试 key 已入设备 user_keys；无 per-key remove API；
+    系统"无线调试→忘记设备"可清理但会移除用户 PC key，需用户自行决定）
+PAIRING_CODE = 仅临时使用（284575/427661），未写入本 evidence
+PRIVATE KEY = 未写入本 evidence（仅公钥 comment/hash）
 ```
 
-## 6. 动态端点记录
+## 8. 安全
 
 ```text
-G13/G14: OLD=42713 → NEW=40437
-G3/G10/G8G9 会话: 39795 →（testhost parity 会话）42583 → 40103
-（无线端口随 adbd 重启轮换；evidence 只记录，不 hardcode 到生产）
-```
-
-## 7. Identity 安全
-
-```text
-PC adbkey 仅经 run-as 注入 app files/（adbonlyhost + testhost），未写仓库 / evidence
-测试结束：/data/local/tmp/at23_* 信号/guard 文件清理
-```
-
-## 8. 环境备注
-
-```text
-本机网络波动导致一次 BackendParityAuditTest 中断（USB 连接仍在；WD 会话随 WiFi 断）。
-重跑后 34/34 PASS（781.5s）。无代码问题。
-AOSP adbd 无自动中断机制。
-关于 WD 会话寿命：早期不稳定网络环境曾观察到 Wireless Debugging drop；
-稳定 Wi-Fi / hotspot 下已完成较长时间连续运行（本 evidence 的 BackendParityAuditTest
-781.5s 全程稳定）；当前没有足够证据证明存在固定 2–4 分钟 MagicOS lifetime。
-本证全部在稳定网络下完成。
+测试 identity = V3 自生成（独立 keyDir），未打包进 APK，未 commit
+未复用/复制用户 PC trusted key 到测试身份（PC key 仅 testhost 回归注入）
+私钥未出现在 Git/docs/evidence/log archive
 ```

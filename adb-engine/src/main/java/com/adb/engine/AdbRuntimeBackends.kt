@@ -25,15 +25,32 @@ enum class AdbWirelessDebuggingState {
 }
 
 /**
- * Platform backend for Wireless ADB connect-service discovery.
+ * Wireless ADB mDNS service type selector (AT.V3-DEBT-1).
+ *
+ * ADB has TWO distinct mDNS services: the connect service and the pairing
+ * service. Both use the same NSD discovery machinery (discover/resolve) — only
+ * the service type string differs. This enum lets callers select which service
+ * to scan WITHOUT duplicating the NSD implementation.
+ */
+enum class AdbDiscoveryServiceType(val serviceType: String) {
+    CONNECT("_adb-tls-connect._tcp."),
+    PAIRING("_adb-tls-pairing._tcp."),
+}
+
+/**
+ * Platform backend for Wireless ADB service discovery.
  *
  * Exposes only [AdbDiscoveredService]; never NsdManager / NsdServiceInfo /
- * Context. Only the connect service `_adb-tls-connect._tcp.` is discovered
- * (pairing service deliberately out of scope for this primitive).
+ * Context. Supports both the connect service (`_adb-tls-connect._tcp.`) and the
+ * pairing service (`_adb-tls-pairing._tcp.`) through [scan]'s serviceType —
+ * one NSD implementation, no duplicated backends.
  */
 interface AdbDiscoveryBackend {
-    /** Run a bounded mDNS scan; returns all usable discovered services. */
-    fun scan(timeoutMs: Long): List<AdbDiscoveredService>
+    /** Run a bounded mDNS scan for [serviceType]; returns all usable services. */
+    fun scan(
+        timeoutMs: Long,
+        serviceType: AdbDiscoveryServiceType = AdbDiscoveryServiceType.CONNECT,
+    ): List<AdbDiscoveredService>
 }
 
 /** Android NsdManager implementation of [AdbDiscoveryBackend]. */
@@ -41,7 +58,6 @@ class AdbAndroidNsdDiscoveryBackend(context: Context) : AdbDiscoveryBackend {
 
     private companion object {
         const val TAG = "AdbNsdDiscovery"
-        const val SERVICE_TYPE = "_adb-tls-connect._tcp."
     }
 
     private val appContext = context.applicationContext
@@ -52,7 +68,10 @@ class AdbAndroidNsdDiscoveryBackend(context: Context) : AdbDiscoveryBackend {
 
     private var discoveryListener: NsdManager.DiscoveryListener? = null
 
-    override fun scan(timeoutMs: Long): List<AdbDiscoveredService> {
+    override fun scan(
+        timeoutMs: Long,
+        serviceType: AdbDiscoveryServiceType,
+    ): List<AdbDiscoveredService> {
         synchronized(found) { found.clear() }
 
         val manager = appContext.getSystemService(Context.NSD_SERVICE) as? NsdManager
@@ -94,7 +113,7 @@ class AdbAndroidNsdDiscoveryBackend(context: Context) : AdbDiscoveryBackend {
         }
 
         try {
-            manager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener!!)
+            manager.discoverServices(serviceType.serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener!!)
         } catch (t: Throwable) {
             Log.e(TAG, "discoverServices threw", t)
         }

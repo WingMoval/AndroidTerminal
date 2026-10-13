@@ -57,7 +57,7 @@ AndroidTerminal-V3/
 | `at-core/.../adb/client/adb_key_store.*` | 持久身份 | 迁 native | **MIGRATED**（编译+链接；identity/key load 真机 PASS） |
 | `at-core/.../adb/client/adb_client.*` | one-shot shell + connect | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；connect/one-shot/reuse 真机 PASS） |
 | `at-core/.../adb/client/adb_interactive_stream.*` | PROVISIONAL interactive stream | 迁 native（ADB Backend 消费）| **MIGRATED**（编译+链接；interactive primitive 真机 PASS；AT.V3-2.1 改为经 `AdbStreamHub` 单 RX owner 消费，不再直读连接） |
-| `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | **MIGRATED / PARITY PENDING**（native 与 V2 AT.C-1 逐字节 IDENTICAL 10/10；JNI/Kotlin surface PRESENT；V3 真机 E4 parity 未跑 —— 见 AT.V3-DEBT-0 DEBT-P01；android_pubkey 524B 修复已随迁） |
+| `at-core/.../adb/pairing/*` | SPAKE2/AES-GCM/PeerInfo/PairingClient | 迁 native | **MIGRATED**（native 与 V2 AT.C-1 逐字节 IDENTICAL 10/10；JNI/Kotlin surface PRESENT；AT.V3-DEBT-1 真机 E4 parity PASS：fresh identity→pair→trust→connectAuto→uid=2000；android_pubkey 524B 修复已随迁） |
 | `at-core/.../adb/service/shell_v2_protocol.*` | shell-v2 帧 | 迁 native | **MIGRATED**（编译+链接；one-shot stdout/stderr/exit 真机 PASS） |
 | `at-core/.../adb_protocol/*` | packet framing | 迁 native | **MIGRATED**（编译+链接；Golden Chain 真机 PASS） |
 | `at-core/.../transport/*` | TCP transport | 迁 native | **MIGRATED**（编译+链接；connect 真机 PASS） |
@@ -65,7 +65,7 @@ AndroidTerminal-V3/
 | `at-core/.../AdbManager.kt`（JNI bridge 部分） | JNI bridge | 迁为 **`internal/AdbNative.kt`**（ADB-domain，无 AT 类型）| **MIGRATED**（编译；真机 PASS） |
 | `at-runtime/.../AtConnectionRequest.kt` | explicit 连接输入 | 迁为 **`AdbConnectionRequest.kt`** | **MIGRATED**（编译） |
 | `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁为 **`AdbEndpoint.kt`** | **MIGRATED**（AT.V3-2.3 真机 discovery/selection PASS） |
-| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁为 **`AdbRuntimeBackends.kt`（AdbDiscoveryBackend / AdbAndroidNsdDiscoveryBackend）** | **MIGRATED**（AT.V3-2.3 真机 `_adb-tls-connect._tcp.` 发现 PASS；修复 resolveService 迁移 bug） |
+| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁为 **`AdbRuntimeBackends.kt`（AdbDiscoveryBackend / AdbAndroidNsdDiscoveryBackend）** | **MIGRATED**（AT.V3-2.3 真机 `_adb-tls-connect._tcp.` 发现 PASS；AT.V3-DEBT-1 扩展 serviceType CONNECT/PAIRING + 真机 `_adb-tls-pairing._tcp.` 发现 PASS） |
 | `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁为 **`AdbRuntimeBackends.kt`（AdbWirelessDebuggingReadinessBackend / AdbAndroid...Backend）** | **MIGRATED**（AT.V3-2.3 真机 WD ON/OFF readiness PASS） |
 | `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁为 **`AdbEndpointStore`** | **MIGRATED**（AT.V3-2.3 真机 connectAuto/endpoint lifecycle PASS） |
 | `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁为 **`AdbConnectionIntent` / `AdbRecoveryPolicy` / `AdbRecoveryCoordinator`**（recovery 改走 **AdbEngine**，不再依赖 AT `TerminalRuntime`）；`LossClassifier` 的 AT-result 耦合留待 AT track | **MIGRATED**（AT.V3-2.3 真机 dynamic endpoint recovery PASS：42713→40437；有界；单 owner；无透明重放） |
@@ -166,7 +166,8 @@ ADB_ENGINE_INDEP     = VERIFIED（:adb-engine 零依赖 :at-engine/UI/AG）
 ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS；
                        AT.V3-2.1：单连接 concurrent multi-stream multiplexing 真机 PASS；
                        AT.V3-2.3：readiness/discovery/endpoint/auto-connect/basic-recovery 真机 PASS；
-                       pairing = MIGRATED/PARITY-PENDING（native 与 V2 逐字节一致；V3 真机 E4 未跑））
+                       AT.V3-DEBT-1：pairing E4 + pairing discovery + Accessibility code +
+                       WRITE_SECURE/auto-WD mechanism 真机 parity PASS → V2_VERIFIED_MIGRATION_DEBT=0）
 AT_CONTRACT          = REVISED_DRAFT（AT.CONTRACT-0 + AT.PERSIST-0 C1/C2/C3 修订）
 AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
 LOCAL_BACKEND        = MIGRATED（AT.PERSIST-0 真机 P1–P10 PASS）
@@ -210,7 +211,13 @@ AT.V3-DEBT-0         = COMPLETE（V2 verified debt 盘点：pairing native MIGRA
                        first-run state machine = V2 DESIGN-ONLY；reconnect migration debt = 0；
                        NEXT = V3 Pairing Primitive Parity Closure（Slice 1）；
                        ledger: docs/audit/AT.V3-DEBT-0_V2_Verified_Debt_Inventory_and_First_Run_Closure_Plan.md）
-NEXT                 = AT.EMULATOR-0（优先级仍待 V2-debt Slice 1 决策；DEBT-0 建议 NEXT = Pairing Parity Closure）
+AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pairing E4 / pairing discovery E1 /
+                       Accessibility code E2 / WRITE_SECURE_SETTINGS + auto-WD mechanism E3 全部 V3 真机 parity PASS；
+                       V2_VERIFIED_MIGRATION_DEBT = 0；V2_VERIFIED_CAPABILITY_PARITY = CLOSED；
+                       evidence: docs/evidence/at_v3_debt_1/）
+ADB_ENGINE_COMPLETION = FOLLOWUP（PairingCoordinator / Identity lifecycle / AUTH taxonomy / re-pair /
+                       first-run orchestration / diagnostics / reconnect UX = NOT_STARTED；非 V2 debt）
+NEXT                 = ADB_ENGINE_COMPLETION（AT.EMULATOR-0 / AT.CONTRACT-1 仍在其后按总控排序）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

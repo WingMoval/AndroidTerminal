@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_probe_description">DEBUG-ONLY validation probe: reads the Wireless Debugging pairing-code node for AT.V3-DEBT-1 parity. Not a product component.</string>
+</resources>

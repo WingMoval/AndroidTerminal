@@ -85,4 +85,30 @@ if(z-lib)
     target_link_libraries(adbd_engine ${z-lib})
 endif()
 
+# --- AT.V3-DEBT-1: pairing deterministic self-test (device-free, V2 AT.C-1) ---
+# Restored from V2 (at-core pairing_selftest, IDENTICAL source). Covers
+# PairingPacket framing, PeerInfo 8192B layout, SPAKE2 64B key material
+# (guards the historical 32B-truncation regression), AES-128-GCM roundtrip +
+# bad-tag/wrong-key rejection, pairing-code validation. Not packaged into the
+# app; run as a standalone native binary on device/emulator.
+add_executable(pairing_selftest
+    adb/pairing/pairing_selftest.cpp
+    adb/pairing/pairing_aes_gcm.cpp
+    adb/pairing/pairing_auth.cpp
+)
+target_include_directories(pairing_selftest PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${BORINGSSL_INCLUDE}
+)
+set_target_properties(pairing_selftest PROPERTIES
+    LINK_FLAGS "-static-libstdc++ -static-libgcc"
+)
+target_link_libraries(pairing_selftest
+    ${log-lib}
+    ${BORINGSSL_LIB}
+)
+if(z-lib)
+    target_link_libraries(pairing_selftest ${z-lib})
+endif()
+
 message(STATUS "BoringSSL: linking ${BORINGSSL_LIB}")

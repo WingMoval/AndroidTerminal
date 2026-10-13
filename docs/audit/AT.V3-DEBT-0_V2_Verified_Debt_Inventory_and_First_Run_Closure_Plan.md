@@ -490,3 +490,37 @@ ambiguous outcome。
   FAILED_OPERATION_TRANSPARENT_REPLAY = 0（V3-2.3 证明）
   UNKNOWN_OUTCOME_RETRY_POLICY = DEFERRED（未证明；后续独立策略）
 ```
+
+---
+
+# Closure Addendum — AT.V3-DEBT-1
+
+> 本文档（DEBT-0）的历史 Debt Ledger 分类**原样保留**；以下记录 DEBT-1 对其中
+> V2 VERIFIED 债项的闭合。DEBT-0 剩余 D 类（design-only）与 C 类（productization）
+> 不属 migration debt，转入 ADB Engine Completion。
+
+- 日期：2026-10-13
+- 修复：`AT.V3-DEBT-1_V2_Verified_ADB_Capability_Parity_Closure.md`（完整报告）
+- 证据：`docs/evidence/at_v3_debt_1/EVIDENCE.md`
+
+## Debt Ledger 闭合
+
+| ID | DEBT-0 分类 | DEBT-1 后状态 | 证据 |
+|---|---|---|---|
+| P01 Pairing primitive（含 P02 android_pubkey fix） | B（migrated-not-parity） | **CLOSED**（V3 E4 parity PASS；native 10/10 IDENTICAL） | E4：fresh identity→pair→trust→connectAuto→uid=2000 |
+| P03 Pairing endpoint discovery | A（not migrated） | **CLOSED**（V3 E1 parity PASS；serviceType 扩展） | `_adb-tls-pairing._tcp` 真机发现+resolve+lifecycle |
+| P04 Accessibility pairing-code | A（not migrated） | **CLOSED AT V2-EVIDENCE LEVEL**（V3 E2 parity PASS，validation-only） | probe 读 `com.android.settings:id/pairing_code`=427661 |
+| P10 WRITE_SECURE_SETTINGS bootstrap | A/C | **CLOSED AT V2-EVIDENCE LEVEL**（V3 E3 parity PASS） | grant effective + app 进程控制 |
+| P11 Auto-WD mechanism | A/C | **CLOSED AT V2-EVIDENCE LEVEL**（V3 E3 parity PASS） | app 进程 putInt 0/1 控制监听 + post-enable connectAuto |
+| P05/P06/P07/P08/P09/P12/P13/P14/P15/P16/P17 | D（design-only）/ C（productization） | 保持（非 V2 migration debt）→ **ADB Engine Completion** | — |
+
+## 结论
+
+```text
+V2_VERIFIED_MIGRATION_DEBT = 0
+V2_VERIFIED_CAPABILITY_PARITY = CLOSED（E1/E2/E3/E4 全部 V3 真机 parity PASS）
+PAIRING_MECHANISM_CLOSURE = VERIFIED_IN_V3
+FIRST_RUN_MECHANISM_BASELINE = RESTORED
+剩余（PairingCoordinator / Identity lifecycle / AUTH taxonomy / re-pair /
+first-run orchestration / product UI / reconnect UX）= ADB Engine Completion / NOT_STARTED
+```
