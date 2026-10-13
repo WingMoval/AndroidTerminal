@@ -64,11 +64,11 @@ AndroidTerminal-V3/
 | `at-core/.../jni/terminal_jni.cpp`（JNI 部分） | JNI marshal | 迁为 **`jni/adb_engine_jni.cpp`**（新 canonical JNI，剥离 legacy handshake）| **MIGRATED**（编译+链接；11 JNI symbols == Kotlin externals；真机 PASS） |
 | `at-core/.../AdbManager.kt`（JNI bridge 部分） | JNI bridge | 迁为 **`internal/AdbNative.kt`**（ADB-domain，无 AT 类型）| **MIGRATED**（编译；真机 PASS） |
 | `at-runtime/.../AtConnectionRequest.kt` | explicit 连接输入 | 迁为 **`AdbConnectionRequest.kt`** | **MIGRATED**（编译） |
-| `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁为 **`AdbEndpoint.kt`** | **COMPILED**（编译；未真机） |
-| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁为 **`AdbRuntimeBackends.kt`（AdbDiscoveryBackend / AdbAndroidNsdDiscoveryBackend）** | **COMPILED**（编译；mDNS 真机未跑） |
-| `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁为 **`AdbRuntimeBackends.kt`（AdbWirelessDebuggingReadinessBackend / AdbAndroid...Backend）** | **COMPILED**（编译；WD 查询真机未跑） |
-| `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁为 **`AdbEndpointStore`** | **COMPILED**（编译；未真机） |
-| `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁为 **`AdbConnectionIntent` / `AdbRecoveryPolicy` / `AdbRecoveryCoordinator`**（recovery 改走 **AdbEngine**，不再依赖 AT `TerminalRuntime`）；`LossClassifier` 的 AT-result 耦合留待 AT track | **COMPILED**（编译；真机 recovery 未跑） |
+| `at-runtime/.../AtEndpoint.kt` / `AtEndpointSource.kt` / `AtDiscoveredService.kt` | 端点数据 | 迁为 **`AdbEndpoint.kt`** | **MIGRATED**（AT.V3-2.3 真机 discovery/selection PASS） |
+| `at-runtime/.../DiscoveryBackend.kt` / `AndroidNsdDiscoveryBackend.kt` | mDNS 发现 | 迁为 **`AdbRuntimeBackends.kt`（AdbDiscoveryBackend / AdbAndroidNsdDiscoveryBackend）** | **MIGRATED**（AT.V3-2.3 真机 `_adb-tls-connect._tcp.` 发现 PASS；修复 resolveService 迁移 bug） |
+| `at-runtime/.../WirelessDebuggingReadinessBackend.kt` / `AndroidWirelessDebuggingReadinessBackend.kt` | WD 状态 | 迁为 **`AdbRuntimeBackends.kt`（AdbWirelessDebuggingReadinessBackend / AdbAndroid...Backend）** | **MIGRATED**（AT.V3-2.3 真机 WD ON/OFF readiness PASS） |
+| `at-runtime/.../EndpointStore.kt` | 端点缓存 | 迁为 **`AdbEndpointStore`** | **MIGRATED**（AT.V3-2.3 真机 connectAuto/endpoint lifecycle PASS） |
+| `at-runtime/.../ConnectionIntent.kt` / `RecoveryCoordinator.kt` / `RecoveryPolicy.kt` / `LossClassifier.kt` | 连接恢复 | 迁为 **`AdbConnectionIntent` / `AdbRecoveryPolicy` / `AdbRecoveryCoordinator`**（recovery 改走 **AdbEngine**，不再依赖 AT `TerminalRuntime`）；`LossClassifier` 的 AT-result 耦合留待 AT track | **MIGRATED**（AT.V3-2.3 真机 dynamic endpoint recovery PASS：42713→40437；有界；单 owner；无透明重放） |
 | `at-core/.../third_party/boringssl/*` | BoringSSL 依赖 | 迁 vendored | **MIGRATED**（编译+链接+真机 PASS） |
 
 > 说明：`AdbClient` 新增 `connection()` accessor（ADB Engine 内部，供 interactive stream 复用同一 ONLINE 连接）。非行为变更。
@@ -192,6 +192,17 @@ BACKEND_PARITY       = VERIFIED（大输出由 BACKEND_BUG 转 PARITY；1 Local 
 AT_CONTRACT          = REVISED_DRAFT / EXECUTION_VALIDATED（未 Frozen；见
                        docs/architecture/AT_Execution_Contract_Parity_Matrix.md）
 AT_CONTRACT_FREEZE_READINESS = READY_FOR_EMULATOR_VALIDATION（非 READY_TO_FREEZE；AT.CONTRACT-1 ≠ COMPLETE）
+AT.V3-2.3            = COMPLETE（ADB-only composition + auto-connect + recovery closure：
+                       :adb-only-test-host 物理隔离（Gradle/dex/native 无 Local）；
+                       AdbRuntime lifecycle facade 接线 readiness/discovery/endpoint/recovery；
+                       connectAuto 冷启动 + process-restart + connection reuse +
+                       dynamic endpoint recovery（42713→40437）+ 无透明重放 +
+                       WD OFF bounded + error observability 全部真机 PASS；
+                       evidence: docs/evidence/at_v3_2_3/）
+AT_ENGINE_ADB_ONLY_COMPOSITION = VERIFIED
+LOCAL_BACKEND_REQUIRED = NO
+ADB_RUNTIME_CLOSURE = PASS_POST_TRUST_CONNECTION_LIFECYCLE（pairing 仍 COMPILED / NOT VERIFIED；
+                       reconnect UX / manual reconnect API / background recovery / retry policy = DEFERRED）
 NEXT                 = AT.EMULATOR-0
 ```
 

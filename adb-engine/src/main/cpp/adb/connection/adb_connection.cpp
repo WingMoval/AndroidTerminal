@@ -265,6 +265,12 @@ void AdbConnection::disconnect() {
 
 void AdbConnection::shutdownSocket() { transport_->shutdownSocket(); }
 
+void AdbConnection::markTransportLost() {
+    if (state_ != ConnectionState::Online) return;
+    state_ = ConnectionState::Offline;
+    LOGE("[C14] TRANSPORT_LOST: connection marked Offline (real transport failure)");
+}
+
 bool AdbConnection::readPacket(AdbPacket* packet, std::string* error) {
     if (!transport_->is_open()) {
         if (error) *error = "transport not open";

@@ -70,6 +70,10 @@ void AdbStreamHub::rxLoop() {
         if (!conn_->readPacket(&pkt, &err)) {
             if (stopping_.load()) break;  // normal teardown (our shutdown)
             LOGE("[HUB02] RX_OWNER_READ_FAIL: %s", err.c_str());
+            // AT.V3-2.3: a real transport failure must update the connection's
+            // liveness truth so connectionState() no longer reports a stale
+            // ONLINE. This lets ensure-ready skip / recovery trigger correctly.
+            conn_->markTransportLost();
             failAll("connection failed: " + err);
             break;
         }

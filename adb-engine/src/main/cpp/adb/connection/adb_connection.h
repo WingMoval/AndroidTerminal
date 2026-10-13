@@ -50,6 +50,15 @@ public:
 
     void disconnect();
 
+    // Mark the connection as no longer usable because the transport was
+    // LOST (e.g. the post-ONLINE RX owner thread hit a real read failure),
+    // WITHOUT closing the socket. This is the ADB-domain liveness truth for
+    // AT.V3-2.3: a stale `Online` state would make `ensure-ready` skip a
+    // reconnect and let recovery misjudge readiness. Idempotent; only takes
+    // effect when currently Online. (Distinct from disconnect(), which also
+    // closes the transport.)
+    void markTransportLost();
+
     // fd-level shutdown that wakes a thread blocked in readPacket() without
     // closing the socket. Used by the stream hub to stop the single RX owner
     // before disconnect() tears the transport down (AT.V3-2.1).

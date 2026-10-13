@@ -516,3 +516,63 @@ EXPECTED_PROVIDER_DIFFERENCE、NON_BLOCKING_TECH_DEBT）**保持原样**。
 adbd `kick_all_tcp_tls_transports()` → `SSL_read err=5`）。AOSP adbd 代码无自动中断机制
 （`research/ADB/daemon/adb_wifi.cpp`）；属 OEM/框架行为。稳定网络 + 保屏后整类稳定完成。
 逐行 1M 因此以分块命令验证（大 WRTE 路径）。
+
+---
+
+# Closure Addendum — AT.V3-2.3
+
+> 本文档 AT.V3-3 / AT.V3-2.2 的历史结论**原样保留，未篡改**。
+> 以下记录 AT.V3-2.3 关闭 ADB Runtime followup（AT.V3-3 §F：stale connectionState、
+> discovery/recovery/readiness 从 COMPILED → VERIFIED）。
+
+- 日期：2026-10-13
+- 修复：`AT.V3-2.3_ADB_Only_Composition_AutoConnection_Recovery_Closure.md`（完整报告）
+- 证据：`docs/evidence/at_v3_2_3/EVIDENCE.md`
+
+## AT.V3-3 ADB_RUNTIME_FOLLOWUP → 本轮闭环
+
+```text
+AT.V3-3 结论（保留）:  ADB_RUNTIME_FOLLOWUPS = stale connectionState；
+                        pairing/discovery/recovery/readiness（COMPILED 未真机）
+
+AT.V3-2.3 闭环:
+  ADB_RUNTIME_READINESS              COMPILED → VERIFIED（真机 WD ON/OFF readiness）
+  ADB_RUNTIME_DISCOVERY              COMPILED → VERIFIED（修复 resolveService 迁移 bug；
+                                       真机 _adb-tls-connect._tcp. 发现 PASS）
+  ADB_RUNTIME_ENDPOINT_LIFECYCLE     COMPILED → VERIFIED（connectAuto/endpoint set/invalidate）
+  ADB_RUNTIME_AUTO_CONNECTION        不存在  → VERIFIED（AdbRuntime.connectAuto 冷启动 +
+                                       process-restart + reuse 真机 PASS）
+  ADB_RUNTIME_BASIC_RECOVERY         COMPILED → VERIFIED（dynamic endpoint 42713→40437；
+                                       有界；单 owner；无透明重放；post-recovery cmd+session）
+  ADB_RUNTIME_ERROR_OBSERVABILITY    新增     → VERIFIED（TRANSPORT_ERROR + hasError + error）
+  stale connectionState              （AT.V3-3 ADB_CONNECTION_STATE_AFTER_LOSS=ONLINE stale）
+                                       → CLOSED（markTransportLost：Offline）
+  PAIRING                            仍 COMPILED / NOT VERIFIED（OUT_OF_SCOPE）
+```
+
+## 新增 ADB-domain lifecycle facade
+
+`AdbRuntime`（`:adb-engine`，ADB-domain）——接线原 dead 的 readiness/discovery/endpoint/
+recovery 死件，暴露 `initialize/readiness/connectAuto/connect/disconnect/state/
+onOperationResult`。AT public contract 零改动；`:adb-engine` 零 AT 依赖。
+
+## 关键实现（V2 Oracle 修正）
+
+- **discovery 迁移 bug**：V3 首次移植 scan() 直接读 onServiceFound 的 host/port（未 resolve
+  → host=null/port=0）→ 永远 ENDPOINT_NOT_FOUND。按 V2 AT.RUNTIME-2B 修正为
+  `onServiceFound → resolveService()`。
+- **stale ONLINE**：`AdbConnection::markTransportLost()`（Online→Offline，幂等）由
+  `AdbStreamHub::rxLoop` 真实失败分支调用；`connectionState()` 不再 stale。
+- **operation-driven recovery**：backend 在 transport 失败时调 `AdbRuntime.onOperationResult`；
+  有界恢复 connection，**绝不透明重放 command**。
+
+## 真机结果
+
+```text
+ADB-only composition / artifact isolation = PASS（Gradle/dex/native 无 Local）
+确定性 lifecycle 12/12；G-gates G3-G18 真机 PASS（详见 evidence）
+回归：Local 11/11、AT unit 6/6、App 16/16、Headless 1/1、ADB 25/25、Parity 34/34
+ADB_RUNTIME_CLOSURE = PASS_POST_TRUST_CONNECTION_LIFECYCLE
+AT_EXECUTION_CLOSURE = PASS（保持）
+AT_CONTRACT_FREEZE_READINESS = READY_FOR_EMULATOR_VALIDATION（保持）
+```

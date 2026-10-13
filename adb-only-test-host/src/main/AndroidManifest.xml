@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ADB-only Test Host manifest (AT.V3-2.3). TEST / VALIDATION ONLY.
+
+  No Activity / launcher / service / binder / database. Instrumentation does
+  not require an Activity. Discovery permissions are merged from :adb-engine.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="AndroidTerminal ADB-only TestHost"
+        android:supportsRtl="true"
+        android:allowBackup="false">
+    </application>
+
+</manifest>

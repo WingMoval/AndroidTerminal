@@ -23,6 +23,7 @@
 | AT.V3-2.1 concurrent ADB stream closure 证据（Gate C 关闭：1 conn / 1 TLS / 3 并发 stream / 整类 25 tests PASS） | `docs/evidence/at_v3_2_1/EVIDENCE.md` |
 | AT.V3-3 backend parity / execution contract closure 审计证据（one-shot O1–O5 双后端 / ADB 大输出 blocker / persistent p1–p8 / multi-session / cross-mode / transport-loss t1 / 回归 6 套） | `docs/evidence/at_v3_3/EVIDENCE.md` |
 | AT.V3-2.2 ADB one-shot flow-control closure 证据（WRTE/OKAY 1:1 credit / 64K 66560B / 256K 266240B / 1M 分块 1048582B / mixed stdout+stderr+nonzero / reuse / cross-mode large / failure-path f1 / 整类 25+34 / 回归 Local 11 / AT 6 / App 7 / Headless 1 / Dynamic 9） | `docs/evidence/at_v3_2_2/EVIDENCE.md` |
+| AT.V3-2.3 ADB-only composition & auto-connection / recovery closure 证据（ADB-only artifact isolation Gradle/dex/native / deterministic lifecycle 12/12 / 真机 G-gates：cold-start connectAuto / reuse / persistent+multi / dynamic endpoint recovery 42713→40437 / no transparent replay / post-recovery command+session / WD OFF / error observability / 回归 Local 11 + AT 6 + App 16 + Headless 1 + ADB 25 + Parity 34） | `docs/evidence/at_v3_2_3/EVIDENCE.md` |
 
 ## V2 Evidence 索引（READ-ONLY 来源）
 

@@ -100,6 +100,9 @@ PTY 实现            Local posix PTY + sh -i           ADB remote PTY（shell,v
 ```text
 Terminal Emulator / ScreenState / full-screen TUI semantics   → AT.EMULATOR-0 之后
 Pairing / Discovery / Recovery / WD readiness                 → ADB Runtime Track
+  （AT.V3-2.3 已闭环：readiness/discovery/endpoint/auto-connect/basic recovery/
+    error observability 真机 VERIFIED；pairing 仍 OUT_OF_SCOPE；reconnect UX/
+    manual reconnect API/background recovery/retry policy = DEFERRED）
 Human adb CLI / SSH / AG integration                          → OUT_OF_SCOPE (本轮)
 ```
 

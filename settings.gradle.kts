@@ -36,3 +36,6 @@ include(":at-backend-local")
 include(":at-backend-adb")
 include(":app")
 include(":test-host")
+// AT.V3-2.3: ADB-only Test Host (TEST / VALIDATION ONLY) — proves physical
+// ADB-only composition (no :at-backend-local / :app dependency).
+include(":adb-only-test-host")

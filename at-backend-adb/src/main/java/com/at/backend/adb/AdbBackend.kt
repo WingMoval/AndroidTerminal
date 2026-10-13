@@ -13,6 +13,7 @@ package com.at.backend.adb
 import com.adb.engine.AdbConnectionRequest
 import com.adb.engine.AdbEngine
 import com.adb.engine.AdbInteractiveStream
+import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbShellResult
 import com.adb.engine.AdbShellStatus
 import com.at.engine.ATExecutionOutcome
@@ -40,10 +41,27 @@ class AdbOneShotBackend(
     private val connection: AdbConnectionRequest,
 ) : ATOneShotBackend {
 
-    /** Ensure the ADB Engine is ONLINE for this endpoint (connect once). */
+    /**
+     * Ensure the ADB Engine is ONLINE for this endpoint.
+     *
+     * AT.V3-2.3 (operation-driven recovery): in the AUTO lifecycle path the
+     * connection is established by [AdbRuntime.connectAuto] (consumer never
+     * knows the port). The backend's connection request then carries a
+     * placeholder port (0) meaning "reuse the lifecycle connection only" —
+     * NEVER eagerly connect to port 0. If the connection is not ONLINE, return
+     * false and let the operation fail with TRANSPORT_ERROR, after which
+     * [AdbRuntime.onOperationResult] runs bounded connection recovery
+     * (V2 AT.RUNTIME-2D operation-driven semantics; no command replay).
+     * In the EXPLICIT path (real port > 0) the backend still connects itself.
+     */
     private fun ensureConnected(): Boolean {
         if (AdbEngine.connectionState().isOnline) return true
-        return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
+        if (connection.port > 0) {
+            return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
+        }
+        // Auto/placeholder path: no explicit endpoint to (re)connect; the caller
+        // lets executeShell fail and triggers recovery via onOperationResult.
+        return false
     }
 
     private fun mapAdb(r: AdbShellResult): ATExecutionResult = ATExecutionResult(
@@ -59,7 +77,9 @@ class AdbOneShotBackend(
     )
 
     override fun execute(request: ATExecutionRequest): ATExecutionResult {
-        if (!ensureConnected()) {
+        val connected = ensureConnected()
+        if (!connected && connection.port > 0) {
+            // Explicit endpoint that failed to (re)connect: report transport failure.
             return ATExecutionResult(
                 outcome = ATExecutionOutcome.TRANSPORT_ERROR,
                 stdout = "",
@@ -69,7 +89,14 @@ class AdbOneShotBackend(
                 error = "ADB connect failed for ${connection.host}:${connection.port}",
             )
         }
+        // AUTO path (port == 0) or online explicit path: run the operation. On a
+        // dead connection executeShell returns TRANSPORT_ERROR, after which we
+        // signal AdbRuntime for bounded connection recovery. The ORIGINAL
+        // failure below is returned unchanged — no transparent command replay.
         val r = AdbEngine.executeShell(request.command, request.timeoutMs)
+        if (r.status != AdbShellStatus.COMPLETED) {
+            AdbRuntime.onOperationResult(transportLost = true)
+        }
         return mapAdb(r)
     }
 }
@@ -86,16 +113,29 @@ class AdbPersistentBackend(
 
     private fun ensureConnected(): Boolean {
         if (AdbEngine.connectionState().isOnline) return true
-        return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
+        if (connection.port > 0) {
+            return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
+        }
+        return false
     }
 
     override fun openSession(launch: ATPersistentBackend.Launch): ATOpenSessionResult {
-        if (!ensureConnected()) {
+        val connected = ensureConnected()
+        if (!connected && connection.port > 0) {
             return ATOpenSessionResult.Failure("ADB connect failed for ${connection.host}:${connection.port}")
         }
         // Real remote PTY: empty command after "pty:" (AOSP services.cpp).
         val stream = AdbEngine.openInteractive("shell,v2,pty:")
-            ?: return ATOpenSessionResult.Failure("ADB interactive open failed")
+        if (stream == null) {
+            // OPEN failed. If the transport was previously ONLINE and is now
+            // not, this is a transport loss -> signal AdbRuntime for bounded
+            // connection recovery. The Failure below is returned unchanged
+            // (no session is created; no replay).
+            if (!AdbEngine.connectionState().isOnline) {
+                AdbRuntime.onOperationResult(transportLost = true)
+            }
+            return ATOpenSessionResult.Failure("ADB interactive open failed")
+        }
         val session = AdbTerminalSession(stream)
         // Apply initial size (remote PTY starts at 0x0 unless set).
         session.resize(launch.initialRows, launch.initialCols)

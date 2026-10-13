@@ -1,2 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<!--
+  ADB Engine manifest (AT.V3-2.3).
+
+  mDNS discovery (NsdManager) for the Wireless ADB connect service requires
+  network-state + (on most OEMs) fine-location. These are ADB-domain platform
+  permissions, merged into any consumer (test-host / adb-only-host / app).
+  The engine itself declares no components, services, or UI.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- NsdManager discoverServices requires fine location on API 26+ (Android 8+) -->
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="35" />
+
+</manifest>
