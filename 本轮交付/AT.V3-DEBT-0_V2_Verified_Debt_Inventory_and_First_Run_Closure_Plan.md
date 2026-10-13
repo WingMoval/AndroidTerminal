@@ -461,7 +461,7 @@ NEXT_IMPLEMENTATION_TASK = V3 Pairing Primitive Parity Closure（Slice 1）
 NEXT_TASK_OBJECTIVE = V3 fresh identity → pair() → device trust → 同 identity connectAuto → uid=2000(shell)；
                       仅当 parity 发现 migration bug 才最小修复；不携带 PairingCoordinator/Accessibility/UI
 
-GIT_COMMIT = （commit 后回填）
+GIT_COMMIT = 3b00177（AT.V3-DEBT-0 audit commit）
 GIT_WORKTREE = CLEAN
 V2_WRITES = 0
 
