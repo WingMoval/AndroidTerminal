@@ -1,7 +1,7 @@
 # AT.TERM-0 Evidence — Shell-independent AT Engine Validation
 
 > 设备：`APLMUT4312005935`（HONOR ALI-AN00 / Android 15 / arm64-v8a）
-> 状态：构建/审计/代码 COMPLETE；**真机 G2-G19 + 回归待设备接入**
+> 状态：**COMPLETE**（构建/审计/代码 + 真机 G2-G19 + 全回归 全 PASS）
 > 日期：2026-10-13
 
 ## 0. 基线
@@ -66,48 +66,96 @@ APK:
   at-shellless-test-host-debug-androidTest.apk   417618B
 ```
 
-## 4. 真机 Gate（待设备）
+## 4. 真机 Gate（G2-G19）— 全 PASS
 
 ```text
-G2  child not /system/bin/sh        PENDING（/proc/<pid>/exe + cmdline）
-G3  real PTY isatty 0/1/2 = 1       PENDING（READY line: tty=/dev/pts/<n> isatty*=1）
-G4  initial 33x99 (TIOCGWINSZ)      PENDING
-G5  write->child->read roundtrip    PENDING
-G6  chunked input                   PENDING
-G7  UTF-8 byte preservation         PENDING
-G8  resize 41x123 child-observed    PENDING
-G9  control byte 0x03 -> SIGINT     PENDING
-G10 natural EXIT 7 -> Exited(7)     PENDING
-G11 explicit close -> CLOSED        PENDING
-G12 pull mode                       PENDING
-G13 push/listener mode              PENDING
-G14 3 concurrent sessions           PENDING
-G15 session resize isolation        PENDING
-G16 close-one isolation             PENDING
-G17 sequential lifecycle 20/20      PENDING
-G18 natural exit -> reopen          PENDING
-G19 bounded failure path            PENDING
+ShelllessRealDeviceTest = OK (15 tests)  [14 G-gates + 1 /proc capture]
+
+G2  child not /system/bin/sh        PASS（/proc 证据见 §6）
+G3  real PTY isatty 0/1/2 = 1       PASS（READY: tty=/dev/pts/<n> isatty0/1/2=1）
+G4  initial 33x99 (TIOCGWINSZ)      PASS（child 自身读出 rows=33 cols=99）
+G5  write->child->read roundtrip    PASS（PING alpha -> PONG alpha）
+G6  chunked input                   PASS（"PING "+"beta+"\n" -> PONG beta）
+G7  UTF-8 byte preservation         PASS（PING 中文测试 + split-utf8 -> byte-exact）
+G8  resize 41x123 child-observed    PASS（RESIZE rows=41 cols=123 + Resized event）
+G9  control byte 0x03 -> SIGINT     PASS（0x03 -> SIGINT marker；ISIG 信号路径）
+G10 natural EXIT 7 -> Exited(7)     PASS（state EXITED）
+G11 explicit close -> CLOSED        PASS（write 后 close 返回 -1，无残留）
+G12 pull mode                       PASS（READY/PONG；timeout 空数组；EOF null）
+G13 push/listener mode              PASS（Data/Resized/Exited/Closed）
+G14 3 concurrent sessions           PASS（PING A/B/C 无串流）
+G15 session resize isolation        PASS（A=20x70 / B=40x120 / C 无 RESIZE）
+G16 close-one isolation             PASS（close B 不影响 A/C）
+G17 sequential lifecycle 20/20      PASS（无 leak；post-cycle 新 session 正常）
+G18 natural exit -> reopen          PASS（A EXIT 7 后 B 正常 PONG）
+G19 bounded failure path            PASS（未知 selector "rm -rf /" -> Failure，无 shell）
 ```
 
-## 5. Regression（待设备）
+## 5. Regression — 全 PASS
 
 ```text
-Local 11 / App 16 / Headless 1 / ADB 25 / Parity 34 / Runtime 12 / Pairing 54
-（AT 6/6 已在 JVM 复跑 PASS）
+Local (LocalPersistentSliceTest)        OK (11)
+App (app.test)                          OK (16)
+Headless (TestHostHeadlessInputTest)    OK (1)
+ADB Backend (AdbBackendHeadlessTest)    OK (25)   [port 42173, PC key, WD=1]
+Backend Parity (BackendParityAuditTest) OK (34)   [port 42173]
+AdbRuntimeLifecycle (12)                OK (12)
+Pairing deterministic (pairing_selftest) 54 PASS / 0 FAIL（真机 /data/local/tmp）
+AT Engine unit (JVM)                    6/6
 ```
 
-## 6. 待采集运行证据（真机）
+## 6. 运行证据（真机 /proc + logcat）
+
+### child /proc 身份（g2_procCapture，child 存活时采集）
 
 ```text
-child PID / /proc/<pid>/exe / /proc/<pid>/cmdline / /proc/<pid>/status
-TTY_NAME / isatty 0/1/2 / initial 33x99 / PING-PONG / chunked / UTF-8
-resize 41x123 / 0x03 behavior / EXIT 7 / close / pull / push / multi / sequential
-（设备接入后回填本节）
+CHILD_PID   = 17038
+CMDLINE     = com.androidterminal.shelllesshost（fork 继承原 cmdline，未 exec 任何 shell）
+EXE         = /system/bin/app_process64   ← NOT /system/bin/sh
+TTY_FD0     = /dev/pts/1                  ← 真实 PTY
+NAME        = ...roidJUnitRunner（instrumentation 进程名，fork 继承）
+PPid        = 16696（= test 进程；child 是其子进程）
+Uid         = 10357（= shelllesshost app uid，非 shell uid 2000）
 ```
 
-## 7. 安全
+### READY 行（G2/G3/G4）
 
 ```text
-本轮无需 ADB private key / pairing code（ADB 完全 ABSENT）。
-无用户敏感数据。
+READY pid=14404 tty=/dev/pts/0 isatty0=1 isatty1=1 isatty2=1 rows=33 cols=99
+```
+
+### logcat（resize 因果）
+
+```text
+AtShelllessPty: parent TIOCSWINSZ master=90 -> 41x123 rc=0 errno=0
+AtShelllessPty: parent readback master=90 = 41x123
+AtShelllessPty: child winsize changed 33x99 -> 41x123
+```
+
+```text
+CHILD_EXECVE_USED = NO
+CHILD_PROGRAM = in-process native probe after fork
+CHILD_EXE = /system/bin/app_process64（非 shell）
+```
+
+## 7. 设备清理
+
+```text
+shellless 测试文件 (shellless_proc/child/pid.txt)  = 已删
+shellless APK (main + test)                        = 已卸载
+/data/local/tmp (pairing_selftest, ps_out, atkey*, aokey*) = 已删
+残留 shellless 进程                                = 无
+残留 zombie (defunct)                              = 0
+残留 /dev/pts                                      = 0
+主 App (com.androidterminal.app)                   = 保留
+WD 恢复开局值                                      = 1
+（本轮未新增 pairing trust residue；ADB 回归用已有 PC key）
+```
+
+## 8. 安全
+
+```text
+本轮无需 ADB private key / pairing code（shellless 路径 ADB 完全 ABSENT）。
+ADB 回归用 PC key（设备已信任，DEBT-1 前既有 trust）。
+无用户敏感数据。测试 identity 未 commit。
 ```

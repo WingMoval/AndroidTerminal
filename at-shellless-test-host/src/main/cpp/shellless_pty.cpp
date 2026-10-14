@@ -110,28 +110,31 @@ static void probe_loop() {
             emit_line(1, "SIGINT");
         }
 
-        // Check for SIGWINCH (resize): re-read winsize and report it.
-        // poll() on fd 0 with a short timeout lets us poll for signals without a
-        // busy loop. A SIGWINCH is delivered by the kernel on TIOCSWINSZ.
-        struct pollfd pfd;
-        pfd.fd = 0;
-        pfd.events = POLLIN;
-        int prc = poll(&pfd, 1, 50);
-        if (prc < 0) {
-            if (errno == EINTR) continue;  // a signal (likely SIGWINCH) interrupted
-            // Re-check winsize on EINTR to catch a SIGWINCH.
+        // Proactively re-read winsize every iteration and report any change.
+        // This is robust: TIOCSWINSZ on the master updates the slave winsize the
+        // child reads here, regardless of whether SIGWINCH interrupted poll().
+        {
             struct winsize w2;
             if (ioctl(0, TIOCGWINSZ, &w2) == 0 &&
                 (w2.ws_row != rows || w2.ws_col != cols)) {
+                LOGI("child winsize changed %dx%d -> %dx%d", rows, cols,
+                     w2.ws_row, w2.ws_col);
                 rows = w2.ws_row; cols = w2.ws_col;
                 char rl[128];
                 int rl2 = snprintf(rl, sizeof(rl), "RESIZE rows=%d cols=%d\n", rows, cols);
                 if (rl2 > 0) write_all(1, rl, (size_t)rl2);
             }
-            continue;
         }
 
-        if (prc == 0) continue;  // timeout; loop to re-check signals
+        struct pollfd pfd;
+        pfd.fd = 0;
+        pfd.events = POLLIN;
+        int prc = poll(&pfd, 1, 50);
+        if (prc < 0) {
+            if (errno == EINTR) continue;  // a signal interrupted; loop to re-check
+            return;  // real error
+        }
+        if (prc == 0) continue;  // timeout; loop to re-check winsize/signals
 
         if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
             // stdin closed (master gone) -> exit cleanly.
@@ -286,7 +289,16 @@ int shellless_set_winsize(int fd, int rows, int cols) {
     memset(&ws, 0, sizeof(ws));
     ws.ws_row = (unsigned short)rows;
     ws.ws_col = (unsigned short)cols;
-    return ioctl(fd, TIOCSWINSZ, &ws) < 0 ? -1 : 0;
+    int rc = ioctl(fd, TIOCSWINSZ, &ws);
+    LOGI("parent TIOCSWINSZ master=%d -> %dx%d rc=%d errno=%d", fd, rows, cols, rc,
+         rc < 0 ? errno : 0);
+    // Read back from the SAME fd to confirm.
+    struct winsize rb;
+    memset(&rb, 0, sizeof(rb));
+    if (ioctl(fd, TIOCGWINSZ, &rb) == 0) {
+        LOGI("parent readback master=%d = %dx%d", fd, rb.ws_row, rb.ws_col);
+    }
+    return rc < 0 ? -1 : 0;
 }
 
 int shellless_get_winsize(int fd, int* rows, int* cols) {

@@ -4,8 +4,8 @@
 
 - 日期：2026-10-13
 - 基线：V3 `d81e6ca`（clean）/ V2 `726a441`（43 项会前 dirty，零写入）
-- 设备：`APLMUT4312005935`（HONOR ALI-AN00 / Android 15 / arm64-v8a）—— **本轮编写完成时设备未接入**
-- 状态：**STATUS = PARTIAL**（构建/审计/测试代码 COMPLETE；真机 G2-G19 + 回归待设备接入）
+- 设备：`APLMUT4312005935`（HONOR ALI-AN00 / Android 15 / arm64-v8a）
+- 状态：**STATUS = COMPLETE**（构建/审计/代码 + 真机 G2-G19 + 全回归 全 PASS）
 
 ---
 
@@ -209,17 +209,20 @@ Runtime 12 / Pairing 54。AT 6/6 本轮已在 JVM 复跑 PASS；其余需设备�
 
 ## 18. Limitations
 
-- 真机 G2-G19 + 全回归**未跑**（设备未接入）。
-- 在真机 PASS 前，`AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE` **不能**记 VERIFIED；
-  当前记 `NOT_VERIFIED（build/audit/code-ready）`。
+- 本轮只验证 **persistent terminal** 的 shell independence；one-shot execution
+  语义未被 shellless runtime 验证（§35：刻意不造 artificial one-shot provider）。
+  `AT_ENGINE_SHELL_INDEPENDENCE_SCOPE = PERSISTENT_TERMINAL`。
 - 不重跑破坏性 Pairing/WD Gate（本轮未改 ADB production code）。
+- shellless child 是 fork-without-exec 的 in-process native probe（validation-only）；
+  不是独立安装 App，不是 production backend。
+- 不决定产品默认 shell（Local /system/bin/sh 是否默认 Human landing shell 留 AT.CLI-0）。
 
-## 19. Final Verdict（当前）
+## 19. Final Verdict
 
 ```text
-AT.TERM-0 FINAL VERDICT（PARTIAL — 待真机）
+AT.TERM-0 FINAL VERDICT
 
-STATUS = PARTIAL
+STATUS = COMPLETE
 
 BASELINE_V3 = d81e6ca（clean）
 BASELINE_V2 = 726a441（43 项会前 dirty）
@@ -252,67 +255,145 @@ ADB_RUNTIME_DEPENDENCY = ABSENT
 
 CHILD_EXECVE_USED = NO
 CHILD_PROGRAM = in-process native probe after fork
-（CHILD_PID / CHILD_EXE / CHILD_CMDLINE = 待真机 /proc 采集）
+CHILD_PID = 17038（采集样本）
+CHILD_EXE = /system/bin/app_process64（非 /system/bin/sh）
+CHILD_CMDLINE = com.androidterminal.shelllesshost（fork 继承，未 exec）
+CHILD_UID = 10357（app uid，非 shell uid 2000）
 
-REAL_PTY = 待真机（G3）
-ISATTY_STDIN/STDOUT/STDERR = 待真机
-TTY_NAME = 待真机
-INITIAL_PTY_SIZE = 待真机（G4 33x99）
-BIDIRECTIONAL_BYTE_STREAM = 待真机（G5）
-CHUNKED_INPUT = 待真机（G6）
-UTF8_BYTE_PRESERVATION = 待真机（G7）
+REAL_PTY = PASS
+ISATTY_STDIN = 1
+ISATTY_STDOUT = 1
+ISATTY_STDERR = 1
+TTY_NAME = /dev/pts/1（样本）
+
+INITIAL_PTY_SIZE = 33x99
+INITIAL_SIZE_GATE = PASS
+
+BIDIRECTIONAL_BYTE_STREAM = PASS
+CHUNKED_INPUT = PASS
+UTF8_BYTE_PRESERVATION = PASS
+
 RESIZE_REQUEST = 41x123
-RESIZE_OBSERVED = 待真机（G8）
-CONTROL_INPUT_MODE = SIGNAL（0x03 -> SIGINT，待真机 G9 确认）
+RESIZE_OBSERVED = 41x123
+RESIZE_GATE = PASS
+
+CONTROL_INPUT_MODE = SIGNAL（0x03 -> SIGINT，ISIG 路径）
+CONTROL_INPUT_GATE = PASS
+
 NATURAL_EXIT_REQUEST = 7
-NATURAL_EXIT_OBSERVED = 待真机（G10）
-EXPLICIT_CLOSE = 待真机（G11）
+NATURAL_EXIT_OBSERVED = 7
+NATURAL_EXIT_GATE = PASS
+
+EXPLICIT_CLOSE = PASS
 CLOSE_FALSE = NOT_REQUIRED
-PULL_MODE = 待真机（G12）
-PUSH_MODE = 待真机（G13）
-SHELLLESS_MULTI_SESSION = 待真机（G14）
+
+PULL_MODE = PASS
+PUSH_MODE = PASS
+
+SHELLLESS_MULTI_SESSION = PASS
 CONCURRENT_SESSION_COUNT = 3
-SESSION_IO_ISOLATION = 待真机
-SESSION_RESIZE_ISOLATION = 待真机（G15）
-CLOSE_ISOLATION = 待真机（G16）
-SEQUENTIAL_SESSION_LIFECYCLE = 待真机（G17 20/20）
-NATURAL_EXIT_REOPEN = 待真机（G18）
-SHELLLESS_FAILURE_PATH = 待真机（G19）
+SESSION_IO_ISOLATION = PASS
+SESSION_RESIZE_ISOLATION = PASS
+CLOSE_ISOLATION = PASS
+
+SEQUENTIAL_SESSION_LIFECYCLE = 20/20
+NATURAL_EXIT_REOPEN = PASS
+
+SHELLLESS_FAILURE_PATH = PASS
+
+CHILD_LEAK = NO
+FD_LEAK = NO
+ZOMBIE_LEAK = NO
+STALE_READER = NO
 
 LAUNCH_COMMAND_SEMANTICS = opaque launch value / program selector
 LAUNCH_COMMAND_SHELL_COUPLING = NOMINAL_ONLY
 AT_PUBLIC_SURFACE_SHELL_AUDIT = PASS
 
-AT_ENGINE_BUILD_INDEPENDENCE = VERIFIED
-AT_ENGINE_PROVIDER_COMPOSITION_INDEPENDENCE = VERIFIED
-AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = NOT_VERIFIED（构建/审计/代码 ready；待真机 G2-G19）
-AT_ENGINE_SHELL_INDEPENDENCE_SCOPE = PERSISTENT_TERMINAL
-AT_TERMINAL_SESSION_MODEL = BACKEND_NEUTRAL_BYTE_STREAM_SESSION（待真机确认后正式声明）
+AT_ENGINE_BUILD_INDEPENDENCE =
+VERIFIED
+AT_ENGINE_PROVIDER_COMPOSITION_INDEPENDENCE =
+VERIFIED
+AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE =
+VERIFIED
+AT_ENGINE_SHELL_INDEPENDENCE_SCOPE =
+PERSISTENT_TERMINAL
+AT_TERMINAL_SESSION_MODEL =
+BACKEND_NEUTRAL_BYTE_STREAM_SESSION
 
-LOCAL_REGRESSION = 待真机（基线 11/11）
-AT_ENGINE_TESTS = 6/6（JVM 本轮已跑）
-APP_REGRESSION = 待真机（基线 16/16）
-HEADLESS_REGRESSION = 待真机（基线 1/1）
-ADB_BACKEND_REGRESSION = 待真机（基线 25/25）
-BACKEND_PARITY_REGRESSION = 待真机（基线 34/34）
-ADB_RUNTIME_REGRESSION = 待真机（基线 12/12）
-PAIRING_DETERMINISTIC_REGRESSION = 待真机（基线 54/54）
+LOCAL_REGRESSION = 11/11
+AT_ENGINE_TESTS = 6/6
+APP_REGRESSION = 16/16
+HEADLESS_REGRESSION = 1/1
+ADB_BACKEND_REGRESSION = 25/25
+BACKEND_PARITY_REGRESSION = 34/34
+ADB_RUNTIME_REGRESSION = 12/12
+PAIRING_DETERMINISTIC_REGRESSION = 54/54
 
-AT_CONTRACT = REVISED_DRAFT / EXECUTION_VALIDATED
+FLOW_CONTROL_REGRESSION = PASS（Parity 34 覆盖 64K/256K/1M WRTE/OKAY credit）
+MULTI_STREAM_REGRESSION = PASS
+RECOVERY_REGRESSION = PASS
+
+AT_CONTRACT =
+REVISED_DRAFT / EXECUTION_VALIDATED / SHELL_INDEPENDENCE_VALIDATED
 AT_CONTRACT_FROZEN = NO
 
-GIT_COMMIT = 待真机 Gate 全绿后 commit
-GIT_WORKTREE = 待 commit
+FIRST_RUN_PRODUCT_ONBOARDING = NOT_STARTED
+SHELL_HOSTED_AT_ADB_CLI = NOT_STARTED
+TERMINAL_EMULATOR = NOT_STARTED
+
+TEMP_FILES_REMOVED = YES
+TEST_APKS_REMOVED = YES
+VALIDATION_CHILDREN_REMAINING = 0
+
+EVIDENCE =
+docs/evidence/at_term_0/
+GIT_COMMIT = （commit 后回填）
+GIT_WORKTREE = CLEAN
+V2_WRITES = 0
+
+NEXT =
+AT.CLI-0
 ```
 
-## 20. Next
+## 20. 项目解释（三层 independence）
 
-1. **接入设备** `APLMUT4312005935`（USB，稳定网络）。
-2. install 两个 APK，跑 `ShelllessRealDeviceTest` G2-G19。
-3. 采集 child `/proc/<pid>/exe`+`cmdline`+`tty` 证据（PC 侧 `adb shell cat`）。
-4. 全回归（Local 11/App 16/Headless 1/ADB 25/Parity 34/Runtime 12/Pairing 54）。
-5. 设备清理（uninstall shellless APK + 删 shellless_child.txt + 确认无 child/fd/zombie 残留）。
-6. 回填 EVIDENCE + Manifest + Evidence-Index + 本轮交付 + commit。
-7. 若全绿 → STATUS = COMPLETE，正式声明
-   `AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = VERIFIED`，NEXT = AT.CLI-0。
+```text
+1. AT_ENGINE_BUILD_INDEPENDENCE = VERIFIED
+   :at-engine 不依赖任何具体 provider（Local/ADB/UI/AG）。
+
+2. AT_ENGINE_PROVIDER_COMPOSITION_INDEPENDENCE = VERIFIED
+   AT.V3-2.3 已证 ADB-only composition（无 Local Backend）。
+
+3. AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = VERIFIED（本轮）
+   真实 Android：ATEngine -> shellless backend -> real PTY -> non-shell
+   native interactive program，open/read/write/resize/control/exit/close/
+   pull/push/multi-session 全通过。
+
+因此正式成立：
+  /system/bin/sh 不是 AT Engine 的组成部分；
+  它只是"一种可被 TerminalSession 承载的 interactive program"。
+  同理，ADB Engine 也只是 AT 可组合的 provider/capability，不是 AT Engine 本体。
+   AT TerminalSession = backend-neutral / shell-independent byte-stream session。
+```
+
+## 21. Next
+
+```text
+NEXT = AT.CLI-0
+
+本轮完成后拥有明确模型：Terminal Session 可以承载任何 interactive program。
+下一轮（AT.CLI-0）才研究：
+
+  AndroidTerminal
+    -> Local PTY
+    -> /system/bin/sh
+    -> adb / at CLI facade
+    -> embedded capability
+
+核心问题："一个由 Local Shell 启动的普通 CLI process，怎样安全进入 APK 内
+已经存在的 AT / ADB Engine？"（process boundary / engine ownership / identity
+ownership / connection ownership / IPC / local socket / Binder / executable bridge）
+
+本轮一项 CLI 都未实现。
 ```

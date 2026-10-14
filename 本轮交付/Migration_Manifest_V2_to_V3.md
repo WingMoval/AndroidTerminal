@@ -217,10 +217,11 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                        evidence: docs/evidence/at_v3_debt_1/）
  ADB_ENGINE_COMPLETION = FOLLOWUP（PairingCoordinator / Identity lifecycle / AUTH taxonomy / re-pair /
                         first-run orchestration / diagnostics / reconnect UX = NOT_STARTED；非 V2 debt）
- AT.TERM-0             = PARTIAL（shell-independent AT Engine validation：:at-shellless-test-host 物理隔离
+ AT.TERM-0             = COMPLETE（shell-independent AT Engine validation：:at-shellless-test-host 物理隔离
                         ABSENT local/adb/app + shell 字符串 ABSENT + shellless native probe fork-without-exec；
-                        构建/审计/代码 + AT unit 6/6 PASS；真机 G2-G19 + 回归待设备接入 → 待 COMPLETE）
- NEXT                  = AT.TERM-0 真机 Gate（设备接入后跑 G2-G19 + 回归 → COMPLETE）→ AT.CLI-0
+                        真机 G2-G19 15/15 PASS + 回归 Local 11/App 16/Headless 1/ADB 25/Parity 34/Runtime 12/
+                        Pairing 54/AT 6 全 PASS → AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = VERIFIED）
+ NEXT                  = AT.CLI-0（Local /system/bin/sh -> adb/at CLI facade -> embedded capability）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

@@ -176,17 +176,14 @@ internal class ShelllessSession(
         if (closed) return
         closed = true
         val st = _state
-        if (st == ATSessionState.CLOSED || st == ATSessionState.EXITED) {
-            // Still ensure the master fd is released.
-            ShelllessPtyNative.close(masterFd, pid, Sl.EXIT_WAIT_MS)
-            return
-        }
+        if (st == ATSessionState.CLOSED) return  // already closed (idempotent)
         // Stop the reader (it will exit on closed flag / EOF).
         reader.interrupt()
         val status = ShelllessPtyNative.close(masterFd, pid, Sl.EXIT_WAIT_MS)
-        if (terminateProcess || status >= 0) {
-            exitedCode = if (status >= 0) exitCodeFromStatus(status) else exitedCode
+        if (status >= 0 && exitedCode == null) {
+            exitedCode = exitCodeFromStatus(status)
         }
+        // Always surface Closed on explicit close (idempotent at the AT level).
         _state = ATSessionState.CLOSED
         listener?.invoke(ATSessionEvent.Closed)
     }

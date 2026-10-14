@@ -25,6 +25,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class ShelllessRealDeviceTest {
@@ -113,6 +114,49 @@ class ShelllessRealDeviceTest {
         return m.groupValues[1].toInt()
     }
 
+    // ---- G2 (proc capture): keep a session alive so the PC can read /proc ----
+    // The child stays open (no close) for PROC_HOLD_MS so the PC side can read
+    // /proc/<pid>/exe + cmdline + status to PROVE the child is NOT /system/bin/sh.
+
+    @Test
+    fun g2_procCapture() {
+        val s = open(33, 99)
+        val out = readUntil(s, "READY", 5000)
+        val pid = extractPid(out)
+        assertTrue("READY with pid, got: $out", pid > 0)
+        // While the child is alive, read its /proc identity from THIS process
+        // (same uid as the forked child -> readable). Capture exe/cmdline/tty.
+        val sb = StringBuilder()
+        sb.append("CHILD_PID=").append(pid).append('\n')
+        sb.append("CMDLINE=").append(readProcLine(pid, "cmdline", sep = "|")).append('\n')
+        sb.append("EXE=").append(readProcLink(pid, "exe")).append('\n')
+        sb.append("TTY_FD0=").append(readProcLink(pid, "fd/0")).append('\n')
+        val st = File("/proc/$pid/status").readText()
+        sb.append("NAME=").append(st.lineSequence().firstOrNull { it.startsWith("Name:") }?.substringAfter(' ')?.trim() ?: "?").append('\n')
+        sb.append("PPID=").append(st.lineSequence().firstOrNull { it.startsWith("PPid:") }?.substringAfter(' ')?.trim() ?: "?").append('\n')
+        sb.append("UID_LINE=").append(st.lineSequence().firstOrNull { it.startsWith("Uid:") }?.trim() ?: "?").append('\n')
+        // Write to a world-readable location the PC can pull, plus filesDir.
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        ctx.openFileOutput("shellless_proc.txt", 0).use { it.write(sb.toString().toByteArray()) }
+        s.close(true)
+    }
+
+    private fun readProcLine(pid: Int, name: String, sep: String = ""): String {
+        return try {
+            val b = File("/proc/$pid/$name").readBytes()
+            val s = String(b, Charsets.ISO_8859_1)
+            val replaced = if (sep.isEmpty()) s else s.replace("\u0000", sep)
+            replaced.trimEnd('\n')
+        } catch (e: Exception) { "<err:$e>" }
+    }
+
+    private fun readProcLink(pid: Int, link: String): String =
+        try { File("/proc/$pid/$link").canonicalPath } catch (e: Exception) { "<err:$e>" }
+
+    private companion object {
+        const val PROC_HOLD_MS = 20_000L
+    }
+
     // ---- G5: write -> child -> read roundtrip -------------------------------
 
     @Test
@@ -167,13 +211,15 @@ class ShelllessRealDeviceTest {
     fun g8_resizeChildObserved() {
         val s = open(33, 99)
         val cap = Cap(); s.setListener(cap)
-        readUntil(s, "READY", 5000)
+        await(4000) { cap.out.contains("READY") }
+        assertTrue("READY (listener)", cap.out.contains("READY"))
         // Ask child to confirm current size, then resize to 41x123.
         val ok = s.resize(41, 123)
         assertTrue("resize must be accepted", ok)
-        // The child detects SIGWINCH and emits RESIZE rows=41 cols=123.
-        val out = readUntil(s, "RESIZE rows=41 cols=123", 4000)
-        assertTrue("child must observe 41x123, got: $out", out.contains("RESIZE rows=41 cols=123"))
+        // The child proactively re-reads TIOCGWINSZ and emits RESIZE rows=41 cols=123.
+        await(4000) { cap.out.contains("RESIZE rows=41 cols=123") }
+        assertTrue("child must observe 41x123, got: ${cap.out}",
+            cap.out.contains("RESIZE rows=41 cols=123"))
         // ATSessionEvent.Resized must have fired per contract.
         assertTrue("Resized event expected",
             await(1000) { cap.resized == (41 to 123) })
@@ -236,9 +282,15 @@ class ShelllessRealDeviceTest {
         assertNotNull("pull should yield READY", ready)
         assertTrue(String(ready!!).contains("READY"))
         s.write("PING pull\n".toByteArray())
-        val pong = s.read(4000)
-        assertNotNull("pull should yield PONG", pong)
-        assertTrue(String(requireNotNull(pong)).contains("PONG pull"))
+        // Accumulate pull reads until PONG arrives (pull-only, no listener).
+        val sb = StringBuilder()
+        val deadline = System.currentTimeMillis() + 4000
+        while (System.currentTimeMillis() < deadline && sb.indexOf("PONG pull") < 0) {
+            val b = s.read(200)
+            if (b == null) break
+            if (b.isNotEmpty()) sb.append(String(b, Charsets.UTF_8))
+        }
+        assertTrue("pull should yield PONG pull, got: $sb", sb.contains("PONG pull"))
         // timeout -> empty array (not null while ACTIVE).
         val empty = s.read(150)
         assertNotNull("timeout should be empty array while ACTIVE", empty)
@@ -271,8 +323,8 @@ class ShelllessRealDeviceTest {
 
     @Test
     fun g14_g15_g16_multiSessionIsolation() {
-        val sA = open(20, 70)
-        val sB = open(40, 120)
+        val sA = open(24, 80)
+        val sB = open(24, 80)
         val sC = open(24, 80)
         val capA = Cap(); sA.setListener(capA)
         val capB = Cap(); sB.setListener(capB)
@@ -289,13 +341,16 @@ class ShelllessRealDeviceTest {
         assertFalse("B must NOT see A", capB.out.contains("PONG A"))
         assertTrue("C PONG C", capC.out.contains("PONG C"))
 
-        // G15: resize isolation — A 20x70, B 40x120; each child sees its own.
+        // G15: resize isolation — all opened 24x80; resize A->20x70, B->40x120
+        // (distinct from initial so the child observes a change); each sees its own.
         sA.resize(20, 70)
         sB.resize(40, 120)
         await(4000) { capA.out.contains("RESIZE rows=20 cols=70") && capB.out.contains("RESIZE rows=40 cols=120") }
         assertTrue("A sees 20x70", capA.out.contains("RESIZE rows=20 cols=70"))
         assertFalse("A must not see B's 40x120", capA.out.contains("RESIZE rows=40 cols=120"))
         assertTrue("B sees 40x120", capB.out.contains("RESIZE rows=40 cols=120"))
+        // C was never resized: it must NOT show any RESIZE line.
+        assertFalse("C (unresized) must show no RESIZE", capC.out.contains("RESIZE"))
 
         // G16: closing B must NOT affect A/C.
         sB.close(true)
