@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AT.TERM-0 — Shellless Test Host manifest (TEST / VALIDATION ONLY).
+
+  No Activity / launcher / service / binder / database. Instrumentation does
+  not require an Activity. No ADB permissions (ADB is ABSENT by construction).
+  The shellless child is an in-process native probe; /system/bin/sh is never
+  launched, so no shell-related permissions are needed.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="AndroidTerminal Shellless TestHost"
+        android:supportsRtl="true"
+        android:allowBackup="false">
+    </application>
+
+</manifest>

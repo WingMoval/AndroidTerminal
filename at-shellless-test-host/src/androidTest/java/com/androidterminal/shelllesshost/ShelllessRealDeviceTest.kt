@@ -1,0 +1,360 @@
+// AT.TERM-0 — Shellless real-device G-gate harness (VALIDATION ONLY).
+//
+// Runs on the real device. Every session operation goes ONLY through
+// ATEngine.openSession(...) -> ShelllessPersistentBackend -> real PTY ->
+// in-process non-shell native probe. No /system/bin/sh, no ADB, no Local
+// backend. The consumer NEVER calls the backend or native directly.
+//
+// Gates (AT.TERM-0 §49): G2..G19. G0 (artifact isolation) is done via
+// Gradle/DEX/native audit on the PC, not here.
+
+package com.androidterminal.shelllesshost
+
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.at.engine.ATEngine
+import com.at.engine.ATOpenSessionResult
+import com.at.engine.ATPersistentBackend
+import com.at.engine.ATSessionEvent
+import com.at.engine.ATSessionState
+import com.at.engine.ATTerminalSession
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class ShelllessRealDeviceTest {
+
+    private val args get() = InstrumentationRegistry.getArguments()
+    private val eng: ATEngine get() = ShelllessHost.engine()
+
+    private fun open(rows: Int = 24, cols: Int = 80): ATTerminalSession =
+        (eng.openSession(
+            ATPersistentBackend.Launch(
+                command = Sl.PROBE_COMMAND,
+                initialRows = rows, initialCols = cols,
+            )
+        ) as ATOpenSessionResult.Success).session
+
+    private fun await(timeoutMs: Long, predicate: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (predicate()) return true
+            Thread.sleep(25)
+        }
+        return predicate()
+    }
+
+    /** Collect output lines from a session using PULL read mode. */
+    private fun readUntil(sess: ATTerminalSession, needle: String, timeoutMs: Long = 4000): String {
+        val sb = StringBuilder()
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val b = sess.read(100)
+            if (b != null && b.isNotEmpty()) sb.append(String(b, Charsets.UTF_8))
+            if (sb.indexOf(needle, ignoreCase = false) >= 0) return sb.toString()
+            if (b == null) break
+        }
+        return sb.toString()
+    }
+
+    private class Cap : (ATSessionEvent) -> Unit {
+        val out = StringBuilder()
+        @Volatile var resized: Pair<Int, Int>? = null
+        @Volatile var exitedCode: Int? = null
+        @Volatile var closed = false
+        override fun invoke(e: ATSessionEvent) {
+            when (e) {
+                is ATSessionEvent.Data -> out.append(String(e.bytes, Charsets.UTF_8))
+                is ATSessionEvent.Resized -> resized = e.rows to e.cols
+                is ATSessionEvent.Exited -> exitedCode = e.exitCode
+                is ATSessionEvent.Eof -> {}
+                is ATSessionEvent.Closed -> closed = true
+                is ATSessionEvent.Failed -> {}
+            }
+        }
+    }
+
+    // ---- G2 + G3: child not /system/bin/sh; real PTY isatty -----------------
+
+    @Test
+    fun g2_g3_childNotShell_realPtyIsatty() {
+        val s = open(33, 99)
+        // G4 folded here too: initial 33x99 must be observed by the child.
+        val out = readUntil(s, "READY", 5000)
+        assertTrue("probe must emit READY, got: $out", out.contains("READY"))
+        // G2: the child reports its own pid + tty + isatty. We assert the TTY is a
+        // real pts and isatty(0/1/2)=1. The pid is the CHILD (probe), and we
+        // verify (on PC) via /proc that it is NOT /system/bin/sh. Here we capture
+        // the child identity for the evidence.
+        assertTrue("READY must carry isatty0=1, got: $out", out.contains("isatty0=1"))
+        assertTrue("READY must carry isatty1=1, got: $out", out.contains("isatty1=1"))
+        assertTrue("READY must carry isatty2=1, got: $out", out.contains("isatty2=1"))
+        assertTrue("tty must be a /dev/pts, got: $out", out.contains("tty=/dev/pts/"))
+        // G4: initial size observed by the child itself (TIOCGWINSZ on slave).
+        assertTrue("child must observe initial 33x99, got: $out",
+            out.contains("rows=33") && out.contains("cols=99"))
+        val pid = extractPid(out)
+        // Save child identity for PC-side /proc evidence.
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .openFileOutput("shellless_child.txt", 0).use { it.write(out.toByteArray()) }
+        s.close(true)
+        // The session must reach a terminal state (CLOSED/EXITED), no leak.
+        assertTrue("session must terminate, state=${s.state}",
+            s.state == ATSessionState.CLOSED || s.state == ATSessionState.EXITED)
+    }
+
+    private fun extractPid(ready: String): Int {
+        val m = Regex("pid=(\\d+)").find(ready) ?: return -1
+        return m.groupValues[1].toInt()
+    }
+
+    // ---- G5: write -> child -> read roundtrip -------------------------------
+
+    @Test
+    fun g5_writeChildReadRoundtrip() {
+        val s = open()
+        readUntil(s, "READY", 5000)
+        s.write("PING alpha\n".toByteArray())
+        val out = readUntil(s, "PONG alpha", 4000)
+        assertTrue("roundtrip PONG alpha, got: $out", out.contains("PONG alpha"))
+        s.close(true)
+    }
+
+    // ---- G6: chunked input --------------------------------------------------
+
+    @Test
+    fun g6_chunkedInput() {
+        val s = open()
+        readUntil(s, "READY", 5000)
+        s.write("PING ".toByteArray())
+        Thread.sleep(120)
+        s.write("beta".toByteArray())
+        Thread.sleep(120)
+        s.write("\n".toByteArray())
+        val out = readUntil(s, "PONG beta", 4000)
+        assertTrue("chunked PONG beta, got: $out", out.contains("PONG beta"))
+        s.close(true)
+    }
+
+    // ---- G7: UTF-8 byte preservation ---------------------------------------
+
+    @Test
+    fun g7_utf8BytePreservation() {
+        val s = open()
+        readUntil(s, "READY", 5000)
+        // UTF-8 multi-byte argument must round-trip byte-exact.
+        s.write("PING 中文测试\n".toByteArray())
+        val out = readUntil(s, "PONG 中文测试", 4000)
+        assertTrue("UTF-8 PONG 中文测试, got: $out", out.contains("PONG 中文测试"))
+        // split UTF-8 chunks: split a multi-byte char across writes.
+        val full = "PING 中\n".toByteArray()
+        s.write(full.copyOfRange(0, 4)) // "PING"
+        Thread.sleep(120)
+        s.write(full.copyOfRange(4, full.size)) // " 中\n"
+        val out2 = readUntil(s, "PONG 中", 4000)
+        assertTrue("split UTF-8 PONG 中, got: $out2", out2.contains("PONG 中"))
+        s.close(true)
+    }
+
+    // ---- G8: resize + child-observed winsize --------------------------------
+
+    @Test
+    fun g8_resizeChildObserved() {
+        val s = open(33, 99)
+        val cap = Cap(); s.setListener(cap)
+        readUntil(s, "READY", 5000)
+        // Ask child to confirm current size, then resize to 41x123.
+        val ok = s.resize(41, 123)
+        assertTrue("resize must be accepted", ok)
+        // The child detects SIGWINCH and emits RESIZE rows=41 cols=123.
+        val out = readUntil(s, "RESIZE rows=41 cols=123", 4000)
+        assertTrue("child must observe 41x123, got: $out", out.contains("RESIZE rows=41 cols=123"))
+        // ATSessionEvent.Resized must have fired per contract.
+        assertTrue("Resized event expected",
+            await(1000) { cap.resized == (41 to 123) })
+        s.close(true)
+    }
+
+    // ---- G9: control byte / SIGINT -----------------------------------------
+
+    @Test
+    fun g9_controlByteSigint() {
+        val s = open()
+        readUntil(s, "READY", 5000)
+        // Send 0x03 (ETX) through the real terminal path. ISIG is on (default
+        // termios on a fresh PTY), so the PTY line discipline converts it to a
+        // real SIGINT delivered to the child's handler (NOT a shell).
+        s.write(byteArrayOf(0x03))
+        val out = readUntil(s, "SIGINT", 4000)
+        assertTrue("0x03 must produce a SIGINT marker, got: $out", out.contains("SIGINT"))
+        s.close(true)
+    }
+
+    // ---- G10: natural exit --------------------------------------------------
+
+    @Test
+    fun g10_naturalExit() {
+        val s = open()
+        val cap = Cap(); s.setListener(cap)
+        readUntil(s, "READY", 5000)
+        s.write("EXIT 7\n".toByteArray())
+        // The probe _exit(7); backend waitpid; AT session must surface exit 7.
+        assertTrue("Exited(7) expected",
+            await(4000) { cap.exitedCode == 7 })
+        assertTrue("state must be EXITED, got ${s.state}",
+            s.state == ATSessionState.EXITED)
+        s.close(true)
+    }
+
+    // ---- G11: explicit close ------------------------------------------------
+
+    @Test
+    fun g11_explicitClose() {
+        val s = open()
+        val cap = Cap(); s.setListener(cap)
+        readUntil(s, "READY", 5000)
+        assertTrue("ACTIVE before close, got ${s.state}", s.state == ATSessionState.ACTIVE)
+        s.close(true)
+        assertTrue("CLOSED event expected", await(1000) { cap.closed })
+        assertTrue("state must be CLOSED, got ${s.state}", s.state == ATSessionState.CLOSED)
+        // No residual child: a write after close must return -1 (not writable).
+        assertEquals(-1, s.write("x".toByteArray()))
+    }
+
+    // ---- G12: pull mode (no listener) --------------------------------------
+
+    @Test
+    fun g12_pullMode() {
+        val s = open()
+        // NO listener set.
+        val ready = s.read(4000)
+        assertNotNull("pull should yield READY", ready)
+        assertTrue(String(ready!!).contains("READY"))
+        s.write("PING pull\n".toByteArray())
+        val pong = s.read(4000)
+        assertNotNull("pull should yield PONG", pong)
+        assertTrue(String(requireNotNull(pong)).contains("PONG pull"))
+        // timeout -> empty array (not null while ACTIVE).
+        val empty = s.read(150)
+        assertNotNull("timeout should be empty array while ACTIVE", empty)
+        assertEquals(0, empty!!.size)
+        s.close(true)
+        // After close/EOF, read returns null.
+        assertNull("post-close read should be null", s.read(300))
+    }
+
+    // ---- G13: push / listener mode (no pull) --------------------------------
+
+    @Test
+    fun g13_pushMode() {
+        val s = open()
+        val cap = Cap(); s.setListener(cap)
+        await(4000) { cap.out.contains("READY") }
+        assertTrue("push READY", cap.out.contains("READY"))
+        s.write("PING push\n".toByteArray())
+        await(4000) { cap.out.contains("PONG push") }
+        assertTrue("push PONG push", cap.out.contains("PONG push"))
+        s.write("EXIT 0\n".toByteArray())
+        await(4000) { cap.exitedCode == 0 }
+        assertTrue("push Exited(0)", cap.exitedCode == 0)
+        s.close(true)
+        await(1000) { cap.closed }
+        assertTrue("push Closed", cap.closed)
+    }
+
+    // ---- G14 + G15 + G16: 3 concurrent sessions, isolation ------------------
+
+    @Test
+    fun g14_g15_g16_multiSessionIsolation() {
+        val sA = open(20, 70)
+        val sB = open(40, 120)
+        val sC = open(24, 80)
+        val capA = Cap(); sA.setListener(capA)
+        val capB = Cap(); sB.setListener(capB)
+        val capC = Cap(); sC.setListener(capC)
+        await(4000) { capA.out.contains("READY") && capB.out.contains("READY") && capC.out.contains("READY") }
+
+        // G14: independent PINGs, no cross-stream.
+        sA.write("PING A\n".toByteArray())
+        sB.write("PING B\n".toByteArray())
+        sC.write("PING C\n".toByteArray())
+        await(4000) { capA.out.contains("PONG A") && capB.out.contains("PONG B") && capC.out.contains("PONG C") }
+        assertTrue("A PONG A", capA.out.contains("PONG A"))
+        assertFalse("A must NOT see B", capA.out.contains("PONG B"))
+        assertFalse("B must NOT see A", capB.out.contains("PONG A"))
+        assertTrue("C PONG C", capC.out.contains("PONG C"))
+
+        // G15: resize isolation — A 20x70, B 40x120; each child sees its own.
+        sA.resize(20, 70)
+        sB.resize(40, 120)
+        await(4000) { capA.out.contains("RESIZE rows=20 cols=70") && capB.out.contains("RESIZE rows=40 cols=120") }
+        assertTrue("A sees 20x70", capA.out.contains("RESIZE rows=20 cols=70"))
+        assertFalse("A must not see B's 40x120", capA.out.contains("RESIZE rows=40 cols=120"))
+        assertTrue("B sees 40x120", capB.out.contains("RESIZE rows=40 cols=120"))
+
+        // G16: closing B must NOT affect A/C.
+        sB.close(true)
+        assertTrue("B CLOSED", await(1000) { capB.closed })
+        sA.write("PING A2\n".toByteArray())
+        sC.write("PING C2\n".toByteArray())
+        await(4000) { capA.out.contains("PONG A2") && capC.out.contains("PONG C2") }
+        assertTrue("A alive after B close", capA.out.contains("PONG A2"))
+        assertTrue("C alive after B close", capC.out.contains("PONG C2"))
+        sA.close(true); sC.close(true)
+    }
+
+    // ---- G17: sequential lifecycle (20 open/close, no leak) -----------------
+
+    @Test
+    fun g17_sequentialLifecycle() {
+        for (i in 0 until 20) {
+            val s = open(24, 80)
+            val out = readUntil(s, "READY", 4000)
+            assertTrue("iter $i READY, got: $out", out.contains("READY"))
+            s.write("PING it$i\n".toByteArray())
+            val pong = readUntil(s, "PONG it$i", 4000)
+            assertTrue("iter $i PONG, got: $pong", pong.contains("PONG it$i"))
+            s.close(true)
+        }
+        // No zombie / fd leak: a fresh session after 20 cycles still works.
+        val s = open()
+        assertTrue("post-cycle READY", readUntil(s, "READY", 4000).contains("READY"))
+        s.close(true)
+    }
+
+    // ---- G18: natural exit -> reopen ---------------------------------------
+
+    @Test
+    fun g18_naturalExitReopen() {
+        val sA = open()
+        val capA = Cap(); sA.setListener(capA)
+        readUntil(sA, "READY", 5000)
+        sA.write("EXIT 7\n".toByteArray())
+        assertTrue("A Exited(7)", await(4000) { capA.exitedCode == 7 })
+        assertTrue("A state EXITED", sA.state == ATSessionState.EXITED)
+        // A non-shell process exit must not pollute the engine.
+        val sB = open()
+        readUntil(sB, "READY", 5000)
+        sB.write("PING after\n".toByteArray())
+        assertTrue("B PONG after", readUntil(sB, "PONG after", 4000).contains("PONG after"))
+        sB.close(true)
+    }
+
+    // ---- G19: bounded failure path -----------------------------------------
+
+    @Test
+    fun g19_boundedFailurePath() {
+        // Unknown launch selector must yield a bounded Failure (no shell, no crash).
+        val r = eng.openSession(
+            ATPersistentBackend.Launch(command = "rm -rf /", initialRows = 24, initialCols = 80)
+        )
+        assertTrue("unknown selector must be Failure, got $r", r is ATOpenSessionResult.Failure)
+        val f = r as ATOpenSessionResult.Failure
+        assertTrue("failure reason non-empty", f.reason.isNotEmpty())
+    }
+}

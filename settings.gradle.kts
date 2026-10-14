@@ -39,3 +39,7 @@ include(":test-host")
 // AT.V3-2.3: ADB-only Test Host (TEST / VALIDATION ONLY) — proves physical
 // ADB-only composition (no :at-backend-local / :app dependency).
 include(":adb-only-test-host")
+// AT.TERM-0: Shellless Test Host (TEST / VALIDATION ONLY) — proves AT Engine
+// persistent terminal is a shell-independent byte-stream session (no
+// :at-backend-local / :at-backend-adb / :adb-engine / :app; no /system/bin/sh).
+include(":at-shellless-test-host")
