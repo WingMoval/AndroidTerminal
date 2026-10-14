@@ -348,7 +348,7 @@ VALIDATION_CHILDREN_REMAINING = 0
 
 EVIDENCE =
 docs/evidence/at_term_0/
-GIT_COMMIT = （commit 后回填）
+GIT_COMMIT = 73065c4（AT.TERM-0 closure commit）
 GIT_WORKTREE = CLEAN
 V2_WRITES = 0
 
