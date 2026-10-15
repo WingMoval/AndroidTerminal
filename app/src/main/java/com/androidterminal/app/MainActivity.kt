@@ -44,6 +44,10 @@ class MainActivity : Activity() {
 
     private val pages = SessionPageController()
 
+    // AT.DEBUG-0: process-scoped session registry + debug-only bridge.
+    private var sessionRegistry: AppSessionRegistry? = null
+    private var debugBridge: com.androidterminal.app.debug.DebugBridge? = null
+
     // UI
     private lateinit var outputText: TextView
     private lateinit var scroll: ScrollView
@@ -52,12 +56,20 @@ class MainActivity : Activity() {
     private lateinit var pageLabel: TextView
     private lateinit var adbStateLabel: TextView
     private lateinit var adbHint: TextView
+    private var debugStatusLabel: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Wire the single ADB runtime owner (process-scoped composition root).
         AppRuntime.initialize(applicationContext)
         setContentView(R.layout.activity_main)
+
+        // AT.DEBUG-0: registry + debug-only bridge (loopback, debug builds only).
+        sessionRegistry = AppSessionRegistry { pages.activePage?.pageId }
+        if (com.androidterminal.app.BuildConfig.DEBUG) {
+            debugBridge = com.androidterminal.app.debug.DebugBridge(sessionRegistry!!)
+            debugBridge?.start()
+        }
 
         outputText = findViewById(R.id.tvOutput)
         scroll = findViewById(R.id.scrollOutput)
@@ -66,6 +78,7 @@ class MainActivity : Activity() {
         pageLabel = findViewById(R.id.tvPage)
         adbStateLabel = findViewById(R.id.tvAdbState)
         adbHint = findViewById(R.id.tvAdbHint)
+        debugStatusLabel = findViewById(R.id.tvDebugBridge)
 
         findViewById<Button>(R.id.btnPrev).setOnClickListener { pages.prev(); renderPage() }
         findViewById<Button>(R.id.btnNext).setOnClickListener { pages.next(); renderPage() }
@@ -109,8 +122,27 @@ class MainActivity : Activity() {
      * SessionPage; only the backend kind differs (fixed at creation).
      */
     fun createPage(kind: SessionBackendKind): SessionPage {
-        val page = pages.add(kind, AppTerminal(eventListener = {}, kind = kind, engine = engineFor(kind)))
-        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) }, kind = kind, engine = engineFor(kind))
+        // Add a placeholder page first (assigns a stable pageId), then attach
+        // the real AppTerminal wired with that pageId + the debug registry.
+        val placeholder = AppTerminal(eventListener = {}, kind = kind, engine = engineFor(kind))
+        val page = pages.add(kind, placeholder)
+        page.terminal = AppTerminal(
+            eventListener = { ev -> onPageEvent(page, ev) },
+            kind = kind,
+            engine = engineFor(kind),
+            sessionId = page.pageId,
+            registry = sessionRegistry,
+            onInputActivity = { source, bytes ->
+                // External input activity = local UI annotation (NOT remote stdout).
+                if (source == InputSource.DEBUG) {
+                    val text = String(bytes, StandardCharsets.UTF_8).trimEnd('\n')
+                    mainHandler.post {
+                        page.outputBuffer.append("DEBUG > ").append(text).append("\n")
+                        if (pages.activePage === page) renderPage()
+                    }
+                }
+            },
+        )
         renderPage()
         return page
     }
@@ -124,7 +156,7 @@ class MainActivity : Activity() {
         if (ok) {
             // Apply the requested initial size (PTY starts at 0x0 per T1 evidence).
             page.terminal.resize(rows, cols)
-            page.terminal.session?.write(banner(page).toByteArray(StandardCharsets.UTF_8))
+            page.terminal.write(banner(page).toByteArray(StandardCharsets.UTF_8))
         }
         renderPage()
         return ok
@@ -135,6 +167,30 @@ class MainActivity : Activity() {
 
     /** Debug-only: the active page's backend kind. */
     fun activePageKind(): SessionBackendKind? = pages.activePage?.kind
+
+    /** Debug/test: the input box (so tests can drive Human input without uiautomator). */
+    val testInputBox: android.widget.EditText get() = inputBox
+
+    /** Debug/test: number of pages. */
+    fun pagesSize(): Int = pages.size
+
+    /** Debug/test: the active page's id (or -1). */
+    fun activePageId(): Int = pages.activePage?.pageId ?: -1
+
+    /** Debug/test: state name of a page by id (or null). */
+    fun pageStateById(id: Int): String? = pages.allPages().firstOrNull { it.pageId == id }?.state?.name
+
+    /** Debug/test: switch to a specific page by id. */
+    fun switchToPage(id: Int) {
+        val target = pages.allPages().indexOfFirst { it.pageId == id }
+        if (target < 0) return
+        // Walk next/prev until active == target.
+        repeat(pages.size) {
+            if (pages.activePage?.pageId == id) return
+            pages.next()
+        }
+        renderPage()
+    }
 
     private fun engineFor(kind: SessionBackendKind): com.at.engine.ATEngine? =
         if (kind == SessionBackendKind.ADB) AppRuntime.adbEngine() else null
@@ -240,7 +296,16 @@ class MainActivity : Activity() {
         pageLabel.text = "${pages.size} page(s)  #${page.pageId} $kindTag (${page.state.name})"
         stateLabel.text = "State: ${page.state.name}"
         outputText.text = page.outputBuffer.toString()
+        updateDebugStatus()
         scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+
+    /** AT.DEBUG-0: show the loopback DebugBridge status (debug builds only). */
+    private fun updateDebugStatus() {
+        val bridge = debugBridge ?: return
+        val label = debugStatusLabel ?: return
+        label.visibility = View.VISIBLE
+        label.text = "DebugBridge: ${bridge.status} (127.0.0.1:${bridge.portForUi()})"
     }
 
     // ------------------------------------------------------------------
@@ -320,5 +385,12 @@ class MainActivity : Activity() {
         super.onDestroy()
         // Close ALL sessions (PTY/fd/shell cleanup). Retention = DEFERRED.
         pages.closeAll()
+        // AT.DEBUG-0: unregister all handles (session lifecycle ended) + stop the
+        // loopback debug bridge (debug builds only).
+        sessionRegistry?.let { reg ->
+            reg.list().forEach { reg.unregister(it.sessionId) }
+        }
+        debugBridge?.stop()
+        debugBridge = null
     }
 }

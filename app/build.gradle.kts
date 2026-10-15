@@ -16,6 +16,10 @@ android {
     namespace = "com.androidterminal.app"
     compileSdk = 34
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.androidterminal.app"
         minSdk = 26

@@ -109,6 +109,7 @@ AndroidTerminal-V3/
 | （AT.CONTRACT-0.5 新增）`AppTerminal` + `AppDebugInputTest` | App consumer 组合 root + debug-only 自动化输入 | 复用同一 AT Engine→Local backend 路径；instrumentation | **DEV_PREVIEW / DEBUG_ONLY**（T1–T8 真机 PASS；非生产公开接口） |
 | （AT.DEVAPP-0.2 新增）`SessionPage` + `SessionPageController` + `DynamicSessionPagesTest` | 动态 Session 分页（App/UI 层）| 每页独立 AppTerminal→ATTerminalSession；操作作用于 active page | **DEV_PREVIEW / DEBUG_ONLY**（ds1–ds9 真机 PASS + 9 张截图；Contract 未改） |
 | （AT.HUMAN-ADB-0 新增）`AppRuntime` + `SessionBackendKind` + `PairActivity` + `CommonConsumerPathTest` / `ProgrammaticAdbConsumerTest` / `AdbHumanPreviewTest` | Human ADB Preview + Common AT Consumer Path（Local + ADB provider composition）| AppRuntime（单 AdbRuntime owner + 构建 Local/ADB ATEngine）；SessionPage 共用（backendKind 固定）；PairActivity 普通 Activity 配对码输入（非悬浮窗）；Debug consumer 经 AppRuntime→ATEngine（无 UI）| **HUMAN_PREVIEW**（Local + ADB provider composition VERIFIED；Human/Debug parity PASS；identity 持久化/restart PASS；AT Engine 0 改动；Contract 未改；正式 Product onboarding 仍 NOT_STARTED） |
+| （AT.DEBUG-0 新增）`SharedSessionHandle` + `AppSessionRegistry` + `debug/DebugBridge` + `debug/DebugProtocol` + `tools/at_debug_client.py` + `SharedSessionBridgeTest` | UI-visible Programmatic Terminal Bridge（developer-only，attach 到 Human 已打开的真实 TerminalSession）| SharedSessionHandle（单一 session listener，serialized write，双向 input/output/state fan-out）；AppSessionRegistry（:app host 层，pageId→handle）；DebugBridge（debug-only loopback 127.0.0.1:45679 TCP JSONL，BuildConfig.DEBUG gate）；PC client（adb forward，stdlib-only）| **PROGRAMMATIC_HUMAN_SHARED_SESSION VERIFIED**（B1-B14 13/13 真机 PASS；Release isolation PASS；AT Engine 0 改动；ADB Engine 0 改动；非 AG protocol；非 AT.CLI；HUMAN_AGENT_SHARED_SESSION 仍 DEFERRED） |
 | （已退役）AT.DEVAPP-0.1 `TestSessionObserver` / 测试观察区 | 旧特殊 Debug UI | 由普通 SessionPage 替代 | **REMOVED**（0.2 后不再特殊化） |
 
 ### 3.6 → `:test-host`
@@ -223,11 +224,22 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                        evidence: docs/evidence/at_v3_debt_1/）
  ADB_ENGINE_COMPLETION = FOLLOWUP（PairingCoordinator / Identity lifecycle / AUTH taxonomy / re-pair /
                         first-run orchestration / diagnostics / reconnect UX = NOT_STARTED；非 V2 debt）
- AT.TERM-0             = COMPLETE（shell-independent AT Engine validation：:at-shellless-test-host 物理隔离
-                        ABSENT local/adb/app + shell 字符串 ABSENT + shellless native probe fork-without-exec；
-                        真机 G2-G19 15/15 PASS + 回归 Local 11/App 16/Headless 1/ADB 25/Parity 34/Runtime 12/
-                        Pairing 54/AT 6 全 PASS → AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = VERIFIED）
- NEXT                  = AT.CLI-0（Local /system/bin/sh -> adb/at CLI facade -> embedded capability）
+  AT.TERM-0             = COMPLETE（shell-independent AT Engine validation：:at-shellless-test-host 物理隔离
+                         ABSENT local/adb/app + shell 字符串 ABSENT + shellless native probe fork-without-exec；
+                         真机 G2-G19 15/15 PASS + 回归 Local 11/App 16/Headless 1/ADB 25/Parity 34/Runtime 12/
+                         Pairing 54/AT 6 全 PASS → AT_ENGINE_SHELL_SEMANTIC_INDEPENDENCE = VERIFIED）
+  AT.DEBUG-0            = COMPLETE（UI-visible Programmatic Terminal Bridge：:app host 层
+                         SharedSessionHandle（单一 session listener，serialized write，双向 fan-out）+
+                         AppSessionRegistry + debug-only DebugBridge（loopback 127.0.0.1:45679 TCP JSONL，
+                         BuildConfig.DEBUG gate）+ stdlib-only PC client；Human UI 已打开的
+                         TerminalSession 被 Debug attach（不创建第二个隐藏 session）；
+                         真机 B1-B14 13/13 PASS + 回归 Local 11/App 7/AT 6/Shellless 15/Pairing 54/
+                         Common 3/HumanPreview 6/Programmatic 7 全 PASS + Release isolation PASS
+                         （debug PRESENT / release ABSENT）→
+                         PROGRAMMATIC_HUMAN_SHARED_SESSION = VERIFIED；
+                         HUMAN_AGENT_SHARED_SESSION = DEFERRED / NOT_STARTED；
+                         evidence: docs/evidence/at_debug_0/）
+  NEXT                  = AT.CLI-0（Local /system/bin/sh -> adb/at CLI facade -> embedded capability）
 ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

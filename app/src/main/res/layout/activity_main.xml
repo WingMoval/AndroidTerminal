@@ -22,6 +22,15 @@
         android:textSize="10sp" />
 
     <TextView
+        android:id="@+id/tvDebugBridge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="DebugBridge: -"
+        android:textColor="#808080"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/tvState"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

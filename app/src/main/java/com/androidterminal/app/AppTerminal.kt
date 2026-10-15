@@ -38,6 +38,12 @@ class AppTerminal(
     private val eventListener: (ATSessionEvent) -> Unit,
     val kind: SessionBackendKind = SessionBackendKind.LOCAL,
     engine: ATEngine? = null,
+    /** Optional app-level session id (SessionPage.pageId) for the shared handle. */
+    val sessionId: Int = 0,
+    /** Optional registry to register the shared handle into (null = no debug bridge). */
+    private val registry: AppSessionRegistry? = null,
+    /** Optional input-activity callback (for UI annotation of external writes). */
+    private val onInputActivity: ((InputSource, ByteArray) -> Unit)? = null,
 ) {
     private val engine: ATEngine = engine ?: ATEngine(
         oneShot = null, // Dev preview / debug is persistent-focused (not one-shot)
@@ -48,9 +54,32 @@ class AppTerminal(
     var session: ATTerminalSession? = null
         private set
 
+    /** Shared handle wrapping the current session (for Human + Debug fan-out). */
+    var sharedHandle: SharedSessionHandle? = null
+        private set
+
+    /** Human UI observer on the shared handle (output/state/input-activity). */
+    private val humanObserver = object : SessionObserver {
+        override fun onOutput(bytes: ByteArray) {
+            eventListener(ATSessionEvent.Data(bytes))
+        }
+
+        override fun onStateChange(state: ATSessionEvent) {
+            eventListener(state)
+        }
+
+        override fun onInputActivity(source: InputSource, bytes: ByteArray) {
+            onInputActivity?.invoke(source, bytes)
+        }
+    }
+
     /**
      * Open a new persistent session. Default command: Local -> /system/bin/sh;
      * ADB -> "" (AdbPersistentBackend opens `shell,v2,pty:` regardless).
+     *
+     * When a registry is provided, the session is wrapped in a SharedSessionHandle
+     * (single listener, fan-out to Human + Debug) and registered. Writes then go
+     * through the handle's serialized path.
      */
     fun open(rows: Int = 24, cols: Int = 80, command: String = defaultCommand()): Boolean {
         close()
@@ -64,7 +93,17 @@ class AppTerminal(
         return when (r) {
             is ATOpenSessionResult.Success -> {
                 session = r.session
-                r.session.setListener { ev -> eventListener(ev) }
+                val reg = registry
+                if (reg != null && sessionId != 0) {
+                    val handle = SharedSessionHandle(sessionId, kind, r.session)
+                    handle.addObserver(humanObserver)
+                    handle.attachSessionListener() // single listener = the handle
+                    reg.register(handle)
+                    sharedHandle = handle
+                } else {
+                    // No debug bridge: direct listener (legacy path).
+                    r.session.setListener { ev -> eventListener(ev) }
+                }
                 true
             }
             is ATOpenSessionResult.Failure -> {
@@ -79,9 +118,19 @@ class AppTerminal(
 
     fun state(): ATSessionState = session?.state ?: ATSessionState.CLOSED
 
-    /** Write raw bytes to the persistent session. Returns bytes accepted or -1. */
-    fun write(bytes: ByteArray): Int =
-        session?.write(bytes) ?: -1
+    /**
+     * Write raw bytes (Human source). Goes through the shared handle's
+     * serialized path when present (so Human + Debug never byte-interleave);
+     * otherwise direct to the session.
+     */
+    fun write(bytes: ByteArray): Int {
+        val h = sharedHandle
+        if (h != null) {
+            h.write(InputSource.HUMAN, bytes)
+            return bytes.size
+        }
+        return session?.write(bytes) ?: -1
+    }
 
     /** Write a string without an auto newline (byte-stream semantics). */
     fun writeText(text: String): Int = write(text.toByteArray())
@@ -92,10 +141,23 @@ class AppTerminal(
     /** Send Ctrl-C (0x03) to the foreground process. */
     fun ctrlC(): Int = write(byteArrayOf(0x03))
 
-    fun resize(rows: Int, cols: Int): Boolean = session?.resize(rows, cols) ?: false
+    fun resize(rows: Int, cols: Int): Boolean {
+        val h = sharedHandle
+        if (h != null) return h.resize(rows, cols)
+        return runCatching { session?.resize(rows, cols) }.getOrNull() ?: false
+    }
 
     fun close() {
-        runCatching { session?.close() }
+        val h = sharedHandle
+        if (h != null) {
+            // Close the session but KEEP the handle in the registry (closed state)
+            // so a Debug write after Human-close gets SESSION_CLOSED (rejected),
+            // not "no such session". Unregister happens on Activity destroy.
+            h.close()
+            sharedHandle = null
+        } else {
+            runCatching { session?.close() }
+        }
         session = null
     }
 }

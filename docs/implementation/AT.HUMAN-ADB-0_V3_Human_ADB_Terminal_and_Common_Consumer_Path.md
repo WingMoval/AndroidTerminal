@@ -268,10 +268,19 @@ test-host ADB Headless/Parity/Runtime 25/34/12 —— 设备本地回环 adbd ke
 ## 29. Cleanup
 
 ```
-TEST_APKS_REMOVED = 收尾时执行
+TEST_APKS_REMOVED = YES（at-human-adb-0 / at-v3-debt-1 / at-term-0 test APK 已卸载；主 App 保留）
 MAIN_APP_LEFT_INSTALLED = YES
 APP_PREVIEW_IDENTITY_PERSISTED = YES
 WD_FINAL_STATE = 1
+```
+
+## 29a. §70 Consistency Corrections（2026-10-16，AT.DEBUG-0 收尾时校正）
+
+```
+MANUAL_PAIRING_PROVISIONING_UI = PRESENT（PairActivity 普通 Activity 配对码输入，非 overlay）
+FIRST_RUN_PAIRING_ONBOARDING   = NOT_STARTED（正式 Product first-run 引导仍 NOT_STARTED）
+TEST_APKS_REMOVED              = YES（主 App 保留）
+PAIRING_MECHANISM              = VERIFIED / MIGRATED（app 自身 identity 配对已验证；非 WRITE_SECURE_SETTINGS bootstrap）
 ```
 
 ## 30. Final Verdict

@@ -1027,6 +1027,24 @@ Human-Agent Shared Session
 = DEFERRED
 ```
 
+> **AT.DEBUG-0 更新（2026-10-16）**：真实需求已触发，并完成一个
+> **developer-only Debug vertical slice** —— UI-visible Programmatic Terminal Bridge
+> （debug build only，loopback `127.0.0.1:45679`），让 PC/OpenCode **attach** 到 Human UI
+> 已打开的真实 TerminalSession（不创建第二个隐藏 session），Human 与 Debug 共享同一个
+> ATTerminalSession（单 listener、单 RX owner、serialized write、双向 input-activity +
+> output + state fan-out）。这是 **HUMAN_DEBUG_SHARED_SESSION**，不是完整
+> **HUMAN_AGENT_SHARED_SESSION**。
+>
+> ```text
+> PROGRAMMATIC_HUMAN_SHARED_SESSION = VERIFIED（AT.DEBUG-0）
+> HUMAN_DEBUG_SHARED_SESSION        = VERIFIED（AT.DEBUG-0）
+> HUMAN_AGENT_SHARED_SESSION        = DEFERRED / NOT_STARTED
+> ATTACH / HANDOFF / TAKEOVER       = DEFERRED（Agent ownership 未设计）
+> ```
+>
+> DebugBridge 是 developer-only transport，**不是** AT Engine feature、**不是** future AG
+> protocol、**不是** AT.CLI。AT Engine public contract 与 ADB Engine 均未改。
+
 ---
 
 ## 18. Input System
