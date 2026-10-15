@@ -108,6 +108,7 @@ AndroidTerminal-V3/
 | `app/.../AtWirelessConnector.kt` | Host helper | 演进（走 AT Engine public boundary）| INVENTORIED |
 | （AT.CONTRACT-0.5 新增）`AppTerminal` + `AppDebugInputTest` | App consumer 组合 root + debug-only 自动化输入 | 复用同一 AT Engine→Local backend 路径；instrumentation | **DEV_PREVIEW / DEBUG_ONLY**（T1–T8 真机 PASS；非生产公开接口） |
 | （AT.DEVAPP-0.2 新增）`SessionPage` + `SessionPageController` + `DynamicSessionPagesTest` | 动态 Session 分页（App/UI 层）| 每页独立 AppTerminal→ATTerminalSession；操作作用于 active page | **DEV_PREVIEW / DEBUG_ONLY**（ds1–ds9 真机 PASS + 9 张截图；Contract 未改） |
+| （AT.HUMAN-ADB-0 新增）`AppRuntime` + `SessionBackendKind` + `PairActivity` + `CommonConsumerPathTest` / `ProgrammaticAdbConsumerTest` / `AdbHumanPreviewTest` | Human ADB Preview + Common AT Consumer Path（Local + ADB provider composition）| AppRuntime（单 AdbRuntime owner + 构建 Local/ADB ATEngine）；SessionPage 共用（backendKind 固定）；PairActivity 普通 Activity 配对码输入（非悬浮窗）；Debug consumer 经 AppRuntime→ATEngine（无 UI）| **HUMAN_PREVIEW**（Local + ADB provider composition VERIFIED；Human/Debug parity PASS；identity 持久化/restart PASS；AT Engine 0 改动；Contract 未改；正式 Product onboarding 仍 NOT_STARTED） |
 | （已退役）AT.DEVAPP-0.1 `TestSessionObserver` / 测试观察区 | 旧特殊 Debug UI | 由普通 SessionPage 替代 | **REMOVED**（0.2 后不再特殊化） |
 
 ### 3.6 → `:test-host`
@@ -171,12 +172,17 @@ ADB_ENGINE_PARITY    = PARTIAL（connect/one-shot/reuse/interactive 真机 PASS�
 AT_CONTRACT          = REVISED_DRAFT（AT.CONTRACT-0 + AT.PERSIST-0 C1/C2/C3 修订）
 AT_ENGINE_INDEP      = VERIFIED（:at-engine 零依赖 backend/adb/UI）
 LOCAL_BACKEND        = MIGRATED（AT.PERSIST-0 真机 P1–P10 PASS）
-APP_PREVIEW          = DEV_PREVIEW（AT.DEVAPP-0：Local raw terminal preview APK，真机安装/启动 PASS；
-                       正式 Human UI 仍 NOT_STARTED）
+APP_PREVIEW          = HUMAN_PREVIEW（AT.HUMAN-ADB-0：Local + ADB provider composition VERIFIED；
+                        Human ADB 真机 id→uid=2000(shell)；Common Consumer Path（Human/Debug parity）
+                        VERIFIED；identity 持久化/process restart PASS；AT Engine 0 改动；Contract 未改；
+                        正式 Product onboarding 仍 NOT_STARTED）
 DEBUG_INPUT          = CONFIRMED（AT.CONTRACT-0.5：Byte Stream 语义；Headless + Dev App 自动化输入
-                       instrumentation，T1–T8 真机 PASS；Contract 未改）
+                        instrumentation，T1–T8 真机 PASS；Contract 未改）
 DYNAMIC_SESSIONS     = CONFIRMED（AT.DEVAPP-0.2：动态 Session 分页，Human 与 Debug 共用普通页，
-                       ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
+                        ds1–ds9 真机 PASS + 9 张截图；旧 Test Observation 特殊 UI 已退役；Contract 未改）
+COMMON_CONSUMER_PATH = VERIFIED（AT.HUMAN-ADB-0：Human + Debug 共同消费 ATEngine，
+                        Human/Debug parity PASS；Debug 不依赖 UI/IME/uiautomator；
+                        结果来自 AT session output；AT Engine 未改）
 ADB_BACKEND          = VERIFIED / COMPLETE（AT.V3-2 + AT.V3-2.1 + AT.V3-2.2：one-shot + persistent
                        + concurrent multi-session 真机 PASS；含 large-output 64K/256K/1M 完整 PASS；
                        AT Engine/Contract 未改）

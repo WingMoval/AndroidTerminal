@@ -22,15 +22,24 @@ import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
 
 /**
- * App-side terminal composition root.
+ * App-side terminal composition helper.
+ *
+ * One AppTerminal = one TerminalSession over a SELECTED backend kind. Local and
+ * ADB share the SAME ATEngine public surface (openSession / write / resize /
+ * close / events). The engine is injected (built by [AppRuntime]) so this class
+ * never constructs backends directly for ADB — it just consumes AT Engine.
  *
  * @param eventListener receives session output/state events (UI shows them;
  *        debug tests assert them). Implementation shape PROVISIONAL.
+ * @param kind which backend kind this terminal drives (provider identity).
+ * @param engine the ATEngine to use (null = build a Local-only engine).
  */
 class AppTerminal(
     private val eventListener: (ATSessionEvent) -> Unit,
+    val kind: SessionBackendKind = SessionBackendKind.LOCAL,
+    engine: ATEngine? = null,
 ) {
-    private val engine: ATEngine = ATEngine(
+    private val engine: ATEngine = engine ?: ATEngine(
         oneShot = null, // Dev preview / debug is persistent-focused (not one-shot)
         persistent = LocalPersistentBackend(),
     )
@@ -39,8 +48,11 @@ class AppTerminal(
     var session: ATTerminalSession? = null
         private set
 
-    /** Open a new Local persistent session (default launch = /system/bin/sh). */
-    fun open(rows: Int = 24, cols: Int = 80, command: String = "/system/bin/sh"): Boolean {
+    /**
+     * Open a new persistent session. Default command: Local -> /system/bin/sh;
+     * ADB -> "" (AdbPersistentBackend opens `shell,v2,pty:` regardless).
+     */
+    fun open(rows: Int = 24, cols: Int = 80, command: String = defaultCommand()): Boolean {
         close()
         val r = engine.openSession(
             ATPersistentBackend.Launch(
@@ -61,6 +73,9 @@ class AppTerminal(
             }
         }
     }
+
+    private fun defaultCommand(): String =
+        if (kind == SessionBackendKind.ADB) "" else "/system/bin/sh"
 
     fun state(): ATSessionState = session?.state ?: ATSessionState.CLOSED
 

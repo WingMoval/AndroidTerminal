@@ -41,8 +41,11 @@ dependencies {
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))
-    // The App does NOT depend on :adb-engine directly — ADB reaches it only
-    // through the ADB Backend (Canonical V1 §7.1 consumer-provider rule).
+    // AT.HUMAN-ADB-0: the App composes the ADB lifecycle (AdbRuntime) as the
+    // authoritative ADB connection owner (Canonical V1 §7.2; AT.V3-2.3
+    // composition). Terminal execution still goes ONLY through ATEngine ->
+    // ADB Backend -> ADB Engine.
+    implementation(project(":adb-engine"))
 
     // AT.CONTRACT-0.5: debug-only automated input test (AppDebugInputTest).
     androidTestImplementation("androidx.test:runner:1.5.2")

@@ -1,161 +1,202 @@
-# AT.TERM-0 Evidence — Shell-independent AT Engine Validation
+# AT.HUMAN-ADB-0 Evidence
 
-> 设备：`APLMUT4312005935`（HONOR ALI-AN00 / Android 15 / arm64-v8a）
-> 状态：**COMPLETE**（构建/审计/代码 + 真机 G2-G19 + 全回归 全 PASS）
-> 日期：2026-10-13
+## Baseline
 
-## 0. 基线
-
-```text
-V3 HEAD = d81e6ca（clean）
-V2 HEAD = 726a441（43 项会前 dirty，零写入）
+```
+BASELINE_V3 = ce48b7d（clean）
+BASELINE_V2 = 726a441（43 会前 dirty）
+V2_WRITES = 0
 ```
 
-## 1. Artifact Isolation（G0）— PASS
+## Scope Recovery
 
-### Gradle dependency graph（debugRuntimeClasspath）
+前半程 5 种 HONOR pairing UX 尝试（overlay/freeform/split/MagicWindow/Accessibility）全部不可行，
+已移除相关代码（AutoPairAccessibilityService / freeform 代码 / SYSTEM_ALERT_WINDOW / PairActivity 悬浮窗版）。
+恢复 PairActivity 为**普通 Activity** 配对码输入窗口（非悬浮窗）。
 
-```text
-Project ':at-shellless-test-host'
-\--- project :at-engine
-（无 :at-backend-local / :at-backend-adb / :adb-engine / :app）
+## Pairing UX Experiment Removal
+
+```
+PAIRING_PRODUCT_UI = ABSENT
+ACCESSIBILITY_PAIRING_SERVICE = ABSENT
+OVERLAY_PAIRING_UI = ABSENT
+PAIRING_MAGIC_WINDOW_CODE = ABSENT
+PAIRING_FREEFORM_CODE = ABSENT
 ```
 
-### APK native libs
+## Dependency Graph
 
-```text
-lib/arm64-v8a/libat_shellless_probe.so   （唯一）
-forbidden (at_local_backend / at_adb / libadb) = (none)
+```
+:app → :at-engine, :at-backend-local, :at-backend-adb, :adb-engine
+:at-backend-adb → :at-engine, :adb-engine
+:adb-engine → （native ADB protocol/transport/stream/pairing）
 ```
 
-### DEX string audit（classes.dex .. classes4.dex）
+`:at-engine` 0 改动，`:adb-engine` 0 改动（外部 AT.LOCAL-TCP-0 stash 排除）。
 
-```text
-com/at/backend/local     = (none)
-com/at/backend/adb       = (none)
-com/adb/engine           = (none)
-com/androidterminal/app  = (none)
-/system/bin/sh           = (none)
-sh -c                    = (none)
-toybox sh                = (none)
-/bin/sh                  = (none)
+## AppRuntime Composition
+
+```kotlin
+AppRuntime.initialize(ctx)   // wire AdbRuntime + fix app keyDir (filesDir/adb_identity)
+AppRuntime.adbState()        // single AdbRuntime owner
+AppRuntime.connectAuto()     // drive connectAuto
+AppRuntime.localEngine()     // ATEngine + LocalPersistentBackend
+AppRuntime.adbEngine()       // ATEngine + AdbPersistentBackend
 ```
 
-### Source shell-string audit
+## AdbRuntime Lifecycle Owner
 
-```text
-at-shellless-test-host/src 内 /system/bin/sh|sh -c|toybox|/bin/sh|ProcessBuilder|
-Runtime.exec|system(|popen|execve|kShell 共 8 处，全部为注释（描述"不执行 shell"）。
-实际可执行/runtime path = 0。
-SYSTEM_BIN_SH_RUNTIME_DEPENDENCY = ABSENT
+`AdbRuntime` owns readiness / discovery / endpoint lifecycle / connectAuto / recovery / runtime state.
+`ATEngine` 不操作 ADB lifecycle。`SessionPage` 不操作 mDNS / endpoint。
+
+## ATEngine Execution Owner
+
+Human / Debug 都消费 `ATEngine.openSession` / `write` / `resize` / `close` / events。
+`ATEngine` = terminal execution owner，backend-neutral。
+
+## Identity
+
+```
+APP_ADB_IDENTITY_PATH = files/adb_identity/
+APP_ADB_IDENTITY_SELF_GENERATED = YES
+PC_ADBKEY_COPIED = NO
+adbkey.pub md5 = 506a6036fdc3e82d09d946d19ba1c56c（public key hash，非 secret）
+DEVICE_APP_IDENTITY_TRUST = PRESENT_INTENTIONAL（PairActivity 配对后 trusted）
 ```
 
-## 2. AT Engine unit（JVM，无需设备）
+## Identity Persistence
 
-```text
-ATExecutionContractTest 3/3 + ATSessionContractTest 3/3 = 6/6 PASS
+```
+force-stop 前 adbkey.pub md5 = 506a6036fdc3e82d09d946d19ba1c56c
+force-stop + relaunch 后 = 相同（506a6036fdc3e82d09d946d19ba1c56c）
+APP_ADB_IDENTITY_PERSISTENCE = PASS
+REPAIR_AFTER_RESTART_REQUIRED = NO
 ```
 
-## 3. 构建
+## connectAuto / READY
 
-```text
-:at-shellless-test-host:assembleDebug            BUILD SUCCESSFUL（libat_shellless_probe.so）
-:at-shellless-test-host:assembleDebugAndroidTest BUILD SUCCESSFUL
-APK:
-  at-shellless-test-host-debug.apk              1213804B
-  at-shellless-test-host-debug-androidTest.apk   417618B
+`AppRuntime.connectAuto()` → `AdbRuntime.connectAuto(keyDir)` → READY（trusted identity）。
+
+## Human Path（AdbHumanPreviewTest 6/6）
+
+```
+h1: ADB READY visible
+h2: ADB page id → uid=2000(shell)
+h3: multi ADB session isolation（A cwd /data/local/tmp，B 独立）
+h4: Local + ADB coexistence
+h5: Ctrl-C（sleep 30 → 0x03 → AFTER_CTRL_C，session ACTIVE）
+h6: resize isolation（40x120）
 ```
 
-## 4. 真机 Gate（G2-G19）— 全 PASS
+## Debug Path（CommonConsumerPathTest 3/3 + ProgrammaticAdbConsumerTest 7/7）
 
-```text
-ShelllessRealDeviceTest = OK (15 tests)  [14 G-gates + 1 /proc capture]
+```
+CommonConsumerPathTest:
+  C1-C4 Local session（open/write/observe/resize/close）
+  C5-C10 ADB session（connectAuto → open → id → uid=2000 → resize → close）
+  C11 ADB persistent cwd/env
 
-G2  child not /system/bin/sh        PASS（/proc 证据见 §6）
-G3  real PTY isatty 0/1/2 = 1       PASS（READY: tty=/dev/pts/<n> isatty0/1/2=1）
-G4  initial 33x99 (TIOCGWINSZ)      PASS（child 自身读出 rows=33 cols=99）
-G5  write->child->read roundtrip    PASS（PING alpha -> PONG alpha）
-G6  chunked input                   PASS（"PING "+"beta+"\n" -> PONG beta）
-G7  UTF-8 byte preservation         PASS（PING 中文测试 + split-utf8 -> byte-exact）
-G8  resize 41x123 child-observed    PASS（RESIZE rows=41 cols=123 + Resized event）
-G9  control byte 0x03 -> SIGINT     PASS（0x03 -> SIGINT marker；ISIG 信号路径）
-G10 natural EXIT 7 -> Exited(7)     PASS（state EXITED）
-G11 explicit close -> CLOSED        PASS（write 后 close 返回 -1，无残留）
-G12 pull mode                       PASS（READY/PONG；timeout 空数组；EOF null）
-G13 push/listener mode              PASS（Data/Resized/Exited/Closed）
-G14 3 concurrent sessions           PASS（PING A/B/C 无串流）
-G15 session resize isolation        PASS（A=20x70 / B=40x120 / C 无 RESIZE）
-G16 close-one isolation             PASS（close B 不影响 A/C）
-G17 sequential lifecycle 20/20      PASS（无 leak；post-cycle 新 session 正常）
-G18 natural exit -> reopen          PASS（A EXIT 7 后 B 正常 PONG）
-G19 bounded failure path            PASS（未知 selector "rm -rf /" -> Failure，无 shell）
+ProgrammaticAdbConsumerTest（预留程序化通路，无 UI）:
+  principalUid2000: id → uid=2000(shell)
+  persistentCwd: cd /data/local/tmp → pwd
+  persistentEnv: export AT_PREVIEW=OK → echo → OK
+  ctrlC: sleep 30 → 0x03 → AFTER_CTRL_C
+  resizeIsolation: c1 40x120, c2 24x80 不变
+  multiSessionIsolation: A/B 独立 cwd
+  localAdbCoexistence: ADB uid=2000, Local app UID（非 2000）
 ```
 
-## 5. Regression — 全 PASS
+`DEBUG_RESULT_SOURCE = AT_SESSION_OUTPUT`（非 logcat scraping）。
+`DEBUG_REQUIRES_HUMAN_UI/IME/UIAUTOMATOR = NO`。
 
-```text
-Local (LocalPersistentSliceTest)        OK (11)
-App (app.test)                          OK (16)
-Headless (TestHostHeadlessInputTest)    OK (1)
-ADB Backend (AdbBackendHeadlessTest)    OK (25)   [port 42173, PC key, WD=1]
-Backend Parity (BackendParityAuditTest) OK (34)   [port 42173]
-AdbRuntimeLifecycle (12)                OK (12)
-Pairing deterministic (pairing_selftest) 54 PASS / 0 FAIL（真机 /data/local/tmp）
-AT Engine unit (JVM)                    6/6
+## cwd / env Persistence
+
+```
+ADB_PERSISTENT_CWD = PASS（cd /data/local/tmp → pwd = /data/local/tmp）
+ADB_PERSISTENT_ENV = PASS（export AT_PREVIEW=OK → echo $AT_PREVIEW = OK）
 ```
 
-## 6. 运行证据（真机 /proc + logcat）
+## Ctrl-C
 
-### child /proc 身份（g2_procCapture，child 存活时采集）
-
-```text
-CHILD_PID   = 17038
-CMDLINE     = com.androidterminal.shelllesshost（fork 继承原 cmdline，未 exec 任何 shell）
-EXE         = /system/bin/app_process64   ← NOT /system/bin/sh
-TTY_FD0     = /dev/pts/1                  ← 真实 PTY
-NAME        = ...roidJUnitRunner（instrumentation 进程名，fork 继承）
-PPid        = 16696（= test 进程；child 是其子进程）
-Uid         = 10357（= shelllesshost app uid，非 shell uid 2000）
+```
+ADB_UI_CTRL_C = PASS（sleep 30 → 0x03 → SIGINT → echo AFTER_CTRL_C 仍工作，session ACTIVE）
 ```
 
-### READY 行（G2/G3/G4）
+## Resize
 
-```text
-READY pid=14404 tty=/dev/pts/0 isatty0=1 isatty1=1 isatty2=1 rows=33 cols=99
+```
+ADB_UI_RESIZE = PASS（40x120 stty size 反映 40）
+ADB_UI_RESIZE_ISOLATION = PASS（c2 不受影响，仍 24）
 ```
 
-### logcat（resize 因果）
+## Multi-session
 
-```text
-AtShelllessPty: parent TIOCSWINSZ master=90 -> 41x123 rc=0 errno=0
-AtShelllessPty: parent readback master=90 = 41x123
-AtShelllessPty: child winsize changed 33x99 -> 41x123
+```
+ADB_HUMAN_MULTI_SESSION = PASS
+ADB_SESSION_COUNT = 3（ProgrammaticAdbConsumerTest 用 2，AdbHumanPreviewTest h3 用 2）
+PHYSICAL_ADB_CONNECTION_COUNT = 1（单 AdbRuntime owner）
+TLS_HANDSHAKE_COUNT = 1
+RX_OWNER_COUNT = 1
+SESSION_IO_ISOLATION = PASS
+SESSION_CWD_ISOLATION = PASS
+SESSION_CTRL_C_ISOLATION = PASS
+SESSION_RESIZE_ISOLATION = PASS
+SESSION_CLOSE_ISOLATION = PASS
+INACTIVE_OUTPUT_BUFFERING = PASS
 ```
 
-```text
-CHILD_EXECVE_USED = NO
-CHILD_PROGRAM = in-process native probe after fork
-CHILD_EXE = /system/bin/app_process64（非 shell）
+## Local + ADB Coexistence
+
+```
+LOCAL_ADB_COEXISTENCE = PASS（Local app UID + ADB uid=2000 同时 ACTIVE）
+LOCAL_BACKEND_REQUIRED_BY_ADB_PREVIEW = NO
 ```
 
-## 7. 设备清理
+## Process Restart
 
-```text
-shellless 测试文件 (shellless_proc/child/pid.txt)  = 已删
-shellless APK (main + test)                        = 已卸载
-/data/local/tmp (pairing_selftest, ps_out, atkey*, aokey*) = 已删
-残留 shellless 进程                                = 无
-残留 zombie (defunct)                              = 0
-残留 /dev/pts                                      = 0
-主 App (com.androidterminal.app)                   = 保留
-WD 恢复开局值                                      = 1
-（本轮未新增 pairing trust residue；ADB 回归用已有 PC key）
+```
+ADB_PREVIEW_PROCESS_RESTART = PASS（force-stop → relaunch → same identity → READY → id uid=2000）
+REPAIR_AFTER_RESTART_REQUIRED = NO
 ```
 
-## 8. 安全
+## APK
 
-```text
-本轮无需 ADB private key / pairing code（shellless 路径 ADB 完全 ABSENT）。
-ADB 回归用 PC key（设备已信任，DEBT-1 前既有 trust）。
-无用户敏感数据。测试 identity 未 commit。
 ```
+APK_PATH = D:\codebank\AndCode\AndroidTerminal-V3\app\build\outputs\apk\debug\app-debug.apk
+APK_SIZE = 7817845
+APK_SHA256 = 17858358592E5962A9B16B32F41D0B884B522B78A431D14F4FF4439CED3C8B43
+APK_INSTALLED = YES
+```
+
+## Screenshot Index
+
+```
+docs/evidence/at_human_adb_0/
+  h1_adb_ready.png
+  h2_adb_id_uid2000.png
+  h3_multi_adb_isolation.png
+  h4_local_adb_coexist.png
+  h5_ctrlc_continue.png
+  h6_adb_resize.png
+```
+
+## Regression Summary
+
+```
+LOCAL_REGRESSION = 11/11
+APP_DEBUG_INPUT_REGRESSION = 7/7
+AT_ENGINE_TESTS = 6/6（JVM）
+SHELLLESS_REGRESSION = 15/15
+PAIRING_DETERMINISTIC_REGRESSION = 54/54
+COMMON_CONSUMER_PATH_TEST = 3/3
+ADB_HUMAN_PREVIEW_TEST = 6/6
+PROGRAMMATIC_ADB_CONSUMER_TEST = 7/7
+test-host ADB Headless/Parity/Runtime = 设备本地回环 adbd key 认证受限
+  （fresh 设备无 root，/data/misc/adb 不可写；独立 ADB provider regression，
+  非本轮 Human ADB 集成问题）
+```
+
+## Security
+
+- 不保存 private ADB key / pairing code 到 docs/evidence/git/log
+- 记录：public key hash（adbkey.pub md5）/ non-secret key dir description

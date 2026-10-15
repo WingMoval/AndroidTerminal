@@ -12,12 +12,15 @@ import com.at.engine.ATSessionState
  * A single dynamic session page.
  *
  * @param pageId process-unique id assigned by the controller.
+ * @param kind the backend kind of this page's session (fixed at creation;
+ *        switching pages never recreates/resets the backend).
  * @param terminal the AppTerminal for this session (owns ATTerminalSession).
  * @param rows current terminal rows.
  * @param cols current terminal cols.
  */
 class SessionPage(
     val pageId: Int,
+    val kind: SessionBackendKind,
     var terminal: AppTerminal,
 ) {
     /** This page's own output buffer (inactive pages keep accumulating). */

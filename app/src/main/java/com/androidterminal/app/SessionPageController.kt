@@ -36,11 +36,16 @@ class SessionPageController {
 
     fun allPages(): List<SessionPage> = pages.toList()
 
-    /** Create a new independent session page and make it active. */
-    fun add(): SessionPage {
+    /**
+     * Create a new independent session page and make it active.
+     * The page's backend kind + AppTerminal are supplied by the caller
+     * (Human UI / debug); the controller does not choose a backend.
+     */
+    fun add(kind: SessionBackendKind, terminal: AppTerminal): SessionPage {
         val page = SessionPage(
             pageId = idSeq.incrementAndGet(),
-            terminal = AppTerminal(eventListener = {}),
+            kind = kind,
+            terminal = terminal,
         )
         pages.add(page)
         activeIndex = pages.size - 1

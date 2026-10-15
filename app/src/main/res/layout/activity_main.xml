@@ -6,10 +6,26 @@
     android:padding="8dp">
 
     <TextView
+        android:id="@+id/tvAdbState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ADB: DISCONNECTED"
+        android:textStyle="bold"
+        android:textColor="#00BFFF" />
+
+    <TextView
+        android:id="@+id/tvAdbHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="未连接 ADB — 请在 设置→开发者选项→无线调试 开启并配对，然后点 ADB 重试"
+        android:textColor="#808080"
+        android:textSize="10sp" />
+
+    <TextView
         android:id="@+id/tvState"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="State: - | AndroidTerminal V3 Dev (LOCAL)"
+        android:text="State: - | AndroidTerminal V3 (LOCAL)"
         android:textStyle="bold" />
 
     <ScrollView
@@ -63,6 +79,20 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="+" />
+
+        <Button
+            android:id="@+id/btnRetryAdb"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="ADB" />
+
+        <Button
+            android:id="@+id/btnPairAdb"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="配对" />
 
         <Button
             android:id="@+id/btnClosePage"

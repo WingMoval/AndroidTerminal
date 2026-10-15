@@ -20,12 +20,17 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
+import com.adb.engine.AdbEngine
+import com.adb.engine.AdbRuntime
+import com.adb.engine.AdbRuntimeState
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
+import com.at.engine.ATTerminalSession
 import java.nio.charset.StandardCharsets
 
 class MainActivity : Activity() {
@@ -45,9 +50,13 @@ class MainActivity : Activity() {
     private lateinit var inputBox: EditText
     private lateinit var stateLabel: TextView
     private lateinit var pageLabel: TextView
+    private lateinit var adbStateLabel: TextView
+    private lateinit var adbHint: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Wire the single ADB runtime owner (process-scoped composition root).
+        AppRuntime.initialize(applicationContext)
         setContentView(R.layout.activity_main)
 
         outputText = findViewById(R.id.tvOutput)
@@ -55,32 +64,53 @@ class MainActivity : Activity() {
         inputBox = findViewById(R.id.etInput)
         stateLabel = findViewById(R.id.tvState)
         pageLabel = findViewById(R.id.tvPage)
+        adbStateLabel = findViewById(R.id.tvAdbState)
+        adbHint = findViewById(R.id.tvAdbHint)
 
         findViewById<Button>(R.id.btnPrev).setOnClickListener { pages.prev(); renderPage() }
         findViewById<Button>(R.id.btnNext).setOnClickListener { pages.next(); renderPage() }
-        findViewById<Button>(R.id.btnAddPage).setOnClickListener { addPage() }
+        findViewById<Button>(R.id.btnAddPage).setOnClickListener { showNewSessionChooser() }
+        findViewById<Button>(R.id.btnRetryAdb).setOnClickListener { retryAdb() }
+        findViewById<Button>(R.id.btnPairAdb).setOnClickListener {
+            startActivity(android.content.Intent(this, PairActivity::class.java))
+        }
         findViewById<Button>(R.id.btnClosePage).setOnClickListener { closeActivePage() }
         findViewById<Button>(R.id.btnSend).setOnClickListener { sendInput() }
         findViewById<Button>(R.id.btnCtrlC).setOnClickListener { sendCtrlC() }
         findViewById<Button>(R.id.btnResize).setOnClickListener { showResizeDialog() }
         findViewById<Button>(R.id.btnClear).setOnClickListener { clearOutput() }
 
+        updateAdbStatus()
         renderPage()
     }
+
+    // ------------------------------------------------------------------
+    // ADB status. The Wi-Fi / Wireless-Debugging gate is the DEVICE's own
+    // mechanism (settings, user-operated). The app does NOT open settings /
+    // auto-navigate — it only reflects the AdbRuntime lifecycle state and
+    // offers a Retry (connectAuto) so the user can re-attempt after they have
+    // enabled Wireless Debugging and paired the device themselves.
+    // ------------------------------------------------------------------
 
     // ------------------------------------------------------------------
     // Page operations (App-layer)
     // ------------------------------------------------------------------
 
     /**
-     * Debug-only (AT.DEVAPP-0.2): create a NEW independent normal session page
+     * Debug-only: create a NEW independent normal session page (default Local)
      * and make it active. Used by instrumentation to drive a normal page.
      * @return the created page.
      */
-    fun createPage(): SessionPage {
-        val page = pages.add()
-        // Wire this page's output into the shared renderer (only when active).
-        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) })
+    fun createPage(): SessionPage = createPage(SessionBackendKind.LOCAL)
+
+    /**
+     * Create a new independent normal session page of the given backend kind
+     * (LOCAL or ADB) and make it active. Local and ADB share the SAME
+     * SessionPage; only the backend kind differs (fixed at creation).
+     */
+    fun createPage(kind: SessionBackendKind): SessionPage {
+        val page = pages.add(kind, AppTerminal(eventListener = {}, kind = kind, engine = engineFor(kind)))
+        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) }, kind = kind, engine = engineFor(kind))
         renderPage()
         return page
     }
@@ -90,28 +120,108 @@ class MainActivity : Activity() {
         val page = pages.activePage ?: return false
         page.rows = rows
         page.cols = cols
-        val ok = page.terminal.open(rows, cols)
+        val ok = page.terminal.open(rows, cols, command = launchCommand(page.kind))
         if (ok) {
             // Apply the requested initial size (PTY starts at 0x0 per T1 evidence).
             page.terminal.resize(rows, cols)
-            page.terminal.session?.write(
-                "echo === AT V3 LOCAL SESSION (page ${page.pageId}) ===; id; tty\n"
-                    .toByteArray(StandardCharsets.UTF_8),
-            )
+            page.terminal.session?.write(banner(page).toByteArray(StandardCharsets.UTF_8))
         }
         renderPage()
         return ok
     }
 
     /** Debug-only: the active page's session, if open. */
-    fun activeSession(): com.at.engine.ATTerminalSession? = pages.activePage?.terminal?.session
+    fun activeSession(): ATTerminalSession? = pages.activePage?.terminal?.session
 
-    private fun addPage() {
-        val page = pages.add()
-        page.terminal = AppTerminal(eventListener = { ev -> onPageEvent(page, ev) })
-        openActiveSession()
+    /** Debug-only: the active page's backend kind. */
+    fun activePageKind(): SessionBackendKind? = pages.activePage?.kind
+
+    private fun engineFor(kind: SessionBackendKind): com.at.engine.ATEngine? =
+        if (kind == SessionBackendKind.ADB) AppRuntime.adbEngine() else null
+
+    private fun launchCommand(kind: SessionBackendKind): String =
+        if (kind == SessionBackendKind.ADB) "" else "/system/bin/sh"
+
+    private fun banner(page: SessionPage): String {
+        val tag = if (page.kind == SessionBackendKind.ADB) "ADB" else "LOCAL"
+        return "echo === AT V3 $tag SESSION (page ${page.pageId}) ===; id; tty\n"
+    }
+
+    private fun showNewSessionChooser() {
+        val opts = arrayOf("ADB", "Local")
+        AlertDialog.Builder(this)
+            .setTitle("New Session")
+            .setItems(opts) { _, which ->
+                val kind = if (which == 0) SessionBackendKind.ADB else SessionBackendKind.LOCAL
+                addPage(kind)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun addPage(kind: SessionBackendKind) {
+        createPage(kind)
+        if (kind == SessionBackendKind.ADB) {
+            openAdbSessionAsync()
+        } else {
+            openActiveSession()
+        }
         renderPage()
     }
+
+    /** ADB page: ensure READY (single AdbRuntime owner), then open the session. */
+    private fun openAdbSessionAsync() {
+        updateAdbStatus()
+        if (AppRuntime.adbState() != AdbRuntimeState.READY) {
+            stateLabel.text = "State: connecting ADB..."
+            Thread {
+                val diag = AppRuntime.connectAuto()
+                mainHandler.post {
+                    updateAdbStatus()
+                    if (AppRuntime.adbState() == AdbRuntimeState.READY) {
+                        openActiveSession()
+                    } else {
+                        stateLabel.text = "State: ADB not ready — ${diag.code} ${diag.message}"
+                    }
+                }
+            }.start()
+        } else {
+            openActiveSession()
+        }
+    }
+
+    private fun retryAdb() {
+        stateLabel.text = "State: connecting ADB..."
+        Thread {
+            val diag = AppRuntime.connectAuto()
+            mainHandler.post {
+                updateAdbStatus()
+                stateLabel.text = "ADB: ${AppRuntime.adbState().name} | ${diag.code}"
+            }
+        }.start()
+    }
+
+    private fun updateAdbStatus() {
+        val s = AppRuntime.adbState()
+        adbStateLabel.text = when (s) {
+            AdbRuntimeState.DISCONNECTED -> "ADB: DISCONNECTED"
+            AdbRuntimeState.CONNECTING -> "ADB: CONNECTING"
+            AdbRuntimeState.READY -> "ADB: READY"
+            AdbRuntimeState.CONNECT_FAILED -> "ADB: CONNECT_FAILED"
+            AdbRuntimeState.ENDPOINT_NOT_FOUND -> "ADB: CONNECT_FAILED"
+            AdbRuntimeState.USER_ACTION_REQUIRED -> "ADB: USER_ACTION_REQUIRED"
+            AdbRuntimeState.TRANSPORT_LOST -> "ADB: TRANSPORT_LOST"
+            AdbRuntimeState.RECOVERING -> "ADB: RECOVERING"
+            AdbRuntimeState.RECOVERY_FAILED -> "ADB: RECOVERY_FAILED"
+        }
+        // Guidance only while not READY (Wireless Debugging is the user's own
+        // device setting; we never open it).
+        adbHint.visibility =
+            if (s == AdbRuntimeState.READY) View.GONE else View.VISIBLE
+    }
+
+    /** Debug-only (tests): refresh the ADB status label from AdbRuntime. */
+    fun updateAdbStatusForTest() = updateAdbStatus()
 
     private fun closeActivePage() {
         pages.closeActive()
@@ -126,7 +236,8 @@ class MainActivity : Activity() {
             outputText.text = ""
             return
         }
-        pageLabel.text = "${pages.size} page(s)  #${page.pageId} (${page.state.name})"
+        val kindTag = if (page.kind == SessionBackendKind.ADB) "ADB" else "Local"
+        pageLabel.text = "${pages.size} page(s)  #${page.pageId} $kindTag (${page.state.name})"
         stateLabel.text = "State: ${page.state.name}"
         outputText.text = page.outputBuffer.toString()
         scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
