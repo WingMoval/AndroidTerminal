@@ -24,18 +24,22 @@ object LocalSessionBootstrap {
     const val APP_PROCESS = "/system/bin/app_process"
     const val ENV_APK = "AT_APP_APK"
     const val ENV_SOCK = "AT_CLI_BRIDGE_SOCK"
+    const val ENV_SESSION_ID = "AT_SESSION_ID"
     const val BOOTSTRAP_SCRIPT = "adb_bootstrap.sh"
 
     /**
-     * Write the bootstrap script (env exports + the `adb` shell function) to
-     * [scriptPath] in the app's private filesDir. The Local /system/bin/sh
-     * (same uid) can source it. Returns the script's absolute path.
+     * Write a per-session bootstrap script (env exports + the `adb` shell
+     * function) to [scriptPath] in the app's private filesDir. The Local
+     * /system/bin/sh (same uid) can source it. Returns the script's absolute
+     * path.
      *
-     * Written to a FILE (not via the PTY) because a multi-line function
-     * definition sent through the interactive PTY gets mangled; sourcing a
-     * file is robust.
+     * [sessionId] is the Local session's stable page id, exported as
+     * $AT_SESSION_ID so AdbCliMain can bind ADB lifecycle status to THIS session
+     * (AT.CLI-0.1A). Written to a per-session FILE (not via the PTY) because a
+     * multi-line function definition sent through the interactive PTY gets
+     * mangled; sourcing a file is robust.
      */
-    fun writeScript(scriptPath: String, apkPath: String, sockPath: String): String {
+    fun writeScript(scriptPath: String, apkPath: String, sockPath: String, sessionId: Int): String {
         val apk = apkPath.replace("'", "'\"'\"'")
         val sock = sockPath.replace("'", "'\"'\"'")
         // The shell function must reference the shell variable $AT_APP_APK.
@@ -44,6 +48,7 @@ object LocalSessionBootstrap {
         val script = buildString {
             appendLine("export $ENV_APK='$apk'")
             appendLine("export $ENV_SOCK='$sock'")
+            appendLine("export $ENV_SESSION_ID='$sessionId'")
             appendLine(
                 "adb() { $APP_PROCESS -Djava.class.path=\"$shellApkVar\" /system/bin " +
                     "$ADB_MAIN_CLASS \"\$@\"; }"

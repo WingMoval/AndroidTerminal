@@ -28,6 +28,11 @@ object AdbCliProtocol {
     const val T_RESIZE = 9
     const val T_CLOSE = 10
     const val T_ERROR = 11
+    // AT.CLI-0.1A: server -> client human-readable lifecycle status, routed to
+    // the CLI's stderr (status channel). Additive (tag 12 was free); existing
+    // frames keep their tags/semantics. Backward-compatible: a client that does
+    // not know tag 12 simply ignores it (its readFrame loop has an else-ignore).
+    const val T_STATUS = 12
 
     const val MAX_FRAME = 1 shl 20 // 1 MiB
 

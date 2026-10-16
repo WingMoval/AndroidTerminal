@@ -240,6 +240,7 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                           HUMAN_AGENT_SHARED_SESSION = DEFERRED / NOT_STARTED；
                           evidence: docs/evidence/at_debug_0/）
     AT.CLI-0              = IN_PROGRESS / ENTRYPOINT_RECOVERY=COMPLETE + ONE_SHOT_CORE=VERIFIED
+                           + LIFECYCLE=COMPLETE (AT.CLI-0.1A)
                            （shell-hosted `adb` CLI：
                            原 `files/bin/adb` private ELF 入口被真实 SELinux `untrusted_app →
                            app_data_file execute` 阻断，真实 Local PTY `exec` RC=126 →
@@ -248,19 +249,27 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                            C8_C12_PREVIOUS_RESULT = INVALIDATED；TEST_HARNESS_BUG = VERIFIED；
                            `/system/bin/app_process`（zygote_exec）入口真实 Local PTY P1-P6 6/6 PASS
                            → SELECTED_ENTRYPOINT = APP_PROCESS；
-                           AT Engine 0 改动 / ADB Engine 0 改动 / Product CLI Bridge 复用同 UID
-                           UDS + protocol v1；
+                           AT Engine 0 改动 / ADB protocol engine 0 改动 / ADB native transport 0 改动 /
+                           Product CLI Bridge 复用同 UID UDS + protocol v1 + T_STATUS=12；
                            **ONE-SHOT CORE = VERIFIED**：`AdbCliOneShotTest` 15/15 PASS（97s，flaky
                            NO），真机 Human Local 路径 Local sh → adb() 函数 → app_process →
                            AdbCliMain → Product CLI Bridge（同 UID UDS，protocol v1）→ AppRuntime →
                            AT Engine → ADB Backend → ADB Engine → adbd → 远程 sh uid=2000；
                            principal transition uid=10313 → uid=2000(shell) → uid=10313（O3），
-                           Local shell 存活（O15）；验证前置 WD=ON + trusted + READY；
-                           interactive `adb shell` / Auto-WD / connection status = NOT_STARTED；
+                           Local shell 存活（O15）；
+                           **AT.CLI-0.1A LIFECYCLE = COMPLETE**：AdbRuntime 长驻生命周期 owner，
+                           `ensureReady` Runtime-owned + auto-WD（WRITE_SECURE putInt）+ bounded
+                           3-retry（adbd 启动时间）+ read-only transport observer（1.5s poll，
+                           ONLINE→!ONLINE edge）+ async T_STATUS→CLI stderr→Local PTY
+                           （session-scoped via AT_SESSION_ID + dedupe + no-replay）；
+                           `AdbCliLifecycleTest` L1-L11 = 11/11 PASS（真机 HONOR ALI-AN00）；
+                           FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED / POST_BOOTSTRAP_AUTO_WD=COMPLETE；
+                           interactive `adb shell` = NOT_STARTED (AT.CLI-0.2)；
                            evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
-                           APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md）
-    NEXT                  = AT.CLI-0.1A
-                           — Auto-WD + ADB Connection Status Integration
+                           APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md +
+                           ADB_RUNTIME_LIFECYCLE_CLOSURE.md）
+    NEXT                  = AT.CLI-0.2
+                           — Interactive `adb shell` (无参) + Ctrl-C / resize relay
  ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

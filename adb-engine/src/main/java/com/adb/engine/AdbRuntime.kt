@@ -26,7 +26,11 @@
 package com.adb.engine
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.provider.Settings
 import android.util.Log
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -51,6 +55,12 @@ import kotlin.concurrent.withLock
 object AdbRuntime {
 
     private const val TAG = "AdbRuntime"
+
+    /** WRITE_SECURE_SETTINGS: product capability for post-bootstrap Auto-WD. */
+    const val WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS"
+
+    @Volatile
+    private var appContext: Context? = null
 
     @Volatile
     private var readinessBackend: AdbWirelessDebuggingReadinessBackend? = null
@@ -79,6 +89,59 @@ object AdbRuntime {
 
     private val lock = ReentrantLock()
 
+    // ---- AT.CLI-0.1A: read-only lifecycle observation ----------------------
+
+    /**
+     * A read-only lifecycle observer. Consumers register to receive state
+     * transitions; they CANNOT mutate Runtime state. Single owner of state is
+     * still AdbRuntime (the [setState] path is the only writer).
+     */
+    fun interface AdbRuntimeListener {
+        fun onStateChange(old: AdbRuntimeState, new: AdbRuntimeState)
+    }
+
+    @Volatile
+    private var lifecycleListeners: CopyOnWriteArrayList<AdbRuntimeListener> =
+        CopyOnWriteArrayList()
+
+    /**
+     * Register a read-only lifecycle listener. Returns a handle whose
+     * [AdbRuntimeListenerHandle.remove] unregisters. Additive; does not change
+     * state ownership.
+     */
+    fun addLifecycleListener(l: AdbRuntimeListener): AdbRuntimeListenerHandle {
+        lifecycleListeners.add(l)
+        return AdbRuntimeListenerHandle(l)
+    }
+
+    class AdbRuntimeListenerHandle(private val l: AdbRuntimeListener) {
+        fun remove() = lifecycleListeners.remove(l)
+    }
+
+    // ---- AT.CLI-0.1A: read-only transport-loss observer --------------------
+    //
+    // A lightweight, READ-ONLY projection: it polls the *existing* native
+    // transportState() (which the native RX owner already advances to OFFLINE on
+    // a real loss) and, on a single ONLINE -> !ONLINE edge while we were READY,
+    // invokes the EXISTING recovery ingress (onObservedTransportLost ->
+    // onOperationResult(true)). It sends no ping, opens no socket, adds no
+    // heartbeat, and owns no connection/recovery of its own.
+    //
+    // Lifecycle is bound to AdbRuntime (start in initialize, stop in
+    // disconnect/resetForTest) — NOT to any Activity, so there is exactly ONE
+    // observer for the single process-scoped Runtime.
+
+    @Volatile
+    private var transportObserverThread: Thread? = null
+
+    @Volatile
+    private var transportObserverRunning = AtomicBoolean(false)
+
+    @Volatile
+    private var lastTransportOnline = false
+
+    private val TRANSPORT_POLL_MS = 1_500L
+
     // ---- platform bootstrap ------------------------------------------------
 
     /**
@@ -89,6 +152,7 @@ object AdbRuntime {
     fun initialize(context: Context) {
         if (readinessBackend != null) return
         val app = context.applicationContext
+        this.appContext = app
         val readiness = AdbAndroidWirelessDebuggingReadinessBackend(app)
         val discovery = AdbAndroidNsdDiscoveryBackend(app)
         val store = AdbEndpointStore({ discovery })
@@ -102,11 +166,194 @@ object AdbRuntime {
         this.discoveryBackend = discovery
         this.endpointStore = store
         this.recoveryCoordinator = coordinator
+        // AT.CLI-0.1A: start the read-only transport-loss observer, bound to the
+        // Runtime lifecycle (one process-scoped Runtime -> one observer).
+        startTransportObserver()
         Log.i(TAG, "initialize: readiness+discovery backends wired")
     }
 
     /** True when [initialize] has been called. */
     fun isInitialized(): Boolean = readinessBackend != null
+
+    // ---- AT.CLI-0.1A: read-only transport-loss observer -------------------
+
+    /**
+     * Start the read-only transport-loss observer (idempotent). Bound to the
+     * Runtime lifecycle: start once in [initialize]; stop in [disconnect]/
+     * [resetForTest]. It only READS the existing [transportState] projection and,
+     * on a single ONLINE -> !ONLINE edge while [readinessState] is READY, invokes
+     * [onObservedTransportLost] (the EXISTING recovery ingress). No ping, no
+     * socket, no second heartbeat/recovery owner.
+     */
+    fun startTransportObserver() {
+        if (!transportObserverRunning.compareAndSet(false, true)) return
+        lastTransportOnline = transportState().isOnline
+        val t = Thread({
+            while (transportObserverRunning.get()) {
+                try {
+                    val online = transportState().isOnline
+                    if (lastTransportOnline && !online) {
+                        // Edge-triggered: exactly one transition ONLINE -> !ONLINE.
+                        if (readinessState() == AdbRuntimeState.READY) {
+                            Log.i(TAG, "transport observer: ONLINE->!ONLINE edge; projecting loss")
+                            onObservedTransportLost()
+                        }
+                    }
+                    lastTransportOnline = online
+                    Thread.sleep(TRANSPORT_POLL_MS)
+                } catch (_: InterruptedException) {
+                    break
+                } catch (t: Throwable) {
+                    Log.w(TAG, "transport observer tick failed", t)
+                }
+            }
+        }, "adb-transport-observer")
+        t.isDaemon = true
+        transportObserverThread = t
+        t.start()
+        Log.i(TAG, "transport observer started (read-only projection)")
+    }
+
+    /** Stop the transport observer (idempotent). */
+    fun stopTransportObserver() {
+        if (!transportObserverRunning.compareAndSet(true, false)) return
+        try { transportObserverThread?.interrupt() } catch (_: Throwable) {}
+        transportObserverThread = null
+        lastTransportOnline = false
+        Log.i(TAG, "transport observer stopped")
+    }
+
+    /**
+     * Internal, observed (non-operation) transport-loss ingress. Reuses the
+     * EXISTING recovery path (onOperationResult) with zero logic change — the
+     * observer never reconnects itself; the single recovery owner does.
+     */
+    fun onObservedTransportLost() {
+        onOperationResult(transportLost = true)
+    }
+
+    // ---- AT.CLI-0.1A: Runtime-owned ensureReady ----------------------------
+
+    /**
+     * Runtime-owned readiness. If already READY, returns immediately (fast path;
+     * no re-discovery / re-TLS). Otherwise runs the Runtime-owned sequence:
+     * WD readiness -> (if WRITE_SECURE_SETTINGS effective) auto-enable WD ->
+     * discovery + connect via [connectAuto]. Emits [statusListener] events so a
+     * CLI can render `[adb] ...` status on stderr.
+     *
+     * CLI must NOT know port/endpoint/TLS/mDNS/recovery internals.
+     */
+    fun ensureReady(
+        keyDir: String,
+        statusListener: (String) -> Unit,
+    ): AdbRuntimeState {
+        // Fast path: already READY.
+        if (state == AdbRuntimeState.READY) return AdbRuntimeState.READY
+        statusListener("checking connection...")
+
+        // WD readiness.
+        val wd = readiness()
+        if (wd == AdbWirelessDebuggingState.DISABLED) {
+            statusListener("wireless debugging: off")
+            if (canWriteSecureSettings()) {
+                statusListener("enabling wireless debugging...")
+                val enabled = enableWirelessDebugging()
+                if (!enabled) {
+                    Log.w(TAG, "ensureReady: auto-WD enable failed")
+                    return AdbRuntimeState.USER_ACTION_REQUIRED
+                }
+                // Wait for the setting to actually take effect (listener starts).
+                val wdOk = waitForWdEnabled(8_000L)
+                if (!wdOk) {
+                    Log.w(TAG, "ensureReady: WD still not enabled after putInt")
+                    return AdbRuntimeState.USER_ACTION_REQUIRED
+                }
+            } else {
+                // No capability: explicit user action required (NOT a timeout).
+                statusListener("user action required: enable Wireless Debugging")
+                return AdbRuntimeState.USER_ACTION_REQUIRED
+            }
+        }
+
+        // After auto-WD (or any cold start), adbd may need a moment to begin
+        // listening on the discovered endpoint. Retry connectAuto a bounded
+        // number of times so a slow adbd bring-up does not surface a spurious
+        // "connection failed" to the Human (Gate C: real listener must be up).
+        var diag = AdbRuntimeDiagnostic(
+            code = "CONNECTING",
+            message = "connecting",
+            readiness = readiness(),
+            transport = transportState(),
+        )
+        var finalState = AdbRuntimeState.CONNECTING
+        for (attempt in 1..3) {
+            if (attempt == 1) {
+                statusListener("discovering...")
+                statusListener("connecting...")
+            } else {
+                statusListener("retrying connection ($attempt of 3)...")
+            }
+            diag = connectAuto(keyDir)
+            finalState = readinessState()
+            if (finalState == AdbRuntimeState.READY) break
+            // Pairing / explicit user-action are not transient; don't retry.
+            if (finalState == AdbRuntimeState.USER_ACTION_REQUIRED) break
+            if (diag.code == "PAIRING_REQUIRED" || diag.message.contains("pair", ignoreCase = true)) break
+            Thread.sleep(2_000L)
+        }
+        if (finalState == AdbRuntimeState.READY) {
+            statusListener("connected")
+        } else if (finalState == AdbRuntimeState.USER_ACTION_REQUIRED) {
+            statusListener("user action required: enable Wireless Debugging")
+        } else if (diag.code == "PAIRING_REQUIRED" || diag.message.contains("pair", ignoreCase = true)) {
+            statusListener("pairing required")
+        } else {
+            statusListener("connection failed: ${diag.message.ifBlank { diag.code }}")
+        }
+        return finalState
+    }
+
+    /**
+     * Whether this process can write Settings.Global (WRITE_SECURE_SETTINGS).
+     * Read-only capability check; does NOT enable anything.
+     */
+    fun canWriteSecureSettings(): Boolean {
+        val ctx = appContext ?: return false
+        return try {
+            ctx.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * Auto-enable Wireless Debugging via Settings.Global (requires
+     * WRITE_SECURE_SETTINGS). Returns true only when the write succeeded.
+     * This is the POST-BOOTSTRAP capability (FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED:
+     * the permission is self-granted over the app's own verified ADB shell after
+     * the first manual WD enable + trust).
+     */
+    fun enableWirelessDebugging(): Boolean {
+        val ctx = appContext ?: return false
+        return try {
+            Settings.Global.putInt(ctx.contentResolver, "adb_wifi_enabled", 1)
+            Log.i(TAG, "auto-WD: Settings.Global adb_wifi_enabled=1 written")
+            true
+        } catch (t: Throwable) {
+            Log.w(TAG, "auto-WD: putInt failed (no WRITE_SECURE_SETTINGS?)", t)
+            false
+        }
+    }
+
+    /** Poll readiness() until WD is ENABLED or [timeoutMs] elapses. */
+    private fun waitForWdEnabled(timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (readiness() == AdbWirelessDebuggingState.ENABLED) return true
+            Thread.sleep(500)
+        }
+        return readiness() == AdbWirelessDebuggingState.ENABLED
+    }
 
     /**
      * Test-only bootstrap with injectable backends (deterministic lifecycle
@@ -260,6 +507,9 @@ object AdbRuntime {
         endpointStore?.invalidate()
         connectionIntent = AdbConnectionIntent.None
         setState(AdbRuntimeState.DISCONNECTED)
+        // Explicit manual disconnect is NOT a transport loss; stop the observer so
+        // it doesn't re-project a loss from a now-disconnected transport.
+        stopTransportObserver()
         return AdbRuntimeDiagnostic(
             code = "DISCONNECT_OK",
             message = "Disconnected",
@@ -346,6 +596,7 @@ object AdbRuntime {
      * Test-only reset so each deterministic lifecycle test starts clean.
      */
     fun resetForTest() = lock.withLock {
+        stopTransportObserver()
         try { AdbEngine.disconnect() } catch (_: Throwable) {}
         endpointStore?.invalidate()
         connectionIntent = AdbConnectionIntent.None
@@ -382,7 +633,17 @@ object AdbRuntime {
     }
 
     private fun setState(s: AdbRuntimeState) {
+        val old = state
+        if (old == s) return
         state = s
+        // Read-only lifecycle notification (single owner still AdbRuntime).
+        for (l in lifecycleListeners) {
+            try {
+                l.onStateChange(old, s)
+            } catch (t: Throwable) {
+                Log.w(TAG, "lifecycle listener threw", t)
+            }
+        }
     }
 }
 

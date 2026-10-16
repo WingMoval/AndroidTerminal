@@ -22,6 +22,7 @@ package com.androidterminal.app.cli
 
 import android.os.Process
 import com.adb.engine.AdbRuntime
+import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.AppRuntime
 import com.at.engine.ATExecutionOutcome
 import com.at.engine.ATExecutionRequest
@@ -87,31 +88,77 @@ class AdbCliBridgeServer(private val filesDir: File) {
 
         // CLI-owned interactive sessions, keyed by client fd.
         private val sessions = ConcurrentHashMap<Int, ATTerminalSession>()
-        private var ready = false
+        // AT.CLI-0.1A: fd -> Local session id (from HELLO payload) for ADB status
+        // subscription binding.
+        private val fdSession = ConcurrentHashMap<Int, Int>()
 
         /** Auth: same-UID only (CLI runs as app UID). */
         fun onClientAuth(fd: Int, peerUid: Int): Boolean = peerUid == Process.myUid()
 
-        private fun ensureReady() {
-            if (ready) return
-            if (AdbRuntime.readinessState().isReady) { ready = true; return }
-            // connectAuto may be async (NSD discovery / TLS). Poll for readiness
-            // up to ~15s so a CLI one-shot doesn't fire before the ADB is ONLINE.
-            val deadline = System.currentTimeMillis() + 15_000
-            while (System.currentTimeMillis() < deadline) {
-                if (AdbRuntime.readinessState().isReady) { ready = true; return }
-                runCatching { AppRuntime.connectAuto() }
-                Thread.sleep(500)
+        /**
+         * AT.CLI-0.1A: called by the native server after HELLO/ACK with the
+         * Local session id carried in the HELLO payload (0 = none). Records the
+         * fd->session binding used for ADB lifecycle status subscription.
+         */
+        fun onHello(fd: Int, sessionId: Int) {
+            if (sessionId > 0) fdSession[fd] = sessionId
+        }
+
+        /**
+         * AT.CLI-0.1A: Runtime-owned ensureReady. Delegates the readiness/WD/
+         * discovery/connect sequence to the single AdbRuntime (NOT a CLI-owned
+         * polling loop). Emits `[adb] ...` STATUS frames (stderr channel) as the
+         * Runtime progresses. Subscribes the bound Local session to ADB lifecycle
+         * status so ASYNC transitions (disconnect/reconnect) reach it after the
+         * one-shot process exits.
+         */
+        private fun ensureReady(fd: Int): Boolean {
+            // Fast path: already READY. Surface the "connected" status only on
+            // THIS session's FIRST use (dedupe: subsequent same-session commands
+            // stay silent — no state change, no re-spam). See §23.
+            if (AdbRuntime.readinessState().isReady) {
+                val sid = fdSession[fd]
+                val firstUse = sid != null && !AppRuntime.isAdbStatusSubscribed(sid)
+                if (firstUse) {
+                    sendStatus(fd, "checking connection...\nconnected\n")
+                }
+                subscribeSession(fd)
+                return true
             }
-            ready = AdbRuntime.readinessState().isReady
+            // Not READY: run the Runtime-owned sequence, forwarding status lines.
+            val keyDir = runCatching { AppRuntime.adbIdentityDir() }.getOrNull() ?: return false
+            val finalState = AdbRuntime.ensureReady(keyDir) { line ->
+                sendStatus(fd, "[adb] $line")
+            }
+            subscribeSession(fd)
+            return finalState == AdbRuntimeState.READY
+        }
+
+        /** Bind the fd's Local session to ADB lifecycle status (if any). */
+        private fun subscribeSession(fd: Int) {
+            val sid = fdSession[fd] ?: return
+            AppRuntime.subscribeAdbStatus(sid)
+        }
+
+        private fun sendStatus(fd: Int, text: String) {
+            sendFrame(fd, AdbCliProtocol.T_STATUS, text.toByteArray(Charsets.UTF_8))
         }
 
         /** One-shot: execute and push OUT/ERR/(ERROR)/EXIT frames. */
         fun onOneShot(fd: Int, cmdBytes: ByteArray) {
             val cmd = String(cmdBytes, Charsets.UTF_8)
             android.util.Log.i(TAG, "onOneShot: ensureReady for [$cmd]")
-            ensureReady()
-            android.util.Log.i(TAG, "onOneShot: ready=$ready, executing")
+            val ok = ensureReady(fd)
+            if (!ok) {
+                // Not READY (e.g. WD off + no auto-WD capability). The status
+                // lines (user action required / connection failed) were already
+                // emitted; return a non-zero exit. No command was executed.
+                android.util.Log.w(TAG, "onOneShot: not READY, failing without execute")
+                sendFrame(fd, AdbCliProtocol.T_OUT, ByteArray(0))
+                sendFrame(fd, AdbCliProtocol.T_ERR, ByteArray(0))
+                sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(1))
+                return
+            }
             val result: ATExecutionResult = try {
                 AppRuntime.adbEngine().execute(ATExecutionRequest(command = cmd))
             } catch (e: Exception) {
@@ -134,7 +181,7 @@ class AdbCliBridgeServer(private val filesDir: File) {
 
         /** Open a CLI-owned interactive session. Returns false on failure. */
         fun onInteractiveOpen(fd: Int, rows: Int, cols: Int): Boolean {
-            ensureReady()
+            if (!ensureReady(fd)) return false
             val result: ATOpenSessionResult = try {
                 AppRuntime.adbEngine().openSession(
                     ATPersistentBackend.Launch(command = "", initialRows = rows, initialCols = cols)

@@ -68,6 +68,11 @@ object AdbCliMain {
                     err.println("adb: bridge unavailable (is the AndroidTerminal app running?)")
                     return processExit(1)
                 }
+                // AT.CLI-0.1A: lifecycle status (stderr channel) is emitted FIRST
+                // (before remote stdout) so the Human sees
+                //   [adb] checking... / connected
+                // then the command output — matching the §20/§22 ordering.
+                if (res.status.isNotEmpty()) err.print(res.status)
                 // remote stdout -> System.out ; remote stderr -> System.err
                 if (res.stdout.isNotEmpty()) out.print(res.stdout)
                 if (res.stderr.isNotEmpty()) err.print(res.stderr)
@@ -90,6 +95,7 @@ object AdbCliMain {
         val stderr: String,
         val exitCode: Int,
         val error: String?,
+        val status: String,
     )
 
     /**
@@ -100,7 +106,8 @@ object AdbCliMain {
      */
     private fun bridgeOneShot(remoteCommand: String): OneShotResult? {
         val sock = resolveSocketPath()
-        android.util.Log.i(TAG, "bridgeOneShot: connect $sock cmd=[$remoteCommand]")
+        val sessionId = resolveSessionId()
+        android.util.Log.i(TAG, "bridgeOneShot: connect $sock cmd=[$remoteCommand] session=$sessionId")
         val ls = LocalSocket()
         try {
             ls.connect(LocalSocketAddress(sock, LocalSocketAddress.Namespace.FILESYSTEM))
@@ -115,8 +122,14 @@ object AdbCliMain {
             val outp: OutputStream = ls.outputStream
             val inp: InputStream = ls.inputStream
 
-            // HELLO.
-            writeFrame(outp, AdbCliProtocol.T_HELLO, byteArrayOf(BRIDGE_PROTOCOL_VERSION.toByte()))
+            // HELLO: payload = [version:1][sessionId:4 LE]. Additive; the server
+            // reads version (byte 0) and, if present, the session id for ADB
+            // status subscription binding.
+            val sessionIdBytes = if (sessionId != null) le32(sessionId) else byteArrayOf()
+            val helloPayload = ByteArray(1 + sessionIdBytes.size)
+            helloPayload[0] = BRIDGE_PROTOCOL_VERSION.toByte()
+            System.arraycopy(sessionIdBytes, 0, helloPayload, 1, sessionIdBytes.size)
+            writeFrame(outp, AdbCliProtocol.T_HELLO, helloPayload)
             val ack = readFrame(inp) ?: return fail("no HELLO_ACK")
             if (ack.type != AdbCliProtocol.T_HELLO_ACK) return fail("bad HELLO_ACK type=${ack.type}")
 
@@ -126,6 +139,7 @@ object AdbCliMain {
 
             var stdout = StringBuilder()
             var stderr = StringBuilder()
+            var status = StringBuilder()
             var exitCode = 1
             var error: String? = null
             while (true) {
@@ -134,6 +148,14 @@ object AdbCliMain {
                 when (f.type) {
                     AdbCliProtocol.T_OUT -> stdout.append(String(f.payload, Charsets.UTF_8))
                     AdbCliProtocol.T_ERR -> stderr.append(String(f.payload, Charsets.UTF_8))
+                    // AT.CLI-0.1A: lifecycle status -> stderr channel. Kept in its
+                    // own builder and emitted via the main-branch err.print path
+                    // (proven to reach the Local PTY observer), BEFORE remote
+                    // stdout.
+                    AdbCliProtocol.T_STATUS -> {
+                        val s = String(f.payload, Charsets.UTF_8)
+                        if (s.isNotEmpty()) status.append(s)
+                    }
                     AdbCliProtocol.T_ERROR -> error = String(f.payload, Charsets.UTF_8)
                     AdbCliProtocol.T_EXIT -> {
                         exitCode = if (f.payload.size >= 4) f.le32(0) else 1
@@ -142,13 +164,28 @@ object AdbCliMain {
                     else -> { /* ignore unknown */ }
                 }
             }
-            return OneShotResult(stdout.toString(), stderr.toString(), exitCode, error)
+            return OneShotResult(stdout.toString(), stderr.toString(), exitCode, error, status.toString())
         } catch (e: Exception) {
             return fail(e.message ?: e.javaClass.simpleName)
         } finally {
             runCatching { ls.close() }
         }
     }
+
+    /** Resolve the Local Session id (AT_SESSION_ID env, set by the bootstrap). */
+    private fun resolveSessionId(): Int? = try {
+        val raw = System.getenv("AT_SESSION_ID")
+        raw?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+    } catch (_: Throwable) {
+        null
+    }
+
+    private fun le32(v: Int): ByteArray = byteArrayOf(
+        (v and 0xff).toByte(),
+        ((v shr 8) and 0xff).toByte(),
+        ((v shr 16) and 0xff).toByte(),
+        ((v shr 24) and 0xff).toByte(),
+    )
 
     private fun fail(msg: String): OneShotResult? {
         System.err.println("adb: bridge error: $msg")

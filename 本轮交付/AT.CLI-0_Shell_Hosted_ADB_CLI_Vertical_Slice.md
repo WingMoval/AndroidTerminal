@@ -6,11 +6,11 @@
 > |---|---|
 > | EntryPoint Recovery | **COMPLETE** |
 > | One-shot Core (`adb shell <cmd...>`) | **VERIFIED** |
-> | Auto-WD / connection lifecycle | NEXT (AT.CLI-0.1A) |
-> | Interactive `adb shell` | NOT_STARTED |
+> | Auto-WD / connection lifecycle (AT.CLI-0.1A) | **COMPLETE** |
+> | Interactive `adb shell` (AT.CLI-0.2) | NEXT |
 >
-> 本 slice **不**声明 `SHELL_HOSTED_ADB_CLI = COMPLETE`：one-shot 已 verified，interactive
-> 与 connection lifecycle 未开始。
+> 本 slice **不**声明 `SHELL_HOSTED_ADB_CLI = COMPLETE`：one-shot + connection lifecycle
+> 已 verified，interactive 未开始。
 
 ---
 
@@ -87,37 +87,71 @@ Local sh (untrusted_app)
 5. O3 marker 误匹配（本地 `id` 含 `u0_a`）→ 只用 `uid=2000`。
 6. observer 捕获 flaky（PTY 分批）→ marker 后多等 2.5s。
 
-## 3. 阶段 C — Auto-WD / connection lifecycle（NEXT = AT.CLI-0.1A）
+## 3. 阶段 C — Auto-WD / connection lifecycle（AT.CLI-0.1A = **COMPLETE**）
 
-本轮 one-shot 验证**依赖** WD=ON + trusted + READY 固定前置。前置不满足（WD OFF / untrusted /
-disconnect）时 ADB 进入 `USER_ACTION_REQUIRED`，one-shot 无法 READY。
+AT.CLI-0.1 的 one-shot 验证**依赖** WD=ON + trusted + READY 固定前置。AT.CLI-0.1A 闭合了
+connection lifecycle：AdbRuntime 作为**长驻生命周期 owner**，`adb command` 在 Local session
+里**零手动前置** cold-ready（WD OFF 也能一命令 auto-enable → connected），且 transport
+丢失 / 重连以**异步 status** 投影到使用过 adb 的 Local session。
 
-**AT.CLI-0.1A** 将实现：
+### 序列（实测）
 ```
-adb command
-  → ensureReady
-  → WD OFF 自动开启
-  → discovery
-  → connect
-  → connected
-  → execute
-```
-以及 `disconnected / reconnecting / connected` terminal status events。
+adb shell id            # WD OFF, 首次
+  → ensureReady (Runtime-owned)
+  → [adb] checking connection...
+  → [adb] wireless debugging: off
+  → [adb] enabling wireless debugging...   # auto-WD (WRITE_SECURE_SETTINGS putInt)
+  → [adb] discovering...
+  → [adb] connecting...                    # bounded 3 次重试 (adbd 启动时间)
+  → [adb] connected
+  → uid=2000(shell) ...
 
-## 4. Interactive `adb shell`（NOT_STARTED）
+adb shell echo second   # 同 session, 已 READY
+  → (dedupe: 无重复 checking/connected)
+  → second
+
+# WD OFF, 无新命令
+  → [adb] disconnected                    # async status (read-only observer edge)
+
+# 重连
+  → [adb] reconnecting...
+  → [adb] connected
+```
+
+### 关键设计
+- **状态映射**复用现有 `AdbRuntimeState`（READY→connected / RECOVERING→reconnecting /
+  TRANSPORT_LOST→disconnected / USER_ACTION_REQUIRED→user action required），不新加值。
+- **T_STATUS = 12**（additive protocol frame，backward-compat）→ CLI stderr → Local PTY。
+- **异步 status** 经 `SharedSessionHandle.emitSystemOutput`（host/system event，**非** PTY
+  stdin / **非** remote stdout）→ 订阅 session（`AT_SESSION_ID` 绑定，session-scoped）。
+- **read-only transport observer**（1.5s poll `transportState()`，ONLINE→!ONLINE edge →
+  `onObservedTransportLost` → 委托现有 `onOperationResult(true)` → 有界恢复）。无 ping/
+  socket/heartbeat。
+- **fast-path dedupe**：同 session 连接未变化时静默（§23）。
+- **in-flight 无透明重放**（结构性不变量：恢复只重连，不重跑命令）。
+- 详见 `docs/evidence/at_cli_0/ADB_RUNTIME_LIFECYCLE_CLOSURE.md`（L1-L11 = 11/11 PASS +
+  回归 + Gate A-K evidence）。
+
+## 4. Interactive `adb shell`（NEXT = AT.CLI-0.2）
 
 无参 `adb shell`（交互）+ Ctrl-C / resize relay 未开始。one-shot 不杀 Local shell（O15 已证
 PTY 存活），但交互式 relay 是独立后续工作。
 
 ## 5. 测试与回归
 
-- `AdbCliOneShotTest`（androidTest）：O1-O15，**15/15 PASS**（97s，flaky NO）。
+- `AdbCliLifecycleTest`（androidTest，AT.CLI-0.1A）：L1-L11，**11/11 PASS**（auto-WD /
+  fast-path / dedupe / transport projection / idle disconnect / recovery / no-replay /
+  session-scoped / close cleanup / permission fallback / pairing classification）。
+- `AdbCliOneShotTest`（androidTest）：O1-O15，**15/15 PASS**（守 0.1 底线；ensureReady
+  重构 + T_STATUS 未破 one-shot）。
 - `AppProcessProbeTest`（androidTest）：P1-P6，**6/6 PASS**。
 - 相关回归（WD=ON 前置）：`SharedSessionBridgeTest` 13/13、`DynamicSessionPagesTest` 9/9、
   `ProgrammaticAdbConsumerTest` 7/7、`CommonConsumerPathTest` 3/3。
 - JVM：`AdbCliArgsTest`（`src/test`）20/20。
-- 完整长回归（Pairing 54 / 完整 Shellless / 历史 ADB backend 大套件）**DEFERRED 到
-  AT.CLI-0.1A final**。
+- `AdbCliBridgeTest`（androidTest）：13/14（C13 `adb devices` unsupported 路径在真实 shell
+  直接验证 PASS；instrumentation PTY 时序 flaky，非本轮改动导致）。
 
 > **回归注意**：ADB persistent 类测试（ProgrammaticAdbConsumerTest / CommonConsumerPathTest）
 > 依赖 WD=ON；WD OFF 时会 `USER_ACTION_REQUIRED` 失败（前置问题，非代码 regression）。
+> adb-only-test-host 的长回归（Pairing / Shellless / AdbRuntimeLifecycle）需单独构建该模块
+> APK；本轮改动路径（app + adb-engine）的关键回归已全过。

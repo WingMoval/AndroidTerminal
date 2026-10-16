@@ -26,6 +26,7 @@ import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeDiagnostic
 import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.cli.AdbCliBridgeServer
+import com.androidterminal.app.cli.AdbCliStatusHub
 import com.androidterminal.app.cli.CliFrontendProvisioner
 import com.at.backend.adb.AdbOneShotBackend
 import com.at.backend.adb.AdbPersistentBackend
@@ -52,6 +53,7 @@ object AppRuntime {
     private var filesDirRef: File? = null
     private var appContextRef: Context? = null
     private var cliBridge: AdbCliBridgeServer? = null
+    private var statusHub: AdbCliStatusHub? = null
 
     /** Wire the ADB runtime + fix the app identity dir. Idempotent. */
     fun initialize(context: Context) {
@@ -133,4 +135,29 @@ object AppRuntime {
      * failed. This is a consumer/frontend adapter, NOT an AT/ADB Engine API.
      */
     fun cliBridge(): AdbCliBridgeServer? = cliBridge
+
+    // ---- AT.CLI-0.1A: ADB lifecycle status hub ----------------------------
+
+    /**
+     * AT.CLI-0.1A: bind the session registry to the ADB lifecycle status hub and
+     * start its read-only AdbRuntime listener. Idempotent. The hub observes the
+     * single AdbRuntime and fans out `[adb] ...` status to Local sessions that
+     * have used adb. Host orchestration only — NOT a lifecycle/recovery owner.
+     */
+    fun initStatusHub(registry: AppSessionRegistry) {
+        if (statusHub == null) {
+            statusHub = AdbCliStatusHub(registry)
+            statusHub?.start()
+        }
+    }
+
+    /** A Local session used adb: subscribe it to ADB lifecycle status. */
+    fun subscribeAdbStatus(sessionId: Int) = statusHub?.subscribe(sessionId)
+
+    /** A Local session closed / never used adb: unsubscribe. */
+    fun unsubscribeAdbStatus(sessionId: Int) = statusHub?.unsubscribe(sessionId)
+
+    /** Whether a Local session is currently subscribed to ADB lifecycle status. */
+    fun isAdbStatusSubscribed(sessionId: Int): Boolean =
+        statusHub?.isSubscribed(sessionId) ?: false
 }

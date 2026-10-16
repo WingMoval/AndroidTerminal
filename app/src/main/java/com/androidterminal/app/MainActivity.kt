@@ -68,6 +68,9 @@ class MainActivity : Activity() {
 
         // AT.DEBUG-0: registry + debug-only bridge (loopback, debug builds only).
         sessionRegistry = AppSessionRegistry { pages.activePage?.pageId }
+        // AT.CLI-0.1A: ADB lifecycle status hub (read-only AdbRuntime observer,
+        // fans out `[adb] ...` to Local sessions that used adb).
+        AppRuntime.initStatusHub(sessionRegistry!!)
         if (com.androidterminal.app.BuildConfig.DEBUG) {
             debugBridge = com.androidterminal.app.debug.DebugBridge(sessionRegistry!!)
             debugBridge?.start()
@@ -212,20 +215,25 @@ class MainActivity : Activity() {
     private fun banner(page: SessionPage): String {
         val tag = if (page.kind == SessionBackendKind.ADB) "ADB" else "LOCAL"
         // AT.CLI-0.1: for Local sessions, write the `adb` shell function to a
-        // script in the app filesDir and source it (robust vs PTY-mangled
-        // multi-line function). `command -v adb` then resolves in the shell.
+        // PER-SESSION script in the app filesDir and source it (robust vs
+        // PTY-mangled multi-line function). The script exports AT_SESSION_ID
+        // (= pageId) so AdbCliMain binds ADB lifecycle status to THIS session
+        // (AT.CLI-0.1A). `command -v adb` then resolves in the shell.
         val bootstrap = if (page.kind == SessionBackendKind.LOCAL) {
             runCatching {
                 val apk = AppRuntime.appApkPath()
                 val sock = AppRuntime.cliBridgeSocketPath()
+                // Per-session script so AT_SESSION_ID is unique per Local page.
+                val scriptName = "${LocalSessionBootstrap.BOOTSTRAP_SCRIPT}.${page.pageId}"
                 val script = LocalSessionBootstrap.writeScript(
-                    scriptPath = File(filesDir, LocalSessionBootstrap.BOOTSTRAP_SCRIPT).absolutePath,
+                    scriptPath = File(filesDir, scriptName).absolutePath,
                     apkPath = apk,
                     sockPath = sock,
+                    sessionId = page.pageId,
                 )
                 runCatching {
                     File(filesDir, "adb_bootstrap_diag.txt").writeText(
-                        "apk=[$apk]\nsock=[$sock]\nscript=[$script]\n"
+                        "apk=[$apk]\nsock=[$sock]\nscript=[$script]\nsession=${page.pageId}\n"
                     )
                 }
                 LocalSessionBootstrap.sourceLine(script)
@@ -311,7 +319,10 @@ class MainActivity : Activity() {
     fun updateAdbStatusForTest() = updateAdbStatus()
 
     private fun closeActivePage() {
-        pages.closeActive()
+        val removed = pages.closeActive()
+        // AT.CLI-0.1A: a closed Local session stops receiving ADB lifecycle
+        // status immediately (no observer/registry leak, no stale delivery).
+        removed?.let { AppRuntime.unsubscribeAdbStatus(it.pageId) }
         renderPage()
     }
 

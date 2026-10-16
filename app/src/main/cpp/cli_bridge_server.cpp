@@ -41,6 +41,7 @@ struct Bridge {
     jmethodID onInteractiveData;  // (int fd, int type, byte[] payload)
     jmethodID onInteractiveClose; // (int fd)
     jmethodID pushError;          // (int fd, String msg)
+    jmethodID onHello;            // (int fd, int sessionId) — AT.CLI-0.1A
 };
 
 static Bridge* g_bridge = nullptr;
@@ -185,6 +186,16 @@ static void* client_thread(void* arg) {
         write_all(fd, hdr, 5);
         write_all(fd, &payload[0], 1);
     }
+    // AT.CLI-0.1A: forward the session id (payload bytes 1..4 LE, if present) to
+    // Kotlin so the bridge can bind ADB lifecycle status to this Local session.
+    {
+        int sessionId = 0;
+        if (len >= 5) {
+            sessionId = (int)((uint32_t)payload[1] | ((uint32_t)payload[2] << 8) |
+                              ((uint32_t)payload[3] << 16) | ((uint32_t)payload[4] << 24));
+        }
+        env->CallVoidMethod(g_bridge->handler, g_bridge->onHello, (jint)fd, (jint)sessionId);
+    }
 
     // Serve loop.
     for (;;) {
@@ -288,6 +299,7 @@ Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, job
     b->onInteractiveData = env->GetMethodID(cls, "onInteractiveData", "(IIB[V)V");
     b->onInteractiveClose = env->GetMethodID(cls, "onInteractiveClose", "(I)V");
     b->pushError = env->GetMethodID(cls, "pushError", "(ILjava/lang/String;)V");
+    b->onHello = env->GetMethodID(cls, "onHello", "(II)V");
     g_bridge = b;
 
     if (pthread_create(&b->thread, nullptr, accept_thread, nullptr) != 0) {

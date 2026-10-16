@@ -99,6 +99,25 @@ class SharedSessionHandle(
     fun resize(rows: Int, cols: Int): Boolean =
         if (closed.get()) false else runCatching { session.resize(rows, cols) }.getOrDefault(false)
 
+    /**
+     * AT.CLI-0.1A: inject a HOST/SYSTEM terminal event (e.g. an ADB lifecycle
+     * status line) into this session's Human-visible output fan-out.
+     *
+     * Semantics (documented): this is a TERMINAL SYSTEM EVENT — it is NOT the
+     * Local shell's stdout, NOT the remote command's stdout/stderr, and NOT PTY
+     * stdin (writing to stdin would be parsed by /system/bin/sh as user input).
+     * It rides the existing read-only observer fan-out (onOutput) so the Human
+     * UI renders it like other terminal output, without touching the AT Engine
+     * contract or LocalTerminalSession ownership.
+     *
+     * No-op when closed.
+     */
+    fun emitSystemOutput(bytes: ByteArray) {
+        if (closed.get()) return
+        val b = bytes.copyOf()
+        forEachObserver { it.onOutput(b) }
+    }
+
     /** Close the underlying session (Human lifecycle authority calls this). */
     fun close() {
         if (closed.compareAndSet(false, true)) {

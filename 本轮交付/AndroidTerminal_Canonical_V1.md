@@ -1733,6 +1733,7 @@ AG_MAINLINE                 = PARALLEL
 AT_CLI_0_OVERALL_STATUS        = IN_PROGRESS
 AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
 ADB_CLI_ONESHOT_CORE           = VERIFIED
+ADB_RUNTIME_LIFECYCLE          = COMPLETE          # AT.CLI-0.1A
 
 SELINUX_EXEC_BLOCKER           = VERIFIED
 PRIVATE_ELF_ENTRYPOINT         = REJECTED
@@ -1742,19 +1743,32 @@ TEST_HARNESS_BUG               = VERIFIED
 APP_PROCESS_P1_P6              = 6/6 PASS
 SELECTED_CLI_ENTRYPOINT        = APP_PROCESS
 ADB_CLI_ONESHOT_TEST           = 15/15 PASS (O1-O15, 97s, flaky NO)
+ADB_CLI_LIFECYCLE_TEST         = 11/11 PASS (L1-L11, AT.CLI-0.1A)
 
-PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 (REUSE)
+PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 + T_STATUS=12 (REUSE)
 AT_ENGINE_MODIFIED             = NO
-ADB_ENGINE_MODIFIED            = NO
+ADB_PROTOCOL_ENGINE_MODIFIED   = NO
+ADB_NATIVE_TRANSPORT_MODIFIED  = NO
+ADBRUNTIME_LIFECYCLE_MODIFIED  = YES
 
-SHELL_HOSTED_ADB_CLI           = ONESHOT_VERIFIED_INTERACTIVE_NOT_STARTED
-FULL_ADB_CLI                   = NOT_STARTED
-AUTO_WD_PRODUCT_INTEGRATION    = NOT_STARTED
-CONNECTION_STATUS_TERMINAL_EVENTS = NOT_STARTED
+SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE_VERIFIED_INTERACTIVE_NOT_STARTED
+FULL_ADB_CLI                   = INTERACTIVE_NOT_STARTED
+AUTO_WD_PRODUCT_INTEGRATION    = COMPLETE          # WRITE_SECURE auto-enable + bounded retry
+CONNECTION_STATUS_TERMINAL_EVENTS = COMPLETE       # T_STATUS async -> Local PTY, session-scoped
+
+ADB_RUNTIME_ROLE               = LONG_LIVED_LIFECYCLE_OWNER
+AUTO_READY                     = RUNTIME_OWNED_ENSURE_READY
+POST_BOOTSTRAP_AUTO_WD         = COMPLETE          # FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED
+TRANSPORT_LOSS_PROJECTION      = READ_ONLY_OBSERVER_EDGE (1.5s poll, no ping/socket/heartbeat)
+RECOVERY_OWNER                 = ADB_RUNTIME (ONE, bounded 3-attempt)
+TERMINAL_STATUS_PROJECTION     = T_STATUS -> CLI STDERR -> LOCAL PTY (session-scoped, dedupe)
   ```
 
-> **one-shot 验证前置（冻结）**：WD=ON + identity TRUSTED + AdbRuntime READY。
-> WD OFF / UNTRUSTED / DISCONNECT 场景 **NOT COVERED**，留给 AT.CLI-0.1A。
+> **one-shot 前置（AT.CLI-0.1 冻结）**：WD=ON + identity TRUSTED + AdbRuntime READY。
+> **AT.CLI-0.1A 闭合**：WD OFF / DISCONNECT 场景由 AdbRuntime ensureReady + auto-WD +
+> read-only transport observer + async T_STATUS 覆盖（L1-L11 = 11/11 PASS）。
+> `FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED`（fresh install 无 WRITE_SECURE，需首次手动 WD +
+> trust + `pm grant`）；`POST_BOOTSTRAP_AUTO_WD = COMPLETE`。
 
 要点（详见 `docs/evidence/at_cli_0/`）：
 
@@ -1781,9 +1795,13 @@ CONNECTION_STATUS_TERMINAL_EVENTS = NOT_STARTED
   Backend → ADB Engine → adbd → 远程 sh uid=2000）。principal transition 实测
   `uid=10313 → uid=2000(shell) → uid=10313`（O3），Local shell 存活（O15）。
   详见 `docs/evidence/at_cli_0/ONESHOT_CLOSURE.md`。
-- **interactive `adb shell`（无参）+ Ctrl-C/resize relay = NOT_STARTED**；
-  **Auto-WD + connection status events = NOT_STARTED**（AT.CLI-0.1A）。
-- 故 `SHELL_HOSTED_ADB_CLI = ONESHOT_VERIFIED_INTERACTIVE_NOT_STARTED`，**不**标 COMPLETE。
+- **AT.CLI-0.1A（Auto-WD + connection lifecycle）= COMPLETE**：AdbRuntime 作为长驻
+  生命周期 owner，`adb command` 零手动前置 cold-ready（WD OFF → auto-WD → connected），
+  transport 丢失/重连以 async T_STATUS 投影到订阅 Local session（session-scoped + dedupe +
+  no-replay）。`AdbCliLifecycleTest` L1-L11 = **11/11 PASS**（真机 HONOR ALI-AN00）。
+  详见 `docs/evidence/at_cli_0/ADB_RUNTIME_LIFECYCLE_CLOSURE.md`。
+- **interactive `adb shell`（无参）+ Ctrl-C/resize relay = NOT_STARTED**（AT.CLI-0.2）。
+- 故 `SHELL_HOSTED_ADB_CLI = ONESHOT+LIFECYCLE_VERIFIED_INTERACTIVE_NOT_STARTED`，**不**标 COMPLETE。
 
 ---
 
@@ -1832,20 +1850,19 @@ AT.V3-1 — ADB Engine Extraction / Migration
 
 由此开始真正的 V3 实现主线。
 
-### 35.1 当前实际 NEXT（AT.CLI-0.1A）
+### 35.1 当前实际 NEXT（AT.CLI-0.2）
 
-AT.CLI-0 入口恢复 COMPLETE（`SELECTED_CLI_ENTRYPOINT = APP_PROCESS`），one-shot core
-已 VERIFIED（`ADB_CLI_ONESHOT_CORE = VERIFIED`，15/15）。当前实际 NEXT：
+AT.CLI-0 入口恢复 COMPLETE，one-shot core VERIFIED（15/15），**connection lifecycle
+（AT.CLI-0.1A）COMPLETE**（`ADB_RUNTIME_LIFECYCLE = COMPLETE`，`AdbCliLifecycleTest`
+L1-L11 = 11/11）。当前实际 NEXT：
 
 ```text
-AT.CLI-0.1A
-  — Auto-WD + ADB Connection Status Integration
+AT.CLI-0.2
+  — Interactive `adb shell` (无参) + Ctrl-C / resize relay
 ```
 
-目标：`adb command → ensureReady → WD OFF 自动开启 → discovery → connect →
-connected → execute`，以及 `disconnected / reconnecting / connected` terminal
-status events。（不将 AT.CLI-0 整体标 COMPLETE：one-shot 已 verified，interactive
-与 connection lifecycle 未开始。）
+目标：无参 `adb shell` 进入交互式 relay（stdin/stdout/resize 透传到远程 shell），
+Ctrl-C 信号 relay。（不将 AT.CLI-0 整体标 COMPLETE：interactive 未开始。）
 
 ---
 
