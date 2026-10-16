@@ -272,7 +272,7 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                            语义归一化：FRESH_INSTALL_ZERO_TOUCH=NOT_COMPLETE /
                            FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED / POST_BOOTSTRAP_AUTO_WD=VERIFIED /
                            POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY=VERIFIED（限定 post-bootstrap）；
-                           interactive `adb shell` = NOT_STARTED (AT.CLI-0.2)；
+                           interactive `adb shell` = VERIFIED (AT.CLI-0.2, automation 16/16, Human Gate pending)；
                            evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
                            APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md +
                                                        **AT.CLI-0.1B LIVE command-time status = VERIFIED**：0.1A 缺口修复
@@ -294,9 +294,10 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                             + Args 20/20；
                             STATUS=HOST/SYSTEM TERMINAL EVENT（emitSystemOutput）/
                             STATUS_DUPLICATE=NO / T_STATUS 保留（非 Human fallback）；
-ADB_RUNTIME_LIFECYCLE_CLOSURE.md + LIVE_COMMAND_STATUS_CLOSURE.md）
-    NEXT                  = AT.CLI-0.2
-                           — Interactive `adb shell` (无参) + Ctrl-C / resize relay
+ADB_RUNTIME_LIFECYCLE_CLOSURE.md + LIVE_COMMAND_STATUS_CLOSURE.md +
+ INTERACTIVE_SHELL_CLOSURE.md）
+    NEXT                  = AT.POSTCLI-0
+                           — CLI 完成后架构复核 + Terminal Emulator / Screen State 进入条件审计
  ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

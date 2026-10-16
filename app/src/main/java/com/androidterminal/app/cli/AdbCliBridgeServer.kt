@@ -91,6 +91,13 @@ class AdbCliBridgeServer(private val filesDir: File) {
         // AT.CLI-0.1A: fd -> Local session id (from HELLO payload) for ADB status
         // subscription binding.
         private val fdSession = ConcurrentHashMap<Int, Int>()
+        // AT.CLI-0.2: Local session id -> active interactive client fd (the
+        // session currently hosting an `adb shell` remote PTY). Used by the
+        // app-layer resize relay (§20): when the Human resizes a Local session
+        // that is mid-interactive, forward the new size to the inner Remote PTY.
+        // This is a CLI-connection composition map, NOT a second ADB runtime /
+        // session registry / recovery owner.
+        private val interactiveForSession = ConcurrentHashMap<Int, Int>()
 
         /** Auth: same-UID only (CLI runs as app UID). */
         fun onClientAuth(fd: Int, peerUid: Int): Boolean = peerUid == Process.myUid()
@@ -246,11 +253,21 @@ class AdbCliBridgeServer(private val filesDir: File) {
                 when (ev) {
                     is ATSessionEvent.Data -> sendFrame(fd, AdbCliProtocol.T_OUT, ev.bytes)
                     is ATSessionEvent.Exited -> sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(ev.exitCode))
+                    // AT.CLI-0.2: the ADB backend signals a natural remote-shell
+                    // exit as an Eof (stream end) — the shell-v2 facade does not
+                    // carry a shell exit code (INTERACTIVE_EXIT_CODE = NOT_EXPOSED).
+                    // Map Eof -> T_EXIT so the CLI frontend closes the relay and
+                    // the shell wrapper restores the Outer TTY. Without this the
+                    // relay never terminates (AdbCliMain blocks forever).
+                    is ATSessionEvent.Eof -> sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(0))
                     is ATSessionEvent.Failed -> pushError(fd, ev.error)
                     else -> {}
                 }
             }
             sessions[fd] = session
+            // AT.CLI-0.2: record the Local session -> interactive fd binding so
+            // the app-layer resize relay can reach the inner Remote PTY.
+            fdSession[fd]?.let { interactiveForSession[it] = fd }
             return true
         }
 
@@ -269,6 +286,26 @@ class AdbCliBridgeServer(private val filesDir: File) {
         /** Close the CLI-owned session. */
         fun onInteractiveClose(fd: Int) {
             sessions.remove(fd)?.let { runCatching { it.close() } }
+            // AT.CLI-0.2: drop the Local session -> interactive fd binding.
+            fdSession[fd]?.let { sid ->
+                // Only remove if this fd still owns the binding (a newer
+                // interactive on the same session would have overwritten it).
+                if (interactiveForSession[sid] == fd) interactiveForSession.remove(sid)
+            }
+        }
+
+        /**
+         * AT.CLI-0.2: app-layer resize relay (§20). When the Human resizes a
+         * Local session that is currently hosting an active `adb shell`
+         * interactive, forward the new rows/cols to the inner Remote PTY (so
+         * remote `stty size` reflects the change). No-op if the session has no
+         * active interactive. This is app/CLI composition — the AT Engine
+         * never learns about "nested adb shell".
+         */
+        fun relayResize(sessionId: Int, rows: Int, cols: Int) {
+            val fd = interactiveForSession[sessionId] ?: return
+            val s = sessions[fd] ?: return
+            executor.execute { runCatching { s.resize(rows, cols) } }
         }
 
         fun pushError(fd: Int, msg: String) {
@@ -286,6 +323,15 @@ class AdbCliBridgeServer(private val filesDir: File) {
     }
 
     external private fun nativeSendFrame(fd: Int, type: Int, payload: ByteArray)
+
+    /**
+     * AT.CLI-0.2: app-layer resize relay entry. Forward a Local session resize
+     * to the inner Remote PTY if that session is mid-`adb shell` interactive.
+     * See [CliBridgeHandler.relayResize].
+     */
+    fun relayInteractiveResize(sessionId: Int, rows: Int, cols: Int) {
+        handler.relayResize(sessionId, rows, cols)
+    }
 }
 
 private fun ByteArray.le32At(offset: Int): Int =

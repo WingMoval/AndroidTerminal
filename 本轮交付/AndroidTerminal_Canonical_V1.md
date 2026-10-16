@@ -1730,11 +1730,12 @@ AG_MAINLINE                 = PARALLEL
 ### 34.1 AT.CLI-0 当前状态（shell-hosted `adb` CLI 入口恢复）
 
 ```text
-AT_CLI_0_OVERALL_STATUS        = IN_PROGRESS
+AT_CLI_0_OVERALL_STATUS        = COMPLETE          # AT.CLI-0.2 automation VERIFIED (Human Gate 待)
 AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
 ADB_CLI_ONESHOT_CORE           = VERIFIED
 ADB_RUNTIME_LIFECYCLE          = COMPLETE          # AT.CLI-0.1A
 LIVE_COMMAND_STATUS            = VERIFIED          # AT.CLI-0.1B
+INTERACTIVE_ADB_SHELL          = VERIFIED          # AT.CLI-0.2 (automation 16/16)
 
 SELINUX_EXEC_BLOCKER           = VERIFIED
 PRIVATE_ELF_ENTRYPOINT         = REJECTED
@@ -1746,15 +1747,17 @@ SELECTED_CLI_ENTRYPOINT        = APP_PROCESS
 ADB_CLI_ONESHOT_TEST           = 15/15 PASS (O1-O15, 97s, flaky NO)
 ADB_CLI_LIFECYCLE_TEST         = 11/11 PASS (L1-L11, AT.CLI-0.1A)
 ADB_CLI_LIVE_STATUS_TEST       = 9/9 PASS (S1-S9, AT.CLI-0.1B)
+ADB_CLI_INTERACTIVE_TEST       = 16/16 PASS (I1-I16, AT.CLI-0.2)
 
-PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 + T_STATUS=12 (REUSE)
+PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 + T_STATUS=12 (REUSE; interactive frames 7-11)
 AT_ENGINE_MODIFIED             = NO
 ADB_PROTOCOL_ENGINE_MODIFIED   = NO
 ADB_NATIVE_TRANSPORT_MODIFIED  = NO
-ADBRUNTIME_LIFECYCLE_MODIFIED  = YES
+ADBRUNTIME_LIFECYCLE_MODIFIED  = NO                # 0.2 未改 AdbRuntime (0.1A 已改)
+REMOTE_PTY_PRIMITIVE_MODIFIED  = NO
 
-SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE+LIVE_STATUS_VERIFIED_INTERACTIVE_NOT_STARTED
-FULL_ADB_CLI                   = INTERACTIVE_NOT_STARTED
+SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE+LIVE_STATUS+INTERACTIVE (automation VERIFIED)
+FULL_ADB_CLI                   = ONESHOT + INTERACTIVE (Human Gate 待执行)
 AUTO_WD_PRODUCT_INTEGRATION    = COMPLETE          # WRITE_SECURE auto-enable + bounded retry
 CONNECTION_STATUS_TERMINAL_EVENTS = COMPLETE       # T_STATUS async -> Local PTY, session-scoped
 
@@ -1771,6 +1774,34 @@ T_STATUS_FALLBACK              = PRESERVED (non-Human client, buffered)
 REAL_HUMAN_LIVE_STATUS         = PASS            # 真机 Human Gate (WD OFF, status 逐步出现 before uid)
 STATUS_STDOUT_CONTAMINATION    = NO              # CAPTURE=[LIVE_STATUS_TEST] 无 [adb] 混入
 AT_CLI_0_1B                    = CLOSED          # 人工 Gate PASS, docs-only normalization
+
+# --- AT.CLI-0.2 interactive `adb shell` (no-arg) Remote PTY relay ---
+NO_ARG_ADB_SHELL               = PASS            # I1
+OUTER_LOCAL_PTY                = VERIFIED        # app UID /system/bin/sh (raw/restore via adb() wrapper)
+INNER_REMOTE_PTY               = VERIFIED        # uid=2000, shell,v2,pty:
+REMOTE_TTY                     = /dev/pts/*      # I3 real PTY
+REMOTE_PRINCIPAL               = uid=2000(shell) # I2
+BIDIRECTIONAL_RELAY            = PASS            # byte-oriented (stdin thread + bridge read loop)
+CWD_CONTINUITY                 = PASS            # I4
+ENV_CONTINUITY                 = PASS            # I5
+FOREGROUND_STDIN               = PASS            # I6 (cat)
+CTRL_C_REMOTE_FOREGROUND       = PASS            # I7 (0x03 → remote, shell survives)
+RESIZE_RELAY                   = PASS            # I8 (Local→inner Remote PTY, no AT contract change)
+INITIAL_REMOTE_SIZE            = PASS            # stty size → T_INTERACTIVE payload (no hardcode)
+UTF8                           = PASS            # I9
+NATURAL_EXIT                   = PASS            # I10 (Eof→T_EXIT, Local shell return)
+OUTER_TTY_RESTORED             = PASS            # I11 (stty raw/restore)
+INTERACTIVE_EXIT_CODE          = NOT_EXPOSED     # shell-v2 facade 无 exit frame; 不扩大 AT contract
+TRANSPORT_LOSS_TERMINATION     = PASS            # I14 (no transparent resume / no replay)
+INTERACTIVE_TRANSPARENT_RESUME = NO
+INTERACTIVE_INPUT_REPLAY       = NO
+INTERACTIVE_MULTI_SESSION_ISOLATION = PASS       # I15
+INTERACTIVE_CONNECTION_REUSE   = PASS            # I13
+ONE_SHOT_INTERACTIVE_SEMANTIC_SEPARATION = PASS  # one-shot 15/15 全回归绿
+COLD_LIVE_STATUS_BEFORE_REMOTE_PROMPT = PASS     # I16
+REAL_HUMAN_INTERACTIVE_SHELL   = PENDING         # §37 Human Gate 待执行
+AT_CLI_0_2_AUTOMATION          = CLOSED          # 16/16 + 全回归绿; Human Gate 待
+AT_CLI_0_2                     = AUTOMATION_VERIFIED  # Human Gate 闭合后 → COMPLETE
 
 # --- fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化，正式冻结）---
 FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE

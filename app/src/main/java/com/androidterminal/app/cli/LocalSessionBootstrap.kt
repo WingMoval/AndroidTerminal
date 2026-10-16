@@ -39,20 +39,48 @@ object LocalSessionBootstrap {
      * multi-line function definition sent through the interactive PTY gets
      * mangled; sourcing a file is robust.
      */
+    // AT.CLI-0.2: env vars carrying the Outer Local PTY size to AdbCliMain for
+    // the initial remote PTY size (§21). Read from `stty size` by the shell
+    // wrapper ONLY on the interactive (no-arg) `adb shell` form.
+    const val ENV_ROWS = "AT_CLI_ROWS"
+    const val ENV_COLS = "AT_CLI_COLS"
+
     fun writeScript(scriptPath: String, apkPath: String, sockPath: String, sessionId: Int): String {
         val apk = apkPath.replace("'", "'\"'\"'")
         val sock = sockPath.replace("'", "'\"'\"'")
-        // The shell function must reference the shell variable $AT_APP_APK.
-        // Emit a literal '$' (via char) so Kotlin does not template-expand it.
-        val shellApkVar = "$" + ENV_APK   // -> "$AT_APP_APK"
+        // The shell function must reference the shell variables. Emit literal '$'
+        // (via char) so Kotlin does not template-expand them.
+        val d = "$" // literal dollar
+        val shellApkVar = d + ENV_APK   // -> "$AT_APP_APK"
         val script = buildString {
             appendLine("export $ENV_APK='$apk'")
             appendLine("export $ENV_SOCK='$sock'")
             appendLine("export $ENV_SESSION_ID='$sessionId'")
-            appendLine(
-                "adb() { $APP_PROCESS -Djava.class.path=\"$shellApkVar\" /system/bin " +
-                    "$ADB_MAIN_CLASS \"\$@\"; }"
-            )
+            // AT.CLI-0.2: adb() wrapper.
+            //   - `adb shell` (no command, $# -eq 1): INTERACTIVE remote PTY.
+            //     Save the Outer Local PTY termios, switch to raw/no-echo so the
+            //     relay is byte-oriented (no line buffering, no double-echo,
+            //     Ctrl-C 0x03 reaches the remote instead of killing the local
+            //     child), capture `stty size` for the initial remote PTY, run
+            //     AdbCliMain, then RESTORE the saved termios (hard gate §16) —
+            //     regardless of exit path.
+            //   - `adb shell <cmd...>` (one-shot) and other forms: plain launch,
+            //     NO raw-mode switch (one-shot keeps canonical Local TTY).
+            appendLine("adb() {")
+            appendLine("  if [ \"\$1\" = shell ] && [ \"\$#\" -eq 1 ]; then")
+            appendLine("    local _old _sz _r _c")
+            appendLine("    _old=\"\$(stty -g 2>/dev/null)\"")
+            appendLine("    _sz=\"\$(stty size 2>/dev/null)\"")
+            appendLine("    _r=\$(printf '%s' \"\$_sz\" | awk '{print \$1}')")
+            appendLine("    _c=\$(printf '%s' \"\$_sz\" | awk '{print \$2}')")
+            appendLine("    stty raw -echo 2>/dev/null")
+            appendLine("    $ENV_ROWS=\"\$_r\" $ENV_COLS=\"\$_c\" $APP_PROCESS -Djava.class.path=\"$shellApkVar\" /system/bin $ADB_MAIN_CLASS \"\$@\"")
+            appendLine("    local _rc=\$?")
+            appendLine("    [ -n \"\$_old\" ] && stty \"\$_old\" 2>/dev/null")
+            appendLine("    return \$_rc")
+            appendLine("  fi")
+            appendLine("  $APP_PROCESS -Djava.class.path=\"$shellApkVar\" /system/bin $ADB_MAIN_CLASS \"\$@\"")
+            appendLine("}")
         }
         java.io.File(scriptPath).writeText(script)
         return scriptPath

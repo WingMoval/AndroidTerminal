@@ -296,10 +296,18 @@ Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, job
     b->onClientAuth = env->GetMethodID(cls, "onClientAuth", "(II)Z");
     b->onOneShot = env->GetMethodID(cls, "onOneShot", "(I[B)V");
     b->onInteractiveOpen = env->GetMethodID(cls, "onInteractiveOpen", "(III)Z");
-    b->onInteractiveData = env->GetMethodID(cls, "onInteractiveData", "(IIB[V)V");
+    b->onInteractiveData = env->GetMethodID(cls, "onInteractiveData", "(II[B)V");
     b->onInteractiveClose = env->GetMethodID(cls, "onInteractiveClose", "(I)V");
     b->pushError = env->GetMethodID(cls, "pushError", "(ILjava/lang/String;)V");
     b->onHello = env->GetMethodID(cls, "onHello", "(II)V");
+    // A null method id would later abort the process ("JNI DETECTED ERROR:
+    // mid == null"), so verify all resolved before returning.
+    if (env->ExceptionCheck()) { env->ExceptionDescribe(); env->ExceptionClear(); }
+    if (!b->onClientAuth || !b->onOneShot || !b->onInteractiveOpen ||
+        !b->onInteractiveData || !b->onInteractiveClose || !b->pushError || !b->onHello) {
+        LOGE_ATCLI("nativeStart: a handler method id failed to resolve");
+        return -1;
+    }
     g_bridge = b;
 
     if (pthread_create(&b->thread, nullptr, accept_thread, nullptr) != 0) {

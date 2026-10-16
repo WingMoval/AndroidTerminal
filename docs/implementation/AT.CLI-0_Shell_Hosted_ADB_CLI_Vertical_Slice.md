@@ -1,17 +1,18 @@
 # AT.CLI-0 — Shell-Hosted ADB CLI Vertical Slice (Implementation)
 
-> **AT_CLI_0_OVERALL_STATUS = IN_PROGRESS**
+> **AT_CLI_0_OVERALL_STATUS = COMPLETE**（automation；Interactive Human Gate 待执行）
 >
 > | 阶段 | 状态 |
 > |---|---|
 > | EntryPoint Recovery | **COMPLETE** |
 > | One-shot Core (`adb shell <cmd...>`) | **VERIFIED** |
 > | Auto-WD / connection lifecycle (AT.CLI-0.1A) | **COMPLETE** |
-> | Live command-time ADB status (AT.CLI-0.1B) | **VERIFIED** |
-> | Interactive `adb shell` (AT.CLI-0.2) | NEXT |
+> | Live command-time ADB status (AT.CLI-0.1B) | **VERIFIED / CLOSED** |
+> | Interactive `adb shell` (AT.CLI-0.2) | **VERIFIED**（automation 16/16；Human Gate 待） |
 >
-> 本 slice **不**声明 `SHELL_HOSTED_ADB_CLI = COMPLETE`：one-shot + connection lifecycle
-> + live command-time status 已 verified，interactive 未开始。
+> `SHELL_HOSTED_ADB_CLI = ONESHOT + LIFECYCLE + LIVE_STATUS + INTERACTIVE`
+> （automation VERIFIED）。`AT_CLI_0_2_AUTOMATION = CLOSED`；
+> `REAL_HUMAN_INTERACTIVE_SHELL = PENDING`（§37 Human Gate）。
 
 ---
 
@@ -178,13 +179,71 @@ STATUS_DUPLICATE=NO（单投影路径）/ T_STATUS 保留（非 Human fallback�
 - 详见 `docs/evidence/at_cli_0/LIVE_COMMAND_STATUS_CLOSURE.md`（S1-S9 = 9/9 PASS + 回归全绿 +
   S1 时间戳证明 STATUS_BEFORE_COMMAND_EXIT=REQUIRED）。
 
-## 4. Interactive `adb shell`（NEXT = AT.CLI-0.2）
+## 4. Interactive `adb shell`（AT.CLI-0.2 = **VERIFIED**，Human Gate 待）
 
-无参 `adb shell`（交互）+ Ctrl-C / resize relay 未开始。one-shot 不杀 Local shell（O15 已证
-PTY 存活），但交互式 relay 是独立后续工作。
+无参 `adb shell` 进入真正的长期 Remote PTY shell（`uid=2000(shell)`，`/dev/pts/*`），
+支持 stdin / persistent cwd+env / Ctrl-C / resize / clean exit 回 Local shell。**REUSE 既有
+verified 能力**（AT Engine / ADB Backend / ADB Engine interactive stream / Remote PTY），
+**NOT REWRITE**；仅 `:app` CLI bridge / frontend / bootstrap 组合层改动。
+
+### 4.1 两个 PTY（不合并为一个 Session）
+
+- **OUTER LOCAL PTY** = app UID `/system/bin/sh`（外层 shell，SessionPage 的 ATTerminalSession）。
+- **INNER REMOTE PTY** = `uid=2000` `/system/bin/sh`（`shell,v2,pty:` 打开的 Remote PTY，
+  由 CLI connection 持有的 inner ATTerminalSession）。
+
+### 4.2 实现路径（canonical）
+
+```
+Local /system/bin/sh → adb()（no-arg → stty raw -echo + 保存/恢复）
+  → app_process AdbCliMain shell
+  → Product CLI Bridge (UDS, protocol v1, frames 7-11)
+  → AdbCliBridgeServer.onInteractiveOpen
+  → AppRuntime.adbEngine().openSession(AdbPersistentBackend.Launch("",rows,cols))
+  → AdbTerminalSession → ADB Engine interactive stream → shell,v2,pty: → adbd
+  → INNER REMOTE PTY
+```
+
+### 4.3 关键设计
+
+- **Outer TTY relay mode**：`adb()` wrapper 对 no-arg `adb shell` 保存 `stty -g` →
+  `stty raw -echo` → 运行 → **无论退出路径恢复 `stty "$_old"`**（hard gate）。one-shot
+  不切 raw。
+- **双向 relay**：`AdbCliMain.bridgeInteractive()` = 1 个 stdin relay thread（byte-oriented，
+  不等 newline）+ 1 个 bridge read loop。socket frame write 单 writer（无 interleave）。
+- **Ctrl-C**：raw mode 下 0x03 不被 Outer PTY 当 SIGINT 消费，relay 到 Remote PTY line
+  discipline → remote foreground SIGINT。
+- **Resize**：initial size 来自 `stty size`（`T_INTERACTIVE` payload，无 hardcode）；Human
+  resize Local session 经 `AppTerminal.resize → AppRuntime.relayInteractiveResize →
+  interactiveForSession 映射 → inner ATTerminalSession.resize`（AT Engine 不知 "nested adb
+  shell"，app/CLI 组合 concern）。
+- **Natural exit**：ADB backend 以 `ATSessionEvent.Eof`（stream end）表达 remote exit →
+  bridge 映射 `T_EXIT(code=0)` → relay 关闭 → wrapper 恢复 Outer TTY。
+  `INTERACTIVE_EXIT_CODE = NOT_EXPOSED`（shell-v2 facade 无 exit frame，不扩大 AT contract）。
+- **Transport loss**：当前 interactive invocation 终止 + Local TTY 恢复；**不**透明 resume /
+  **不** replay；recovery 由既有 AdbRuntime（ONE owner）。
+- **Multi-session**：每 fd 持有自己的 inner session（`sessions[fd]`）；无 global
+  singleInteractiveSession。
+
+### 4.4 已知修复（root cause）
+
+- **JNI 签名 bug**（`cli_bridge_server.cpp`）：`onInteractiveData` `GetMethodID` 签名
+  `(IIB[V)V`（`B[` 顺序错）→ null → 首次 interactive `JNI DETECTED ERROR: mid == null`
+  SIGABRT。修为 `(II[B)V` + nativeStart 非空校验。
+- **Eof 未映射**（`AdbCliBridgeServer`）：ADB backend 以 `Eof` 表达 natural remote exit，
+  listener 原忽略 → relay 永不终止。改为 Eof→T_EXIT。
+
+- 详见 `docs/evidence/at_cli_0/INTERACTIVE_SHELL_CLOSURE.md`（I1-I16 = 16/16 PASS + 回归全绿）。
 
 ## 5. 测试与回归
 
+- `AdbCliInteractiveTest`（androidTest，AT.CLI-0.2，**新**）：I1-I16，**16/16 PASS**
+  （no-arg opens interactive / uid=2000 / /dev/pts/* real PTY / cwd continuity / env
+  continuity / foreground stdin cat / Ctrl-C kills remote fg + shell survives / resize
+  reflected by remote stty size / UTF-8 / natural exit → Local return / Outer TTY restored /
+  second reopen / connection reuse / transport loss termination (no resume) / multi-session
+  isolation / cold WD-OFF live status before prompt）。真实 Human Local PTY path，每 test
+  有 BODY_EXECUTED sentinel（无 vacuous PASS）。
 - `AdbCliLiveStatusTest`（androidTest，AT.CLI-0.1B，**新**）：S1-S9，**9/9 PASS**（cold live
   status before exit / ordering / no duplicate / fast-path dedupe / stdout isolation /
   permission failure / session scope / async regression / close cleanup）。核心 S1 证明中间

@@ -35,16 +35,16 @@ data class AdbCliParseResult(
     val exitCode: Int = 0,
     val toStderr: Boolean = false,
 ) {
-    enum class Kind { SHELL, HELP, VERSION, UNSUPPORTED, NO_ARGS }
+    enum class Kind { SHELL, INTERACTIVE, HELP, VERSION, UNSUPPORTED, NO_ARGS }
 
     companion object {
         const val UNSUPPORTED_EXIT = 2
         const val NO_ARGS_EXIT = 2
 
         val HELP_TEXT = "usage: adb shell <command...>\n" +
-            "       adb shell              (interactive — not implemented in AT.CLI-0.1)\n" +
+            "       adb shell              (interactive remote PTY shell)\n" +
             "       adb --help | adb version\n" +
-            "AndroidTerminal product CLI (app_process entrypoint, shell one-shot)."
+            "AndroidTerminal product CLI (app_process entrypoint; one-shot + interactive)."
 
         const val VERSION_TEXT = "AndroidTerminal adb CLI (app_process entrypoint, bridge protocol v1)"
 
@@ -66,13 +66,15 @@ data class AdbCliParseResult(
                 "shell" -> {
                     val rest = args.copyOfRange(1, args.size)
                     if (rest.isEmpty()) {
-                        // Interactive `adb shell` (no command) — deferred to AT.CLI-0.2.
+                        // AT.CLI-0.2: interactive `adb shell` (no command) ->
+                        // remote PTY relay. The shell wrapper (LocalSessionBootstrap)
+                        // puts the Outer Local PTY into raw/no-echo mode for this
+                        // form ONLY; one-shot `adb shell <cmd...>` does not.
                         AdbCliParseResult(
-                            kind = Kind.HELP,
-                            message = "adb: interactive `adb shell` is not implemented in AT.CLI-0.1 " +
-                                "(one-shot `adb shell <command...>` only)",
-                            exitCode = UNSUPPORTED_EXIT,
-                            toStderr = true,
+                            kind = Kind.INTERACTIVE,
+                            message = "",
+                            exitCode = 0,
+                            toStderr = false,
                         )
                     } else {
                         AdbCliParseResult(

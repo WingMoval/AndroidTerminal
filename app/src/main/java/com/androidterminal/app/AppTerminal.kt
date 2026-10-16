@@ -143,8 +143,15 @@ class AppTerminal(
 
     fun resize(rows: Int, cols: Int): Boolean {
         val h = sharedHandle
-        if (h != null) return h.resize(rows, cols)
-        return runCatching { session?.resize(rows, cols) }.getOrNull() ?: false
+        val ok = if (h != null) h.resize(rows, cols)
+        else runCatching { session?.resize(rows, cols) }.getOrNull() ?: false
+        // AT.CLI-0.2: if this Local session is mid-`adb shell` interactive,
+        // relay the new size to the inner Remote PTY (§20/§19). App/CLI
+        // composition only; the AT Engine never learns of the nesting.
+        if (sessionId != 0) {
+            runCatching { com.androidterminal.app.AppRuntime.relayInteractiveResize(sessionId, rows, cols) }
+        }
+        return ok
     }
 
     fun close() {

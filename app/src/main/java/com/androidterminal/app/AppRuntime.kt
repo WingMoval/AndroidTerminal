@@ -137,6 +137,16 @@ object AppRuntime {
      */
     fun cliBridge(): AdbCliBridgeServer? = cliBridge
 
+    /**
+     * AT.CLI-0.2: app-layer resize relay (§20). When the Human resizes a Local
+     * session, forward the new size to the inner Remote PTY if that session is
+     * currently hosting an active `adb shell` interactive. No-op otherwise.
+     * App/CLI composition — the AT Engine is never told about "nested adb shell".
+     */
+    fun relayInteractiveResize(sessionId: Int, rows: Int, cols: Int) {
+        runCatching { cliBridge?.relayInteractiveResize(sessionId, rows, cols) }
+    }
+
     // ---- AT.CLI-0.1A: ADB lifecycle status hub ----------------------------
 
     /**

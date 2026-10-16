@@ -121,12 +121,11 @@ class AdbCliArgsTest {
 
     @Test
     fun parseShellNoCommand() {
-        // Interactive `adb shell` -> deferred, nonzero.
+        // AT.CLI-0.2: no-arg `adb shell` -> INTERACTIVE remote PTY relay.
         val r = AdbCliParseResult.parse(arrayOf("shell"))
-        assertEquals(AdbCliParseResult.Kind.HELP, r.kind)
-        assertEquals(AdbCliParseResult.UNSUPPORTED_EXIT, r.exitCode)
-        assertTrue(r.toStderr)
-        assertTrue(r.message.contains("not implemented"))
+        assertEquals(AdbCliParseResult.Kind.INTERACTIVE, r.kind)
+        assertEquals(0, r.exitCode)
+        assertFalse(r.toStderr)
     }
 
     @Test

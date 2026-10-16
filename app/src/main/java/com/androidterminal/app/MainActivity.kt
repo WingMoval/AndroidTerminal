@@ -178,6 +178,9 @@ class MainActivity : Activity() {
     fun activeSharedHandle(): SharedSessionHandle? =
         pages.activePage?.terminal?.sharedHandle
 
+    /** Debug/test: the active page's AppTerminal (resize / lifecycle access). */
+    fun activeAppTerminal(): AppTerminal? = pages.activePage?.terminal
+
     /** Debug-only: the active page's backend kind. */
     fun activePageKind(): SessionBackendKind? = pages.activePage?.kind
 

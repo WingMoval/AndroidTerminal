@@ -61,6 +61,14 @@ object AdbCliMain {
                 out.println(parsed.message)
                 return processExit(0)
             }
+            AdbCliParseResult.Kind.INTERACTIVE -> {
+                // AT.CLI-0.2: interactive remote PTY relay (no-arg `adb shell`).
+                // The shell wrapper (LocalSessionBootstrap) has already put the
+                // Outer Local PTY into raw/no-echo mode and will restore it after
+                // we exit. We relay Local stdin <-> remote PTY byte-oriented.
+                val code = bridgeInteractive()
+                return processExit(code)
+            }
             AdbCliParseResult.Kind.SHELL -> {
                 // One-shot via the Product CLI Bridge.
                 val res = bridgeOneShot(parsed.remoteCommand)
@@ -172,9 +180,137 @@ object AdbCliMain {
         }
     }
 
+    /**
+     * AT.CLI-0.2: interactive remote PTY relay (no-arg `adb shell`).
+     *
+     * Bidirectional, BYTE-ORIENTED (never line-buffered, never waits for
+     * newline):
+     *   Local stdin  -> T_STDIN frames  -> Bridge  -> ATTerminalSession.write
+     *   remote output -> T_OUT frames    -> stdout  -> Outer Local PTY
+     *
+     * Concurrency model (one stdin relay thread + one bridge read loop):
+     *   - a dedicated thread reads System.in and pushes T_STDIN frames;
+     *   - the main thread reads UDS frames and writes System.out / System.err.
+     * Socket frame writes are serialized by the UDS itself (single write path
+     * from this process: only the stdin thread writes frames here; the read loop
+     * only reads), so no frame interleave.
+     *
+     * Returns the process exit code (0 on clean remote exit, 1 on transport
+     * failure). The shell wrapper restores the Outer TTY regardless.
+     */
+    private fun bridgeInteractive(): Int {
+        val out = System.out
+        val err = System.err
+        val sock = resolveSocketPath()
+        val sessionId = resolveSessionId()
+        // Initial remote PTY size from the Outer Local PTY (shell wrapper reads
+        // `stty size` and injects AT_CLI_ROWS / AT_CLI_COLS). Fall back to a
+        // sane default if unavailable (the Human can still resize later).
+        val rows = resolveIntEnv("AT_CLI_ROWS") ?: 24
+        val cols = resolveIntEnv("AT_CLI_COLS") ?: 80
+        android.util.Log.i(TAG, "bridgeInteractive: connect $sock session=$sessionId rows=$rows cols=$cols")
+        val ls = LocalSocket()
+        try {
+            ls.connect(LocalSocketAddress(sock, LocalSocketAddress.Namespace.FILESYSTEM))
+            // No timeout: interactive is open-ended; the read loop is the liveness.
+            ls.soTimeout = 0
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "bridgeInteractive: connect failed: ${e.message}")
+            runCatching { ls.close() }
+            err.println("adb: bridge unavailable (is the AndroidTerminal app running?)")
+            return 1
+        }
+        var stdinThread: Thread? = null
+        try {
+            val outp: OutputStream = ls.outputStream
+            val inp: InputStream = ls.inputStream
+
+            // HELLO (same as one-shot): version + sessionId.
+            val sessionIdBytes = if (sessionId != null) le32(sessionId) else byteArrayOf()
+            val helloPayload = ByteArray(1 + sessionIdBytes.size)
+            helloPayload[0] = BRIDGE_PROTOCOL_VERSION.toByte()
+            System.arraycopy(sessionIdBytes, 0, helloPayload, 1, sessionIdBytes.size)
+            writeFrame(outp, AdbCliProtocol.T_HELLO, helloPayload)
+            val ack = readFrame(inp) ?: return failInteractive("no HELLO_ACK")
+            if (ack.type != AdbCliProtocol.T_HELLO_ACK) return failInteractive("bad HELLO_ACK type=${ack.type}")
+
+            // INTERACTIVE open: payload = [rows:4 LE][cols:4 LE].
+            val openPayload = le32(rows) + le32(cols)
+            writeFrame(outp, AdbCliProtocol.T_INTERACTIVE, openPayload)
+
+            // Start the stdin relay thread (byte-oriented, no newline wait).
+            val stdin: InputStream = System.`in`
+            stdinThread = Thread({
+                val buf = ByteArray(4096)
+                try {
+                    while (true) {
+                        val n = stdin.read(buf)
+                        if (n < 0) break // EOF
+                        if (n == 0) continue
+                        if (!writeFrame(outp, AdbCliProtocol.T_STDIN, buf.copyOf(n))) break
+                    }
+                } catch (_: Throwable) {
+                    // stdin read error: stop relaying input.
+                } finally {
+                    // Signal close so the bridge tears down the inner session.
+                    runCatching { writeFrame(outp, AdbCliProtocol.T_CLOSE, ByteArray(0)) }
+                }
+            }, "at-cli-stdin-relay").also { it.isDaemon = true; it.start() }
+
+            // Bridge read loop: remote output / status / exit.
+            var exitCode = 1
+            while (true) {
+                val f = readFrame(inp) ?: break // EOF / transport loss
+                when (f.type) {
+                    AdbCliProtocol.T_OUT -> {
+                        out.write(f.payload)
+                        out.flush()
+                    }
+                    AdbCliProtocol.T_ERR -> {
+                        err.write(f.payload)
+                        err.flush()
+                    }
+                    // AT.CLI-0.1B/0.2: lifecycle status (checking/connected) on
+                    // the stderr channel, BEFORE the remote prompt (cold path).
+                    AdbCliProtocol.T_STATUS -> {
+                        val s = String(f.payload, Charsets.UTF_8)
+                        if (s.isNotEmpty()) { err.print(s); err.flush() }
+                    }
+                    AdbCliProtocol.T_ERROR -> {
+                        err.println("adb: ${String(f.payload, Charsets.UTF_8)}")
+                    }
+                    AdbCliProtocol.T_EXIT -> {
+                        exitCode = if (f.payload.size >= 4) f.le32(0) else 0
+                        break
+                    }
+                    else -> { /* ignore unknown */ }
+                }
+            }
+            return exitCode
+        } catch (e: Exception) {
+            return failInteractive(e.message ?: e.javaClass.simpleName)
+        } finally {
+            stdinThread?.let { runCatching { it.join(2000) } }
+            runCatching { ls.close() }
+        }
+    }
+
+    private fun failInteractive(msg: String): Int {
+        System.err.println("adb: interactive bridge error: $msg")
+        return 1
+    }
+
     /** Resolve the Local Session id (AT_SESSION_ID env, set by the bootstrap). */
     private fun resolveSessionId(): Int? = try {
         val raw = System.getenv("AT_SESSION_ID")
+        raw?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+    } catch (_: Throwable) {
+        null
+    }
+
+    /** Resolve an int env var (AT_CLI_ROWS / AT_CLI_COLS), null if unset/invalid. */
+    private fun resolveIntEnv(name: String): Int? = try {
+        val raw = System.getenv(name)
         raw?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
     } catch (_: Throwable) {
         null
@@ -194,7 +330,9 @@ object AdbCliMain {
 
     // ---- frame IO (matches AdbCliProtocol / adb_cli.cpp) --------------------
 
-    private fun writeFrame(out: OutputStream, type: Int, payload: ByteArray) {
+    /** Write one frame. Returns false on IO failure (used by the interactive
+     *  stdin relay to stop pushing input when the bridge is gone). */
+    private fun writeFrame(out: OutputStream, type: Int, payload: ByteArray): Boolean = try {
         out.write(type)
         val len = payload.size
         out.write(len and 0xff)
@@ -203,6 +341,9 @@ object AdbCliMain {
         out.write((len shr 24) and 0xff)
         if (payload.isNotEmpty()) out.write(payload)
         out.flush()
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun readFrame(inp: InputStream): Frame? {
