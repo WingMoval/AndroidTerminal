@@ -67,6 +67,8 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     // AT.DEVAPP-0.1: real Activity UI visibility test (ActivityScenario).
     androidTestImplementation("androidx.test:core:1.5.0")
+    // AT.CLI-0.1: pure-JVM parser / quoting unit tests (no device).
+    testImplementation("junit:junit:4.13.2")
 }
 
 // AT.CLI-0: the shell-hosted `adb` CLI frontend is built by CMake (above) and

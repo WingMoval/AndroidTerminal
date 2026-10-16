@@ -50,6 +50,7 @@ object AppRuntime {
 
     private var adbKeyDir: String? = null
     private var filesDirRef: File? = null
+    private var appContextRef: Context? = null
     private var cliBridge: AdbCliBridgeServer? = null
 
     /** Wire the ADB runtime + fix the app identity dir. Idempotent. */
@@ -59,6 +60,7 @@ object AppRuntime {
             AdbRuntime.initialize(app)
         }
         if (adbKeyDir == null) {
+            appContextRef = app
             filesDirRef = app.filesDir
             val dir = File(app.filesDir, "adb_identity")
             dir.mkdirs()
@@ -80,6 +82,23 @@ object AppRuntime {
     /** The app's own persistent ADB identity directory (private storage). */
     fun adbIdentityDir(): String = adbKeyDir
         ?: error("AppRuntime.initialize(context) not called")
+
+    /**
+     * AT.CLI-0.1: the installed base.apk absolute path (injected into the Local
+     * session as $AT_APP_APK so the `adb` shell function can launch app_process
+     * with -Djava.class.path). No `pm path` per command, no hardcoded path.
+     */
+    fun appApkPath(): String {
+        val p = appContextRef?.applicationInfo?.sourceDir
+        android.util.Log.i("AppRuntime", "appApkPath() = [$p]")
+        return p ?: error("AppRuntime.initialize(context) not called")
+    }
+
+    /**
+     * AT.CLI-0.1: the Product CLI Bridge UDS absolute path (injected into the
+     * Local session as $AT_CLI_BRIDGE_SOCK). Empty if the bridge is not up.
+     */
+    fun cliBridgeSocketPath(): String = cliBridge?.socketPath.orEmpty()
 
     /** Current ADB lifecycle state (single owner = AdbRuntime). */
     fun adbState(): AdbRuntimeState = AdbRuntime.readinessState()

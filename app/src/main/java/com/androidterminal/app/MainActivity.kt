@@ -21,6 +21,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import com.androidterminal.app.cli.LocalSessionBootstrap
+import java.io.File
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
@@ -209,7 +211,27 @@ class MainActivity : Activity() {
 
     private fun banner(page: SessionPage): String {
         val tag = if (page.kind == SessionBackendKind.ADB) "ADB" else "LOCAL"
-        return "echo === AT V3 $tag SESSION (page ${page.pageId}) ===; id; tty\n"
+        // AT.CLI-0.1: for Local sessions, write the `adb` shell function to a
+        // script in the app filesDir and source it (robust vs PTY-mangled
+        // multi-line function). `command -v adb` then resolves in the shell.
+        val bootstrap = if (page.kind == SessionBackendKind.LOCAL) {
+            runCatching {
+                val apk = AppRuntime.appApkPath()
+                val sock = AppRuntime.cliBridgeSocketPath()
+                val script = LocalSessionBootstrap.writeScript(
+                    scriptPath = File(filesDir, LocalSessionBootstrap.BOOTSTRAP_SCRIPT).absolutePath,
+                    apkPath = apk,
+                    sockPath = sock,
+                )
+                runCatching {
+                    File(filesDir, "adb_bootstrap_diag.txt").writeText(
+                        "apk=[$apk]\nsock=[$sock]\nscript=[$script]\n"
+                    )
+                }
+                LocalSessionBootstrap.sourceLine(script)
+            }.getOrDefault("")
+        } else ""
+        return bootstrap + "echo === AT V3 $tag SESSION (page ${page.pageId}) ===; id; tty\n"
     }
 
     private fun showNewSessionChooser() {

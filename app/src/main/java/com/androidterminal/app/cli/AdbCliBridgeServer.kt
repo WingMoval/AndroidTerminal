@@ -36,6 +36,10 @@ import java.util.concurrent.Executors
 
 class AdbCliBridgeServer(private val filesDir: File) {
 
+    companion object {
+        private const val TAG = "AdbCliBridge"
+    }
+
     init {
         runCatching { System.loadLibrary("atcli_env") }
     }
@@ -91,23 +95,34 @@ class AdbCliBridgeServer(private val filesDir: File) {
         private fun ensureReady() {
             if (ready) return
             if (AdbRuntime.readinessState().isReady) { ready = true; return }
-            runCatching { AppRuntime.connectAuto() }
+            // connectAuto may be async (NSD discovery / TLS). Poll for readiness
+            // up to ~15s so a CLI one-shot doesn't fire before the ADB is ONLINE.
+            val deadline = System.currentTimeMillis() + 15_000
+            while (System.currentTimeMillis() < deadline) {
+                if (AdbRuntime.readinessState().isReady) { ready = true; return }
+                runCatching { AppRuntime.connectAuto() }
+                Thread.sleep(500)
+            }
             ready = AdbRuntime.readinessState().isReady
         }
 
         /** One-shot: execute and push OUT/ERR/(ERROR)/EXIT frames. */
         fun onOneShot(fd: Int, cmdBytes: ByteArray) {
-            ensureReady()
             val cmd = String(cmdBytes, Charsets.UTF_8)
+            android.util.Log.i(TAG, "onOneShot: ensureReady for [$cmd]")
+            ensureReady()
+            android.util.Log.i(TAG, "onOneShot: ready=$ready, executing")
             val result: ATExecutionResult = try {
                 AppRuntime.adbEngine().execute(ATExecutionRequest(command = cmd))
             } catch (e: Exception) {
+                android.util.Log.w(TAG, "onOneShot: execute threw: ${e.message}")
                 ATExecutionResult(
                     outcome = ATExecutionOutcome.TRANSPORT_ERROR,
                     stdout = "", stderr = "", exitCode = -1, hasError = true,
                     error = e.message ?: "execute failed",
                 )
             }
+            android.util.Log.i(TAG, "onOneShot: result outcome=${result.outcome} exit=${result.exitCode}")
             sendFrame(fd, AdbCliProtocol.T_OUT, result.stdout.toByteArray(Charsets.UTF_8))
             sendFrame(fd, AdbCliProtocol.T_ERR, result.stderr.toByteArray(Charsets.UTF_8))
             if (result.outcome != ATExecutionOutcome.COMPLETED && result.error != null) {

@@ -1732,6 +1732,7 @@ AG_MAINLINE                 = PARALLEL
 ```text
 AT_CLI_0_OVERALL_STATUS        = IN_PROGRESS
 AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
+ADB_CLI_ONESHOT_CORE           = VERIFIED
 
 SELINUX_EXEC_BLOCKER           = VERIFIED
 PRIVATE_ELF_ENTRYPOINT         = REJECTED
@@ -1740,14 +1741,20 @@ TEST_HARNESS_BUG               = VERIFIED
 
 APP_PROCESS_P1_P6              = 6/6 PASS
 SELECTED_CLI_ENTRYPOINT        = APP_PROCESS
+ADB_CLI_ONESHOT_TEST           = 15/15 PASS (O1-O15, 97s, flaky NO)
 
 PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 (REUSE)
 AT_ENGINE_MODIFIED             = NO
 ADB_ENGINE_MODIFIED            = NO
 
-SHELL_HOSTED_ADB_CLI           = NOT_YET_VERIFIED
+SHELL_HOSTED_ADB_CLI           = ONESHOT_VERIFIED_INTERACTIVE_NOT_STARTED
 FULL_ADB_CLI                   = NOT_STARTED
- ```
+AUTO_WD_PRODUCT_INTEGRATION    = NOT_STARTED
+CONNECTION_STATUS_TERMINAL_EVENTS = NOT_STARTED
+  ```
+
+> **one-shot 验证前置（冻结）**：WD=ON + identity TRUSTED + AdbRuntime READY。
+> WD OFF / UNTRUSTED / DISCONNECT 场景 **NOT COVERED**，留给 AT.CLI-0.1A。
 
 要点（详见 `docs/evidence/at_cli_0/`）：
 
@@ -1768,8 +1775,15 @@ FULL_ADB_CLI                   = NOT_STARTED
   -Djava.class.path=<base.apk> /system/bin <CliMain> <args...>`）。
 - AT Engine / ADB Engine **均未修改**；Product CLI Bridge 继续复用现有
   同 UID UDS + protocol v1。
-- shell-hosted `adb shell` **完整能力仍 IN_PROGRESS，尚未 VERIFIED**
-  （`APP_PROCESS_ENTRYPOINT_VERIFIED` ≠ `SHELL_HOSTED_ADB_CLI_VERIFIED`）。
+- shell-hosted `adb shell <command...>` **one-shot 已 VERIFIED**（`AdbCliOneShotTest`
+  15/15，真机 Human Local 路径：Local sh → `adb()` 函数 → app_process → AdbCliMain →
+  既有 Product CLI Bridge（同 UID UDS，protocol v1）→ AppRuntime → AT Engine → ADB
+  Backend → ADB Engine → adbd → 远程 sh uid=2000）。principal transition 实测
+  `uid=10313 → uid=2000(shell) → uid=10313`（O3），Local shell 存活（O15）。
+  详见 `docs/evidence/at_cli_0/ONESHOT_CLOSURE.md`。
+- **interactive `adb shell`（无参）+ Ctrl-C/resize relay = NOT_STARTED**；
+  **Auto-WD + connection status events = NOT_STARTED**（AT.CLI-0.1A）。
+- 故 `SHELL_HOSTED_ADB_CLI = ONESHOT_VERIFIED_INTERACTIVE_NOT_STARTED`，**不**标 COMPLETE。
 
 ---
 
@@ -1818,17 +1832,20 @@ AT.V3-1 — ADB Engine Extraction / Migration
 
 由此开始真正的 V3 实现主线。
 
-### 35.1 当前实际 NEXT（AT.CLI-0 延续）
+### 35.1 当前实际 NEXT（AT.CLI-0.1A）
 
-AT.CLI-0 入口恢复已 COMPLETE（`SELECTED_CLI_ENTRYPOINT = APP_PROCESS`），
-但 shell-hosted `adb shell` 完整能力尚未实现/验证。当前实际 NEXT：
+AT.CLI-0 入口恢复 COMPLETE（`SELECTED_CLI_ENTRYPOINT = APP_PROCESS`），one-shot core
+已 VERIFIED（`ADB_CLI_ONESHOT_CORE = VERIFIED`，15/15）。当前实际 NEXT：
 
 ```text
-AT.CLI-0 continuation
-  — app_process based adb shell frontend implementation
+AT.CLI-0.1A
+  — Auto-WD + ADB Connection Status Integration
 ```
 
-（不将 AT.CLI-0 整体标为 COMPLETE；入口已选定，前端实现待做。）
+目标：`adb command → ensureReady → WD OFF 自动开启 → discovery → connect →
+connected → execute`，以及 `disconnected / reconnecting / connected` terminal
+status events。（不将 AT.CLI-0 整体标 COMPLETE：one-shot 已 verified，interactive
+与 connection lifecycle 未开始。）
 
 ---
 
