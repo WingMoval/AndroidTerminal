@@ -163,8 +163,39 @@ AdbCliStatusHub: unsubscribe session=1
   T_STATUS 日志确认（AdbCliMain 收 type=12 帧，main 分支 err.print 到 Local PTY）。
 - dedupe（同 session 第二命令静默）+ disconnect（WD OFF → `[adb] disconnected` async）
   由 L3/L5 确定性验证。
-- 用户手动操作遇偶发 `syntax error: unexpected '('`（shell 输入解析问题，非代码 bug；
-  bootstrap script 语法正确 + instrumentation 路径完全工作）。
+- 人工操作初始报 `syntax error: unexpected '('` → **定位并修复**（见 §5.1）。
+
+### 5.1 Bug fix — banner 行未引用 `(` 触发 /system/bin/sh syntax error
+**现象**（人工 UI Gate 截图复现 + instrumentation banner 阶段捕获）：
+```
+:/ $ echo === AT V3 LOCAL SESSION (page 1) ===; id; tty
+/system/bin/sh: syntax error: unexpected '('
+```
+banner 的 `echo === AT V3 LOCAL SESSION (page 1) ===` 里**未引用的 `(`**（来自 `(page N)`）
+被 `/system/bin/sh` 在 token 化阶段解析为**子 shell 元字符**（与是否 echo 参数无关）→
+整行 syntax error，`; id; tty` 未执行。
+
+**根因**：`MainActivity.banner()` 生成的 echo 消息未加引号。
+
+**修复**：echo 消息用双引号包裹，使 `(page N)` 在引号内不再是元字符：
+```kotlin
+// before: "echo === AT V3 $tag SESSION (page ${page.pageId}) ===; id; tty\n"
+// after : "echo \"=== AT V3 $tag SESSION (page ${page.pageId}) ===\"; id; tty\n"
+```
+
+**验证**（修复后 banner 阶段捕获）：
+```
+:/ $ echo "=== AT V3 LOCAL SESSION (page 1) ==="; id; tty
+=== AT V3 LOCAL SESSION (page 1) ===
+uid=10313(u0_a313) ... context=u:r:untrusted_app:s0:...
+/dev/pts/0
+:/ $
+```
+无 syntax error，`id` / `tty` 正常执行。`AdbCliLifecycleTest` 11/11 + `AdbCliOneShotTest`
+15/15 修复后均 PASS（不回归）。
+
+> 注：per-session bootstrap script（`adb() { ... }` 函数定义）经**文件 source**（非 PTY
+> 多行写入），不受此影响；此 bug 仅在 banner 的 echo 行（经 PTY 写入的交互式输入）。
 
 ## 6. 边界与后续
 - `FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED`（fresh install 无 WRITE_SECURE，需首次手动 WD +

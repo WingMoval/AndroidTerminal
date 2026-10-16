@@ -129,8 +129,11 @@ adb shell echo second   # 同 session, 已 READY
   socket/heartbeat。
 - **fast-path dedupe**：同 session 连接未变化时静默（§23）。
 - **in-flight 无透明重放**（结构性不变量：恢复只重连，不重跑命令）。
+- **Bug fix（banner `(` syntax error）**：banner 的 `echo === ... (page N) ===` 里未引用的
+  `(` 被 `/system/bin/sh` 当子 shell 元字符 → `syntax error: unexpected '('`，中断整行。
+  修复：echo 消息双引号包裹（详见 evidence §5.1）。
 - 详见 `docs/evidence/at_cli_0/ADB_RUNTIME_LIFECYCLE_CLOSURE.md`（L1-L11 = 11/11 PASS +
-  回归 + Gate A-K evidence）。
+  回归 + Gate A-K evidence + banner bug fix）。
 
 ## 4. Interactive `adb shell`（NEXT = AT.CLI-0.2）
 

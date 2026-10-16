@@ -239,7 +239,10 @@ class MainActivity : Activity() {
                 LocalSessionBootstrap.sourceLine(script)
             }.getOrDefault("")
         } else ""
-        return bootstrap + "echo === AT V3 $tag SESSION (page ${page.pageId}) ===; id; tty\n"
+        // The echo message must be QUOTED: an unquoted `(` (from "(page N)")
+        // is a shell metacharacter (subshell start) and makes /system/bin/sh
+        // fail the whole banner line with `syntax error: unexpected '('`.
+        return bootstrap + "echo \"=== AT V3 $tag SESSION (page ${page.pageId}) ===\"; id; tty\n"
     }
 
     private fun showNewSessionChooser() {
