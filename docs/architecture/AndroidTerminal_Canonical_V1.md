@@ -1768,6 +1768,9 @@ LIVE_COMMAND_STATUS_TEST       = 9/9 PASS (S1-S9, AT.CLI-0.1B)
 STATUS_BEFORE_COMMAND_EXIT     = REQUIRED (S1 timestamp proof)
 STATUS_DUPLICATE               = NO (single projection path: emitStatus)
 T_STATUS_FALLBACK              = PRESERVED (non-Human client, buffered)
+REAL_HUMAN_LIVE_STATUS         = PASS            # 真机 Human Gate (WD OFF, status 逐步出现 before uid)
+STATUS_STDOUT_CONTAMINATION    = NO              # CAPTURE=[LIVE_STATUS_TEST] 无 [adb] 混入
+AT_CLI_0_1B                    = CLOSED          # 人工 Gate PASS, docs-only normalization
 
 # --- fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化，正式冻结）---
 FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE

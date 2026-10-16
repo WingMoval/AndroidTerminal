@@ -200,10 +200,23 @@ app/src/androidTest/java/com/androidterminal/app/AdbCliLifecycleTest.kt (M) L1/L
 | 10 | 不重解 child PTY print（用 Host 路径） | ✅ Host 投影，未动 PTY |
 | 11 | 回归全绿 | ✅ §7 全部 PASS |
 
-## 10. 人工 Gate（§27，待执行）
+## 10. 人工 Gate（§27）= **PASS / CLOSED**
 
-自动化通过后，需人工验证：
-1. WD OFF，打开 Local 页，运行 `adb shell id`。
-2. 观察 `[adb] checking...` / `enabling...` / `discovering...` / `connecting...` /
-   `connected` **逐行实时出现**（在 `uid=2000` 之前），不是 EXIT 时一次性刷出。
-3. 确认 status 行**不**污染远端 stdout（`echo X > file` 后 file 只含 X）。
+用户真实 Human 真机手动验证（HONOR ALI-AN00 / Android 15）：
+
+**A. 实时 status（WD OFF）**：`adb shell id` 下，连接状态
+`checking` / `wireless debugging off` / `enabling` / `discovering` / `connecting` /
+`connected` 在 `uid=2000(shell)` 之前**逐步出现**，**不是** EXIT 后批量刷出。
+→ **`REAL_HUMAN_LIVE_STATUS = PASS`**
+
+**B. stdout 隔离**：
+```
+x="$(adb shell echo LIVE_STATUS_TEST)"
+printf 'CAPTURE=[%s]\n' "$x"
+```
+得 `CAPTURE=[LIVE_STATUS_TEST]`，**无** `[adb] ...` 混入 stdout。
+→ **`STATUS_STDOUT_CONTAMINATION = NO`**
+
+**结论**：**`AT.CLI-0.1B = CLOSED`**（REAL_HUMAN_LIVE_STATUS=PASS +
+STATUS_STDOUT_CONTAMINATION=NO）。本 Gate 闭合为 docs-only normalization，
+未修改任何 production code。
