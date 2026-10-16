@@ -165,6 +165,10 @@ class MainActivity : Activity() {
     /** Debug-only: the active page's session, if open. */
     fun activeSession(): ATTerminalSession? = pages.activePage?.terminal?.session
 
+    /** Debug/test: the active page's SharedSessionHandle (observer fan-out). */
+    fun activeSharedHandle(): SharedSessionHandle? =
+        pages.activePage?.terminal?.sharedHandle
+
     /** Debug-only: the active page's backend kind. */
     fun activePageKind(): SessionBackendKind? = pages.activePage?.kind
 
@@ -173,6 +177,11 @@ class MainActivity : Activity() {
 
     /** Debug/test: number of pages. */
     fun pagesSize(): Int = pages.size
+
+    /** Debug/test: close the active page (so tests don't accumulate PTYs). */
+    fun testCloseActivePage() {
+        closeActivePage()
+    }
 
     /** Debug/test: the active page's id (or -1). */
     fun activePageId(): Int = pages.activePage?.pageId ?: -1

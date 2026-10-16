@@ -38,6 +38,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // AT.CLI-0: build the shell-hosted `adb` CLI frontend (native PIE) and
+    // package it as an asset so the app can extract it into files/bin at
+    // runtime. The CMake project builds per-ABI; the copy task picks arm64-v8a.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 }
 
 dependencies {
@@ -58,3 +68,8 @@ dependencies {
     // AT.DEVAPP-0.1: real Activity UI visibility test (ActivityScenario).
     androidTestImplementation("androidx.test:core:1.5.0")
 }
+
+// AT.CLI-0: the shell-hosted `adb` CLI frontend is built by CMake (above) and
+// shipped as an asset (src/main/assets/cli/adb, arm64-v8a) so the app can extract
+// it into files/bin at runtime. The committed asset is the built arm64 binary;
+// the CMake target still compiles it on every build to keep it in sync.

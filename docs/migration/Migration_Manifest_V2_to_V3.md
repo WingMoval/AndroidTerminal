@@ -236,10 +236,24 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                          真机 B1-B14 13/13 PASS + 回归 Local 11/App 7/AT 6/Shellless 15/Pairing 54/
                          Common 3/HumanPreview 6/Programmatic 7 全 PASS + Release isolation PASS
                          （debug PRESENT / release ABSENT）→
-                         PROGRAMMATIC_HUMAN_SHARED_SESSION = VERIFIED；
-                         HUMAN_AGENT_SHARED_SESSION = DEFERRED / NOT_STARTED；
-                         evidence: docs/evidence/at_debug_0/）
-  NEXT                  = AT.CLI-0（Local /system/bin/sh -> adb/at CLI facade -> embedded capability）
-```
+                          PROGRAMMATIC_HUMAN_SHARED_SESSION = VERIFIED；
+                          HUMAN_AGENT_SHARED_SESSION = DEFERRED / NOT_STARTED；
+                          evidence: docs/evidence/at_debug_0/）
+   AT.CLI-0              = IN_PROGRESS / ENTRYPOINT_RECOVERY_VERIFIED（shell-hosted `adb` CLI：
+                          原 `files/bin/adb` private ELF 入口被真实 SELinux `untrusted_app →
+                          app_data_file execute` 阻断，真实 Local PTY `exec` RC=126 →
+                          PRIVATE_ELF_ENTRYPOINT = REJECTED；
+                          c8-c12 旧 PASS 因 ActivityScenario/test harness bug 未实际执行 →
+                          C8_C12_PREVIOUS_RESULT = INVALIDATED；TEST_HARNESS_BUG = VERIFIED；
+                          `/system/bin/app_process`（zygote_exec）入口真实 Local PTY P1-P6 6/6 PASS
+                          （exec / class load / argv / PTY stdio / 连既有 Product CLI Bridge /
+                          正常返回 shell）→ SELECTED_ENTRYPOINT = APP_PROCESS；
+                          AT Engine 0 改动 / ADB Engine 0 改动 / Product CLI Bridge 复用同 UID
+                          UDS + protocol v1；shell-hosted `adb shell` 完整能力仍 NOT_YET_VERIFIED；
+                          evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
+                          APP_PROCESS_ENTRYPOINT_PROBE.md）
+   NEXT                  = AT.CLI-0 continuation
+                          — app_process based adb shell frontend closure
+ ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。

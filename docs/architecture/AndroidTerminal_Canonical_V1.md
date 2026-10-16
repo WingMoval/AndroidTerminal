@@ -1724,8 +1724,52 @@ PERSISTENT_TERMINAL         = PRIMARY NEW AT CAPABILITY
 
 AG_MAINLINE                 = PARALLEL
 
-HUMAN_AGENT_SHARED_SESSION  = DEFERRED
-```
+ HUMAN_AGENT_SHARED_SESSION  = DEFERRED
+ ```
+
+### 34.1 AT.CLI-0 当前状态（shell-hosted `adb` CLI 入口恢复）
+
+```text
+AT_CLI_0_OVERALL_STATUS        = IN_PROGRESS
+AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
+
+SELINUX_EXEC_BLOCKER           = VERIFIED
+PRIVATE_ELF_ENTRYPOINT         = REJECTED
+C8_C12_PREVIOUS_RESULT         = INVALIDATED
+TEST_HARNESS_BUG               = VERIFIED
+
+APP_PROCESS_P1_P6              = 6/6 PASS
+SELECTED_CLI_ENTRYPOINT        = APP_PROCESS
+
+PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 (REUSE)
+AT_ENGINE_MODIFIED             = NO
+ADB_ENGINE_MODIFIED            = NO
+
+SHELL_HOSTED_ADB_CLI           = NOT_YET_VERIFIED
+FULL_ADB_CLI                   = NOT_STARTED
+ ```
+
+要点（详见 `docs/evidence/at_cli_0/`）：
+
+- 原 `files/bin/adb` private ELF 入口被真实 SELinux
+  `untrusted_app → app_data_file execute` 阻断（真实 Local PTY 中
+  `exec` 返回 **RC=126 / Permission denied**），正式 **REJECTED**。
+- `runas_app` 域执行同一 ELF 虽 PASS，但 **不能代表真实 Local PTY**
+  （Local PTY 的 `/system/bin/sh` 位于 `untrusted_app` 域，非
+  `runas_app`）。
+- c8–c12 旧 PASS 因 `ActivityScenario`/test harness bug（`onActivity`
+  对第 2+ 测试未实际执行 body + 误用 listener 激活下返回 null 的 pull
+  `read()`）**未实际执行**，正式 **INVALIDATED**。
+- `/system/bin/app_process` 入口（context `zygote_exec`）在真实 Local
+  PTY（`untrusted_app` 域）**P1–P6 全 PASS**：可 exec、可加载 APK 内
+  main class、传 argv、继承 Local PTY stdin/stdout/stderr、连接既有
+  Product CLI Bridge（同 UID UDS + protocol v1）、正常返回 Local shell。
+- **Selected CLI entrypoint = APP_PROCESS**（`/system/bin/app_process
+  -Djava.class.path=<base.apk> /system/bin <CliMain> <args...>`）。
+- AT Engine / ADB Engine **均未修改**；Product CLI Bridge 继续复用现有
+  同 UID UDS + protocol v1。
+- shell-hosted `adb shell` **完整能力仍 IN_PROGRESS，尚未 VERIFIED**
+  （`APP_PROCESS_ENTRYPOINT_VERIFIED` ≠ `SHELL_HOSTED_ADB_CLI_VERIFIED`）。
 
 ---
 
@@ -1773,6 +1817,18 @@ AT.V3-1 — ADB Engine Extraction / Migration
 ```
 
 由此开始真正的 V3 实现主线。
+
+### 35.1 当前实际 NEXT（AT.CLI-0 延续）
+
+AT.CLI-0 入口恢复已 COMPLETE（`SELECTED_CLI_ENTRYPOINT = APP_PROCESS`），
+但 shell-hosted `adb shell` 完整能力尚未实现/验证。当前实际 NEXT：
+
+```text
+AT.CLI-0 continuation
+  — app_process based adb shell frontend implementation
+```
+
+（不将 AT.CLI-0 整体标为 COMPLETE；入口已选定，前端实现待做。）
 
 ---
 
