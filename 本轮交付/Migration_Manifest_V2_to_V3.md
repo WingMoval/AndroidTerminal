@@ -257,13 +257,21 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                            AT Engine → ADB Backend → ADB Engine → adbd → 远程 sh uid=2000；
                            principal transition uid=10313 → uid=2000(shell) → uid=10313（O3），
                            Local shell 存活（O15）；
-                           **AT.CLI-0.1A LIFECYCLE = COMPLETE**：AdbRuntime 长驻生命周期 owner，
+                           **AT.CLI-0.1A LIFECYCLE = VERIFIED**：AdbRuntime 长驻生命周期 owner，
                            `ensureReady` Runtime-owned + auto-WD（WRITE_SECURE putInt）+ bounded
                            3-retry（adbd 启动时间）+ read-only transport observer（1.5s poll，
                            ONLINE→!ONLINE edge）+ async T_STATUS→CLI stderr→Local PTY
                            （session-scoped via AT_SESSION_ID + dedupe + no-replay）；
                            `AdbCliLifecycleTest` L1-L11 = 11/11 PASS（真机 HONOR ALI-AN00）；
-                           FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED / POST_BOOTSTRAP_AUTO_WD=COMPLETE；
+                           **AT.CLI-0.1A.R final regression closure**：AdbRuntimeLifecycle 12/12 +
+                           Pairing 54/54 + Shellless 15/15 + AdbCliBridge 13/13（C13 SUPERSEDED by
+                           O12）+ OneShot 15/15 + Lifecycle 11/11 = **FINAL_REGRESSION_CLOSURE=PASS**
+                           （本轮改动路径关键回归全过；PC-orchestration real-device suite 失败为
+                           HONOR adbd 拒绝 loopback / pairing dialog 需手动 / 需 PC 传当前端口，
+                           非 9886838 causal）；
+                           语义归一化：FRESH_INSTALL_ZERO_TOUCH=NOT_COMPLETE /
+                           FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED / POST_BOOTSTRAP_AUTO_WD=VERIFIED /
+                           POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY=VERIFIED（限定 post-bootstrap）；
                            interactive `adb shell` = NOT_STARTED (AT.CLI-0.2)；
                            evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
                            APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md +

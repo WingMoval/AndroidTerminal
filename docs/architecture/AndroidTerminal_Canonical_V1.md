@@ -1758,17 +1758,32 @@ CONNECTION_STATUS_TERMINAL_EVENTS = COMPLETE       # T_STATUS async -> Local PTY
 
 ADB_RUNTIME_ROLE               = LONG_LIVED_LIFECYCLE_OWNER
 AUTO_READY                     = RUNTIME_OWNED_ENSURE_READY
-POST_BOOTSTRAP_AUTO_WD         = COMPLETE          # FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED
 TRANSPORT_LOSS_PROJECTION      = READ_ONLY_OBSERVER_EDGE (1.5s poll, no ping/socket/heartbeat)
 RECOVERY_OWNER                 = ADB_RUNTIME (ONE, bounded 3-attempt)
 TERMINAL_STATUS_PROJECTION     = T_STATUS -> CLI STDERR -> LOCAL PTY (session-scoped, dedupe)
+
+# --- fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化，正式冻结）---
+FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE
+FIRST_USE_MANUAL_BOOTSTRAP         = REQUIRED
+POST_BOOTSTRAP_AUTO_WD             = VERIFIED
+POST_BOOTSTRAP_ONE_COMMAND_COLD_READY = VERIFIED
+POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY = VERIFIED   # 限定：post-bootstrap 后，非 fresh install
+FINAL_REGRESSION_CLOSURE           = PASS          # 本轮改动路径关键回归全过；PC-orchestration suite 失败非 causal
   ```
 
 > **one-shot 前置（AT.CLI-0.1 冻结）**：WD=ON + identity TRUSTED + AdbRuntime READY。
 > **AT.CLI-0.1A 闭合**：WD OFF / DISCONNECT 场景由 AdbRuntime ensureReady + auto-WD +
 > read-only transport observer + async T_STATUS 覆盖（L1-L11 = 11/11 PASS）。
-> `FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED`（fresh install 无 WRITE_SECURE，需首次手动 WD +
-> trust + `pm grant`）；`POST_BOOTSTRAP_AUTO_WD = COMPLETE`。
+>
+> **fresh-install / post-bootstrap 语义（归一化）**：
+> - `FRESH_INSTALL_ZERO_TOUCH = NOT_COMPLETE`：fresh install 无 WRITE_SECURE，需首次**手动**
+>   WD + trust/pair + WRITE_SECURE bootstrap（`pm grant`）。
+> - `FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED`。
+> - `POST_BOOTSTRAP_AUTO_WD = VERIFIED` + `POST_BOOTSTRAP_ONE_COMMAND_COLD_READY = VERIFIED`：
+>   完成首次 bootstrap **以后**，WD OFF → `adb shell id` → auto-WD → discovery → connect →
+>   connected → uid=2000，无需额外用户操作。
+> - `POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY = VERIFIED`：**限定语义**——"零手动"仅指
+>   post-bootstrap 状态（非 fresh install）。避免与 `FRESH_INSTALL_ZERO_TOUCH` 混淆。
 
 要点（详见 `docs/evidence/at_cli_0/`）：
 

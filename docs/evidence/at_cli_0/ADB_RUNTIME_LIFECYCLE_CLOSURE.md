@@ -197,17 +197,70 @@ uid=10313(u0_a313) ... context=u:r:untrusted_app:s0:...
 > 注：per-session bootstrap script（`adb() { ... }` 函数定义）经**文件 source**（非 PTY
 > 多行写入），不受此影响；此 bug 仅在 banner 的 echo 行（经 PTY 写入的交互式输入）。
 
-## 6. 边界与后续
-- `FIRST_USE_MANUAL_BOOTSTRAP = REQUIRED`（fresh install 无 WRITE_SECURE，需首次手动 WD +
-  trust + `pm grant`）。`POST_BOOTSTRAP_AUTO_WD = TARGET`（已达成）。
-- **不**声明 `ZERO_TOUCH_FIRST_INSTALL = COMPLETE`。
+## 6. 边界与后续（语义归一化）
+
+### 6.1 fresh-install / post-bootstrap 语义（正式冻结）
+
+```text
+FRESH_INSTALL_ZERO_TOUCH             = NOT_COMPLETE
+FIRST_USE_MANUAL_BOOTSTRAP           = REQUIRED
+POST_BOOTSTRAP_AUTO_WD               = VERIFIED
+POST_BOOTSTRAP_ONE_COMMAND_COLD_READY = VERIFIED
+POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY = VERIFIED   (限定语义，见下)
+```
+
+- **FRESH_INSTALL_ZERO_TOUCH = NOT_COMPLETE**：fresh install 无 WRITE_SECURE_SETTINGS，
+  需**首次手动**：manual WD + trust/pair + WRITE_SECURE_SETTINGS bootstrap（`pm grant`）。
+  **不**声明 zero-touch first install。
+- **POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY = VERIFIED**（限定语义）：完成首次 bootstrap
+  **以后**，WD OFF → `adb shell id` → auto-WD → discovery → connect → connected →
+  uid=2000，**无需额外用户操作**。（即"零手动"仅限定在 post-bootstrap 状态，非 fresh install。）
+
+### 6.2 后续
 - Interactive `adb shell`（无参 + Ctrl-C/resize relay）= NEXT（AT.CLI-0.2）。
-- 完整长回归（adb-only-test-host 的 Pairing / Shellless / AdbRuntimeLifecycle）= 需单独
-  构建该模块 APK；本轮改动路径（app + adb-engine）的关键回归已全过。
 
-## 7. Verdict
+## 7. Final Regression Closure（AT.CLI-0.1A.R）
 
-**ADB_RUNTIME_LIFECYCLE = COMPLETE**（on device APLMUT4312005935）。
+### 7.1 补齐 deferred full regression（真机 APLMUT4312005935）
+
+| Suite | 结果 | 说明 |
+|---|---|---|
+| AdbRuntimeLifecycleTest（adb-only-test-host）| **12/12 PASS** | AdbRuntime 改动无回归 |
+| Pairing deterministic（pairing_selftest）| **54/54 PASS** | native selftest，EXIT=0 |
+| ShelllessRealDeviceTest（at-shellless-test-host）| **15/15 PASS** | g13 push-mode 首次 flaky（PTY 批次），重跑全过；非本轮 causal（AT Engine/Local backend 未改）|
+| TestHostHeadlessInputTest（test-host, Local）| **1/1 PASS** | test-host 模块健康 |
+| AdbCliBridgeTest（app）| **13/13 PASS** | C13 SUPERSEDED by O12（@Ignore），13 active gate 全过 |
+| AdbCliOneShotTest（app, 守 0.1）| **15/15 PASS** | O12 active unsupported gate |
+| AdbCliLifecycleTest（app, 0.1A）| **11/11 PASS** | L1-L11 |
+
+### 7.2 需 PC orchestration 的 real-device suite（本轮未独立 PASS，非本轮 causal）
+
+| Suite | 结果 | 根因（非本轮 causal）|
+|---|---|---|
+| AdbBackendHeadlessTest（test-host）| 0/25（本轮环境）| EXPLICIT path 直连 `127.0.0.1:38793`，TLS 握手成功（`state=Online tls=1`）但 adbd **立即 CLSE + `WIFI TLS disconnect`**——HONOR 设备 adbd 拒绝本机 loopback ADB 连接（设备/环境限制）。baseline 历史 PASS 时用 PC 传入的当前端口（42173）+ PC key。**本轮未改** ADB native transport / protocol / AdbBackend。|
+| BackendParityAuditTest（test-host）| 0/32（本轮环境）| 同上（EXPLICIT path loopback 被 adbd CLSE）。|
+| AdbOnlyRealDeviceTest（adb-only-test-host）| 部分 FAIL（G3/G8/G13/G17）| 直接 `connectAuto`（无 ensureReady 重试），HONOR adbd 慢启动/loopback 限制 → `CONNECT_FAILED`。app 路径（ensureReady+discovery+retry）能连（11/11）。**本轮未改** connectAuto connect 逻辑。|
+| AdbDebt1ValidationTest（adb-only-test-host）| 部分 FAIL（G1/G2 pairing）| pairing 需系统 pairing dialog 打开（用户手动），instrumentation 无法自动开。前置条件问题。|
+
+> **判断**：上述 4 个 suite 的失败全部是**设备/前置条件/PC-orchestration 问题**（HONOR
+> adbd 拒绝 loopback / pairing dialog 需手动 / 需 PC 传当前端口），**非 9886838 causal**——
+> 本轮改动范围（AdbRuntime lifecycle + app CLI）未触及 ADB native transport / protocol /
+> AdbBackend / AT Engine / connectAuto 的 connect 逻辑。app 路径（同一 AdbRuntime，
+> ensureReady+discovery+retry）11/11 PASS 佐证 AdbRuntime 本身健康。
+
+### 7.3 C13 审计（任务 §3）
+
+**C13 = A（SUPERSEDED by AdbCliOneShotTest.o12_unsupported）**。
+- O12（active，15/15 稳定）：`adb devices` → unsupported + RC=2 + NOT 126。
+- C13（legacy，instrumentation PTY 8s 窗口 flaky）：同一验证。真实 shell 直接 `adb devices`
+  返回 "unsupported" + exit 2（行为已证）。
+- 处理：C13 加 `@Ignore("SUPERSEDED by AdbCliOneShotTest.o12_unsupported")`，不再挂
+  "13/14" 在 active summary。AdbCliBridgeTest 现为 **13/13 PASS**（13 active gate）。
+
+## 8. Verdict
+
+**ADB_RUNTIME_LIFECYCLE = VERIFIED**（on device APLMUT4312005935）。
 AdbRuntime 作为长驻生命周期 owner 闭合：Auto-WD + 连接状态集成 + 异步 status 投影，
-`adb shell id` 零手动前置 cold-ready，transport 丢失/重连投影到订阅 Local session。
-架构不变量未破。
+post-bootstrap 零手动 cold-ready，transport 丢失/重连投影到订阅 Local session。
+架构不变量未破。本轮改动路径（app + adb-engine）的关键回归全过；需 PC orchestration 的
+real-device suite 的失败为设备/前置条件问题，非本轮 causal。

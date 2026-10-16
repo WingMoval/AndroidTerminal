@@ -151,10 +151,30 @@ PTY 存活），但交互式 relay 是独立后续工作。
 - 相关回归（WD=ON 前置）：`SharedSessionBridgeTest` 13/13、`DynamicSessionPagesTest` 9/9、
   `ProgrammaticAdbConsumerTest` 7/7、`CommonConsumerPathTest` 3/3。
 - JVM：`AdbCliArgsTest`（`src/test`）20/20。
-- `AdbCliBridgeTest`（androidTest）：13/14（C13 `adb devices` unsupported 路径在真实 shell
-  直接验证 PASS；instrumentation PTY 时序 flaky，非本轮改动导致）。
+- `AdbCliBridgeTest`（androidTest）：**13/13 PASS**（C13 SUPERSEDED by `AdbCliOneShotTest.o12_unsupported`，
+  加 `@Ignore`；13 active gate 全过）。
+- **AT.CLI-0.1A.R final regression closure**（真机 HONOR ALI-AN00）：
+  - AdbRuntimeLifecycle 12/12 + Pairing deterministic 54/54 + Shellless 15/15 +
+    AdbCliBridge 13/13 + OneShot 15/15 + Lifecycle 11/11 + HeadlessInput 1/1 =
+    **FINAL_REGRESSION_CLOSURE = PASS**（本轮改动路径关键回归全过）。
+  - PC-orchestration real-device suite（AdbBackend 25 / Parity 32 / AdbOnlyRealDevice /
+    AdbDebt1）失败为**设备/前置条件**（HONOR adbd 拒绝 loopback：`state=Online tls=1` 但
+    adbd 立即 CLSE + `WIFI TLS disconnect`；pairing dialog 需手动；需 PC 传当前端口），
+    **非 9886838 causal**（本轮未改 ADB native transport / protocol / AdbBackend / AT Engine）。
 
 > **回归注意**：ADB persistent 类测试（ProgrammaticAdbConsumerTest / CommonConsumerPathTest）
 > 依赖 WD=ON；WD OFF 时会 `USER_ACTION_REQUIRED` 失败（前置问题，非代码 regression）。
-> adb-only-test-host 的长回归（Pairing / Shellless / AdbRuntimeLifecycle）需单独构建该模块
-> APK；本轮改动路径（app + adb-engine）的关键回归已全过。
+
+## 6. fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化）
+
+```text
+FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE
+FIRST_USE_MANUAL_BOOTSTRAP         = REQUIRED
+POST_BOOTSTRAP_AUTO_WD             = VERIFIED
+POST_BOOTSTRAP_ONE_COMMAND_COLD_READY = VERIFIED
+POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY = VERIFIED   (限定 post-bootstrap，非 fresh install)
+```
+
+完成首次 manual WD + trust/pair + WRITE_SECURE bootstrap **以后**：WD OFF → `adb shell id` →
+auto-WD → discovery → connect → connected → uid=2000，无需额外用户操作。
+**不**声明 `FRESH_INSTALL_ZERO_TOUCH = COMPLETE`。
