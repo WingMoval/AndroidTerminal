@@ -19,8 +19,6 @@
 
 package com.androidterminal.app.cli
 
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeState
@@ -34,7 +32,6 @@ class AdbCliStatusHub(private val registry: AppSessionRegistry) {
 
     private val subscribed = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
     private var handle: AdbRuntime.AdbRuntimeListenerHandle? = null
-    private val main = Handler(Looper.getMainLooper())
 
     /** Register the read-only AdbRuntime listener (idempotent). */
     fun start() {
@@ -67,24 +64,60 @@ class AdbCliStatusHub(private val registry: AppSessionRegistry) {
     fun isSubscribed(sessionId: Int): Boolean =
         synchronized(subscribed) { sessionId in subscribed }
 
+    /**
+     * AT.CLI-0.1B: emit a COMMAND-TIME status line to a specific Local session
+     * (the session that is currently running `adb shell <cmd>`). This is the
+     * HOST/SYSTEM terminal event path — it does NOT go through the short-lived
+     * AdbCliMain process (whose PTY stdout/stderr is not reliably live during
+     * ensureReady). It rides the same observer fan-out as [onTransition], so
+     * the Human sees it immediately as the Runtime progresses.
+     *
+     * [status] should be the bare status text (e.g. "checking connection...");
+     * this method adds the `[adb] ` prefix and trailing newline.
+     *
+     * No-op if the session is closed or not in the registry.
+     */
+    fun emitCommandStatus(sessionId: Int, status: String) {
+        if (sessionId <= 0 || status.isEmpty()) return
+        val text = "[adb] $status\n"
+        Log.i(TAG, "emitCommandStatus session=$sessionId: $status")
+        // Synchronous delivery (NOT main.post): the caller is the bridge
+        // thread running ensureReady. The observer's onOutput is invoked on
+        // THIS thread. SharedSessionHandle.forEachObserver uses a
+        // synchronized copy of the observer list, so concurrent
+        // register/unregister is safe. The Human UI (MainActivity) renders
+        // onOutput on its own thread; the Local PTY reader path (fanOut)
+        // already delivers on the PTY reader thread, not main.
+        runCatching {
+            val h = registry.lookup(sessionId) ?: return
+            if (h.isClosed()) {
+                unsubscribe(sessionId)
+                return
+            }
+            h.emitSystemOutput(text.toByteArray(Charsets.UTF_8))
+        }.onFailure { Log.w(TAG, "emitCommandStatus to $sessionId failed", it) }
+    }
+
     private fun onTransition(old: AdbRuntimeState, new: AdbRuntimeState) {
         val text = statusLine(old, new) ?: return
         Log.i(TAG, "transition $old -> $new: $text")
         val ids = synchronized(subscribed) { subscribed.toList() }
         if (ids.isEmpty()) return
-        // Deliver on the main thread (SharedSessionHandle/observers are main-UI).
-        main.post {
-            for (id in ids) {
-                runCatching {
-                    val h = registry.lookup(id) ?: return@runCatching
-                    if (h.isClosed()) {
-                        // Closed session: unsubscribe (no leak, no stale delivery).
-                        unsubscribe(id)
-                        return@runCatching
-                    }
-                    h.emitSystemOutput(text.toByteArray(Charsets.UTF_8))
-                }.onFailure { Log.w(TAG, "emit to $id failed", it) }
-            }
+        // Synchronous delivery (NOT main.post): the caller is the AdbRuntime
+        // thread that fired the state transition. SharedSessionHandle.forEachObserver
+        // is synchronized, so concurrent observer register/unregister is safe.
+        // The Human UI (MainActivity) renders onOutput on its own thread; the
+        // Local PTY reader path (fanOut) already delivers on the reader thread.
+        for (id in ids) {
+            runCatching {
+                val h = registry.lookup(id) ?: return@runCatching
+                if (h.isClosed()) {
+                    // Closed session: unsubscribe (no leak, no stale delivery).
+                    unsubscribe(id)
+                    return@runCatching
+                }
+                h.emitSystemOutput(text.toByteArray(Charsets.UTF_8))
+            }.onFailure { Log.w(TAG, "emit to $id failed", it) }
         }
     }
 

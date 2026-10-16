@@ -275,7 +275,26 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                            interactive `adb shell` = NOT_STARTED (AT.CLI-0.2)；
                            evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
                            APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md +
-                           ADB_RUNTIME_LIFECYCLE_CLOSURE.md）
+                                                       **AT.CLI-0.1B LIVE command-time status = VERIFIED**：0.1A 缺口修复
+                            ——cold-connect 命令时刻中间状态（checking/enabling/discovering/
+                            connecting）原本走短命 AdbCliMain PTY stderr（ensureReady 阻塞期间不
+                            live，EXIT 才刷出）；现经 AdbCliStatusHub.emitCommandStatus（单一
+                            命令时刻投影 owner，同步非 main.post）+ AdbCliBridgeServer.emitStatus
+                            （有效 Local session→Host 投影 live / 否则 T_STATUS fallback 单投影
+                            路径）+ ensureReady subscribe 提前 + statusListener 跳过 connected
+                            （lifecycle transition 拥有，避免重复）+ fast path backfill connected +
+                            onTransition 改同步 + AppRuntime.initStatusHub 总是重建 hub +
+                            AppTerminal 用进程级 AppRuntime.sessionRegistry()；
+                            AdbCliLiveStatusTest S1-S9 = 9/9 PASS（真机 HONOR ALI-AN00），
+                            核心 S1：中间 status 在 uid=2000 之前被 observer 观察到（时间戳
+                            证明 STATUS_BEFORE_COMMAND_EXIT=REQUIRED）；
+                            回归全绿：OneShot 15/15 + Lifecycle 11/11（L1/L3 放宽）+ Bridge
+                            13/13 + SharedSessionBridge 13/13 + DynamicSessionPages 9/9 +
+                            ProgrammaticAdbConsumer 7/7 + CommonConsumer 3/3 + HumanPreview 6/6
+                            + Args 20/20；
+                            STATUS=HOST/SYSTEM TERMINAL EVENT（emitSystemOutput）/
+                            STATUS_DUPLICATE=NO / T_STATUS 保留（非 Human fallback）；
+ADB_RUNTIME_LIFECYCLE_CLOSURE.md + LIVE_COMMAND_STATUS_CLOSURE.md）
     NEXT                  = AT.CLI-0.2
                            — Interactive `adb shell` (无参) + Ctrl-C / resize relay
  ```

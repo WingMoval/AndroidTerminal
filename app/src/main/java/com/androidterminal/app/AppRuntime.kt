@@ -54,6 +54,7 @@ object AppRuntime {
     private var appContextRef: Context? = null
     private var cliBridge: AdbCliBridgeServer? = null
     private var statusHub: AdbCliStatusHub? = null
+    private var sessionRegistryRef: AppSessionRegistry? = null
 
     /** Wire the ADB runtime + fix the app identity dir. Idempotent. */
     fun initialize(context: Context) {
@@ -145,11 +146,23 @@ object AppRuntime {
      * have used adb. Host orchestration only — NOT a lifecycle/recovery owner.
      */
     fun initStatusHub(registry: AppSessionRegistry) {
-        if (statusHub == null) {
-            statusHub = AdbCliStatusHub(registry)
-            statusHub?.start()
-        }
+        // Always (re)create the hub with the LATEST registry: if the Activity
+        // is recreated (onCreate re-runs), a NEW AppSessionRegistry is created.
+        // The old hub would hold a stale registry (lookup returns null for
+        // sessions registered in the new one). Re-creating the hub ensures it
+        // uses the same registry as AppTerminal.
+        statusHub?.stop()
+        sessionRegistryRef = registry
+        statusHub = AdbCliStatusHub(registry)
+        statusHub?.start()
     }
+
+    /**
+     * The process-scoped session registry (set by [initStatusHub]). AppTerminal
+     * uses this (NOT the Activity's field) so that the registry is consistent
+     * across Activity recreations.
+     */
+    fun sessionRegistry(): AppSessionRegistry? = sessionRegistryRef
 
     /** A Local session used adb: subscribe it to ADB lifecycle status. */
     fun subscribeAdbStatus(sessionId: Int) = statusHub?.subscribe(sessionId)
@@ -160,4 +173,14 @@ object AppRuntime {
     /** Whether a Local session is currently subscribed to ADB lifecycle status. */
     fun isAdbStatusSubscribed(sessionId: Int): Boolean =
         statusHub?.isSubscribed(sessionId) ?: false
+
+    /**
+     * AT.CLI-0.1B: emit a command-time ADB status line to a specific Local
+     * session (the one running `adb shell <cmd>`). HOST/SYSTEM terminal event —
+     * does NOT go through the short-lived AdbCliMain process. The Human sees it
+     * immediately as ensureReady progresses (live projection, not end-of-command
+     * buffered replay).
+     */
+    fun emitAdbCommandStatus(sessionId: Int, status: String) =
+        statusHub?.emitCommandStatus(sessionId, status)
 }

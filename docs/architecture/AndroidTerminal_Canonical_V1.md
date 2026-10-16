@@ -1734,6 +1734,7 @@ AT_CLI_0_OVERALL_STATUS        = IN_PROGRESS
 AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
 ADB_CLI_ONESHOT_CORE           = VERIFIED
 ADB_RUNTIME_LIFECYCLE          = COMPLETE          # AT.CLI-0.1A
+LIVE_COMMAND_STATUS            = VERIFIED          # AT.CLI-0.1B
 
 SELINUX_EXEC_BLOCKER           = VERIFIED
 PRIVATE_ELF_ENTRYPOINT         = REJECTED
@@ -1744,6 +1745,7 @@ APP_PROCESS_P1_P6              = 6/6 PASS
 SELECTED_CLI_ENTRYPOINT        = APP_PROCESS
 ADB_CLI_ONESHOT_TEST           = 15/15 PASS (O1-O15, 97s, flaky NO)
 ADB_CLI_LIFECYCLE_TEST         = 11/11 PASS (L1-L11, AT.CLI-0.1A)
+ADB_CLI_LIVE_STATUS_TEST       = 9/9 PASS (S1-S9, AT.CLI-0.1B)
 
 PRODUCT_CLI_BRIDGE             = EXISTING UDS + PROTOCOL V1 + T_STATUS=12 (REUSE)
 AT_ENGINE_MODIFIED             = NO
@@ -1751,7 +1753,7 @@ ADB_PROTOCOL_ENGINE_MODIFIED   = NO
 ADB_NATIVE_TRANSPORT_MODIFIED  = NO
 ADBRUNTIME_LIFECYCLE_MODIFIED  = YES
 
-SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE_VERIFIED_INTERACTIVE_NOT_STARTED
+SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE+LIVE_STATUS_VERIFIED_INTERACTIVE_NOT_STARTED
 FULL_ADB_CLI                   = INTERACTIVE_NOT_STARTED
 AUTO_WD_PRODUCT_INTEGRATION    = COMPLETE          # WRITE_SECURE auto-enable + bounded retry
 CONNECTION_STATUS_TERMINAL_EVENTS = COMPLETE       # T_STATUS async -> Local PTY, session-scoped
@@ -1761,6 +1763,11 @@ AUTO_READY                     = RUNTIME_OWNED_ENSURE_READY
 TRANSPORT_LOSS_PROJECTION      = READ_ONLY_OBSERVER_EDGE (1.5s poll, no ping/socket/heartbeat)
 RECOVERY_OWNER                 = ADB_RUNTIME (ONE, bounded 3-attempt)
 TERMINAL_STATUS_PROJECTION     = T_STATUS -> CLI STDERR -> LOCAL PTY (session-scoped, dedupe)
+LIVE_COMMAND_STATUS_PROJECTION = HOST emitSystemOutput (synchronous, command-time, before EXIT)
+LIVE_COMMAND_STATUS_TEST       = 9/9 PASS (S1-S9, AT.CLI-0.1B)
+STATUS_BEFORE_COMMAND_EXIT     = REQUIRED (S1 timestamp proof)
+STATUS_DUPLICATE               = NO (single projection path: emitStatus)
+T_STATUS_FALLBACK              = PRESERVED (non-Human client, buffered)
 
 # --- fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化，正式冻结）---
 FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE
@@ -1815,8 +1822,20 @@ FINAL_REGRESSION_CLOSURE           = PASS          # 本轮改动路径关键回
   transport 丢失/重连以 async T_STATUS 投影到订阅 Local session（session-scoped + dedupe +
   no-replay）。`AdbCliLifecycleTest` L1-L11 = **11/11 PASS**（真机 HONOR ALI-AN00）。
   详见 `docs/evidence/at_cli_0/ADB_RUNTIME_LIFECYCLE_CLOSURE.md`。
+- **AT.CLI-0.1B（Live command-time ADB status）= VERIFIED**：0.1A 缺口修复——cold-connect
+  命令时刻中间状态（`checking`/`enabling`/`discovering`/`connecting`）原本走短命 AdbCliMain
+  PTY stderr（ensureReady 阻塞期间不 live，EXIT 才刷出）；现经
+  `AdbCliStatusHub.emitCommandStatus`（单一命令时刻投影 owner，同步非 main.post）+
+  `AdbCliBridgeServer.emitStatus`（有效 Local session→Host 投影 live / 否则 T_STATUS
+  fallback，单投影路径）+ `ensureReady` subscribe 提前 + statusListener 跳过 `connected`
+  （lifecycle transition 拥有，避免重复）+ fast path backfill + `onTransition` 改同步。
+  `AdbCliLiveStatusTest` S1-S9 = **9/9 PASS**（真机 HONOR ALI-AN00），核心 S1 证明中间 status
+  在 `uid=2000` 之前被 observer 观察到（时间戳，STATUS_BEFORE_COMMAND_EXIT=REQUIRED）。
+  STATUS=HOST/SYSTEM TERMINAL EVENT（emitSystemOutput）/ STATUS_DUPLICATE=NO / T_STATUS 保留
+  （非 Human fallback）。详见 `docs/evidence/at_cli_0/LIVE_COMMAND_STATUS_CLOSURE.md`。
 - **interactive `adb shell`（无参）+ Ctrl-C/resize relay = NOT_STARTED**（AT.CLI-0.2）。
-- 故 `SHELL_HOSTED_ADB_CLI = ONESHOT+LIFECYCLE_VERIFIED_INTERACTIVE_NOT_STARTED`，**不**标 COMPLETE。
+- 故 `SHELL_HOSTED_ADB_CLI = ONESHOT+LIFECYCLE+LIVE_STATUS_VERIFIED_INTERACTIVE_NOT_STARTED`，
+  **不**标 COMPLETE。
 
 ---
 
@@ -1869,7 +1888,8 @@ AT.V3-1 — ADB Engine Extraction / Migration
 
 AT.CLI-0 入口恢复 COMPLETE，one-shot core VERIFIED（15/15），**connection lifecycle
 （AT.CLI-0.1A）COMPLETE**（`ADB_RUNTIME_LIFECYCLE = COMPLETE`，`AdbCliLifecycleTest`
-L1-L11 = 11/11）。当前实际 NEXT：
+L1-L11 = 11/11），**live command-time status（AT.CLI-0.1B）VERIFIED**（`LIVE_COMMAND_STATUS
+= VERIFIED`，`AdbCliLiveStatusTest` S1-S9 = 9/9）。当前实际 NEXT：
 
 ```text
 AT.CLI-0.2

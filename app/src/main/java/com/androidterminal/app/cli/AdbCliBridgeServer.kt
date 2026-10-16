@@ -113,32 +113,81 @@ class AdbCliBridgeServer(private val filesDir: File) {
          * one-shot process exits.
          */
         private fun ensureReady(fd: Int): Boolean {
-            // Fast path: already READY. Surface the "connected" status only on
+            val sid = fdSession[fd]
+            // AT.CLI-0.1B: subscribe BEFORE ensureReady so that command-time
+            // status (Host projection) can reach the session DURING the
+            // cold-connect sequence (not just after). The session is marked
+            // adb-active immediately.
+            if (sid != null) {
+                val firstSubscribe = !AppRuntime.isAdbStatusSubscribed(sid)
+                AppRuntime.subscribeAdbStatus(sid)
+                // If AdbRuntime is ALREADY READY (bootstrap connect happened
+                // before this subscribe), the lifecycle transition already
+                // fired (subscribed was empty then). Backfill "connected" so
+                // the session sees it (no duplicate: the transition won't
+                // fire again for the same state).
+                if (firstSubscribe && AdbRuntime.readinessState().isReady) {
+                    emitStatus(fd, sid, "connected")
+                }
+            }
+
+            // Fast path: already READY. Surface the "checking" status only on
             // THIS session's FIRST use (dedupe: subsequent same-session commands
             // stay silent — no state change, no re-spam). See §23.
             if (AdbRuntime.readinessState().isReady) {
-                val sid = fdSession[fd]
-                val firstUse = sid != null && !AppRuntime.isAdbStatusSubscribed(sid)
+                val firstUse = sid != null && !wasStatusEmittedForSession(fd)
                 if (firstUse) {
-                    sendStatus(fd, "checking connection...\nconnected\n")
+                    // Host projection for valid session; T_STATUS fallback otherwise.
+                    emitStatus(fd, sid, "checking connection...")
+                    // "connected" is already emitted above (backfill) or will
+                    // be emitted by the lifecycle transition (cold path).
                 }
-                subscribeSession(fd)
                 return true
             }
-            // Not READY: run the Runtime-owned sequence, forwarding status lines.
+            // Not READY: run the Runtime-owned sequence, forwarding status lines
+            // LIVE via Host projection (valid session) or T_STATUS (fallback).
+            //
+            // Dedupe: the "connected" line is NOT emitted here — the AdbRuntime
+            // lifecycle transition (READY) already projects `[adb] connected` via
+            // AdbCliStatusHub.onTransition. Emitting it again from the
+            // statusListener would duplicate. We only emit the INTERMEDIATE
+            // status lines (checking / enabling / discovering / connecting /
+            // retrying / user action required / pairing / connection failed).
             val keyDir = runCatching { AppRuntime.adbIdentityDir() }.getOrNull() ?: return false
             val finalState = AdbRuntime.ensureReady(keyDir) { line ->
-                sendStatus(fd, "[adb] $line")
+                // Skip "connected" — lifecycle transition owns it (no duplicate).
+                if (line != "connected") emitStatus(fd, sid, line)
             }
-            subscribeSession(fd)
             return finalState == AdbRuntimeState.READY
         }
 
-        /** Bind the fd's Local session to ADB lifecycle status (if any). */
-        private fun subscribeSession(fd: Int) {
-            val sid = fdSession[fd] ?: return
-            AppRuntime.subscribeAdbStatus(sid)
+        /**
+         * AT.CLI-0.1B: emit a status line to the bound session via HOST
+         * projection (live, immediate) when a valid Local session is bound;
+         * otherwise fall back to T_STATUS (the short-lived AdbCliMain path,
+         * which buffers until EXIT — acceptable for non-Human clients).
+         *
+         * This is the SINGLE projection path for command-time status: it does
+         * NOT also send T_STATUS for a valid session (avoids duplicate).
+         */
+        private fun emitStatus(fd: Int, sid: Int?, line: String) {
+            if (sid != null && sid > 0 && AppRuntime.isAdbStatusSubscribed(sid)) {
+                // Valid Local session: HOST projection (live, immediate).
+                AppRuntime.emitAdbCommandStatus(sid, line)
+                // Mark that status was emitted for this fd (dedupe fast-path).
+                statusEmittedForFd[fd] = true
+            } else {
+                // No valid session (test client / future non-Human client):
+                // T_STATUS fallback (AdbCliMain buffers until EXIT).
+                sendStatus(fd, "[adb] $line")
+            }
         }
+
+        /** Track whether command-time status was already emitted for this fd. */
+        private val statusEmittedForFd = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+
+        private fun wasStatusEmittedForSession(fd: Int): Boolean =
+            statusEmittedForFd[fd] == true
 
         private fun sendStatus(fd: Int, text: String) {
             sendFrame(fd, AdbCliProtocol.T_STATUS, text.toByteArray(Charsets.UTF_8))

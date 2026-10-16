@@ -7,10 +7,11 @@
 > | EntryPoint Recovery | **COMPLETE** |
 > | One-shot Core (`adb shell <cmd...>`) | **VERIFIED** |
 > | Auto-WD / connection lifecycle (AT.CLI-0.1A) | **COMPLETE** |
+> | Live command-time ADB status (AT.CLI-0.1B) | **VERIFIED** |
 > | Interactive `adb shell` (AT.CLI-0.2) | NEXT |
 >
 > 本 slice **不**声明 `SHELL_HOSTED_ADB_CLI = COMPLETE`：one-shot + connection lifecycle
-> 已 verified，interactive 未开始。
+> + live command-time status 已 verified，interactive 未开始。
 
 ---
 
@@ -135,6 +136,48 @@ adb shell echo second   # 同 session, 已 READY
 - 详见 `docs/evidence/at_cli_0/ADB_RUNTIME_LIFECYCLE_CLOSURE.md`（L1-L11 = 11/11 PASS +
   回归 + Gate A-K evidence + banner bug fix）。
 
+## 3.5 Live command-time ADB status（AT.CLI-0.1B = **VERIFIED**）
+
+0.1A 闭合了 **lifecycle / async** status（transport 丢失、重连、READY 等**状态迁移**），
+但**命令时刻（command-time）**的 cold-connect 中间状态（`checking` / `enabling` /
+`discovering` / `connecting`）走短命 `AdbCliMain` 进程的 PTY stderr（T_STATUS frame），
+在 `ensureReady` 阻塞期间**不 live**——Human 看到的是命令 EXIT 时才刷出的一整块 status。
+
+**0.1B 修复**：命令时刻 status 经 **Host 投影**（`SharedSessionHandle.emitSystemOutput`，
+HOST/SYSTEM terminal event）**实时逐行**投影到 Local session，不是 buffered 到 EXIT。
+
+组件改动（全部 app/ 层，CLI/Host + tests）：
+- **`AdbCliStatusHub.emitCommandStatus(sessionId, status)`**（新）：命令时刻 status 的
+  **单一投影 owner**。同步投递（非 `main.post`）——caller 是 bridge 线程（正在跑
+  `ensureReady`），`forEachObserver` 是 synchronized 同步 fan-out。closed session →
+  `unsubscribe`（无泄漏）。
+- **`AdbCliStatusHub.onTransition` 改同步**（去 `main.post`）：与 `emitCommandStatus`
+  一致的投递语义（`forEachObserver` 已线程安全）。
+- **`AdbCliBridgeServer.emitStatus(fd, sid, line)`**（新）：命令时刻 status 的**单一投影
+  路径**。有效 Local session → Host 投影（live）；否则 → T_STATUS fallback（AdbCliMain，
+  buffered，非 Human 可接受）。**不**对有效 session 同时发 T_STATUS（避免重复）。
+- **`ensureReady` subscribe 提前**：`subscribe(sid)` 移到 `AdbRuntime.ensureReady` 之前，
+  使 cold-connect 期间的命令时刻 status 能投影到 session。
+- **`statusListener` 跳过 `"connected"`**：lifecycle transition（`onTransition`
+  CONNECTING→READY）拥有 `connected`，statusListener 再发会重复。
+- **fast path backfill `connected`**：subscribe 时若 AdbRuntime 已 READY（bootstrap
+  connect 早于 subscribe），transition 已 fire（当时 `subscribed` 为空），补发一次
+  `connected`（不重复）。
+- **`statusEmittedForFd`**（ConcurrentHashMap）：per-fd 去重，fast path 只对每个 fd 的
+  首次 use 发 `checking`（无 re-spam）。
+- **`AppRuntime.initStatusHub` 总是重建 hub**（不再 `if (statusHub == null)`）：Activity
+  recreate 时创建新 `AppSessionRegistry`；旧 hub 持 stale registry（lookup 返回 null）。
+- **`AppRuntime.sessionRegistry()`**（新）+ `AppTerminal` 用进程级 registry（跨 Activity
+  recreate 一致）。
+
+**不变量**：`ADB_ENGINE_MODIFIED=NO` / `ADBRUNTIME_MODIFIED=NO`（AdbRuntime READ-ONLY）/
+`AT_ENGINE_MODIFIED=NO` / `ADB_NATIVE_MODIFIED=NO` / `REMOTE_PTY_MODIFIED=NO` /
+`AdbCliMain` 未改（T_STATUS fallback 路径不变）。STATUS=HOST/SYSTEM TERMINAL EVENT /
+STATUS_DUPLICATE=NO（单投影路径）/ T_STATUS 保留（非 Human fallback）。
+
+- 详见 `docs/evidence/at_cli_0/LIVE_COMMAND_STATUS_CLOSURE.md`（S1-S9 = 9/9 PASS + 回归全绿 +
+  S1 时间戳证明 STATUS_BEFORE_COMMAND_EXIT=REQUIRED）。
+
 ## 4. Interactive `adb shell`（NEXT = AT.CLI-0.2）
 
 无参 `adb shell`（交互）+ Ctrl-C / resize relay 未开始。one-shot 不杀 Local shell（O15 已证
@@ -142,9 +185,15 @@ PTY 存活），但交互式 relay 是独立后续工作。
 
 ## 5. 测试与回归
 
+- `AdbCliLiveStatusTest`（androidTest，AT.CLI-0.1B，**新**）：S1-S9，**9/9 PASS**（cold live
+  status before exit / ordering / no duplicate / fast-path dedupe / stdout isolation /
+  permission failure / session scope / async regression / close cleanup）。核心 S1 证明中间
+  status 在 `uid=2000` 之前被 observer 观察到（时间戳，STATUS_BEFORE_COMMAND_EXIT=REQUIRED）。
 - `AdbCliLifecycleTest`（androidTest，AT.CLI-0.1A）：L1-L11，**11/11 PASS**（auto-WD /
   fast-path / dedupe / transport projection / idle disconnect / recovery / no-replay /
   session-scoped / close cleanup / permission fallback / pairing classification）。
+  注：0.1B 后 L1/L3 放宽为中间状态/命令成功（harness 的 main-thread 阻塞可能捕获不全
+  status 行；完整 cold 结果由 `AdbCliLiveStatusTest` S1 长 timeout 验证）。
 - `AdbCliOneShotTest`（androidTest）：O1-O15，**15/15 PASS**（守 0.1 底线；ensureReady
   重构 + T_STATUS 未破 one-shot）。
 - `AppProcessProbeTest`（androidTest）：P1-P6，**6/6 PASS**。

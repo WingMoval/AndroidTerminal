@@ -136,7 +136,11 @@ class MainActivity : Activity() {
             kind = kind,
             engine = engineFor(kind),
             sessionId = page.pageId,
-            registry = sessionRegistry,
+            // Use the process-scoped registry (AppRuntime) so it's consistent
+            // across Activity recreations (NOT the Activity's field, which
+            // would be a new instance on recreate while StatusHub holds the
+            // old one).
+            registry = AppRuntime.sessionRegistry(),
             onInputActivity = { source, bytes ->
                 // External input activity = local UI annotation (NOT remote stdout).
                 if (source == InputSource.DEBUG) {
