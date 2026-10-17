@@ -320,6 +320,11 @@ ADB_RUNTIME_LIFECYCLE_CLOSURE.md + LIVE_COMMAND_STATUS_CLOSURE.md +
     NEXT                  = AT.EMULATOR-0
                            — Minimal Terminal Emulator + Minimal Screen State
                            （AT.POSTCLI-0 review 已冻结；docs/audit/AT.POSTCLI-0_Post_CLI_Architecture_Review.md）
+    # --- AT.PRE-EMULATOR-FREEZE (Known-Good Execution Baseline Freeze) ---
+    AT_PRE_EMULATOR_FREEZE  = COMPLETE
+    PRE_EMULATOR_BASELINE   = KNOWN_GOOD_EXECUTION_BASELINE (source 700ca3b; tag AT.PRE-EMULATOR-FREEZE-V1)
+    AT_TO_AG_HANDOFF_V1     = PUBLISHED (docs/handoff/AT_TO_AG_HANDOFF_V1.md; H1-H10 PASS)
+    # 保持既有含义不变：Emulator=NOT_STARTED / Screen=NOT_STARTED / Contract=DRAFT / NEXT=AT.EMULATOR-0
  ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。
