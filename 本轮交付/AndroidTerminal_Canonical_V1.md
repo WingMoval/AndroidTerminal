@@ -1730,12 +1730,12 @@ AG_MAINLINE                 = PARALLEL
 ### 34.1 AT.CLI-0 当前状态（shell-hosted `adb` CLI 入口恢复）
 
 ```text
-AT_CLI_0_OVERALL_STATUS        = COMPLETE          # AT.CLI-0.2 automation VERIFIED (Human Gate 待)
+AT_CLI_0_OVERALL_STATUS        = COMPLETE          # AT.CLI-0.2 CLOSED (automation 16/16 + Human Gate PASS)
 AT_CLI_0_ENTRYPOINT_RECOVERY   = COMPLETE
 ADB_CLI_ONESHOT_CORE           = VERIFIED
 ADB_RUNTIME_LIFECYCLE          = COMPLETE          # AT.CLI-0.1A
 LIVE_COMMAND_STATUS            = VERIFIED          # AT.CLI-0.1B
-INTERACTIVE_ADB_SHELL          = VERIFIED          # AT.CLI-0.2 (automation 16/16)
+INTERACTIVE_ADB_SHELL          = CLOSED            # AT.CLI-0.2 (automation 16/16 + Human Gate PASS)
 
 SELINUX_EXEC_BLOCKER           = VERIFIED
 PRIVATE_ELF_ENTRYPOINT         = REJECTED
@@ -1756,8 +1756,8 @@ ADB_NATIVE_TRANSPORT_MODIFIED  = NO
 ADBRUNTIME_LIFECYCLE_MODIFIED  = NO                # 0.2 未改 AdbRuntime (0.1A 已改)
 REMOTE_PTY_PRIMITIVE_MODIFIED  = NO
 
-SHELL_HOSTED_ADB_CLI           = ONESHOT+LIFECYCLE+LIVE_STATUS+INTERACTIVE (automation VERIFIED)
-FULL_ADB_CLI                   = ONESHOT + INTERACTIVE (Human Gate 待执行)
+SHELL_HOSTED_ADB_CLI           = COMPLETE          # ONESHOT+LIFECYCLE+LIVE_STATUS+INTERACTIVE
+FULL_ADB_CLI                   = ONESHOT+LIFECYCLE+LIVE_STATUS+INTERACTIVE (CLOSED)
 AUTO_WD_PRODUCT_INTEGRATION    = COMPLETE          # WRITE_SECURE auto-enable + bounded retry
 CONNECTION_STATUS_TERMINAL_EVENTS = COMPLETE       # T_STATUS async -> Local PTY, session-scoped
 
@@ -1799,9 +1799,30 @@ INTERACTIVE_MULTI_SESSION_ISOLATION = PASS       # I15
 INTERACTIVE_CONNECTION_REUSE   = PASS            # I13
 ONE_SHOT_INTERACTIVE_SEMANTIC_SEPARATION = PASS  # one-shot 15/15 全回归绿
 COLD_LIVE_STATUS_BEFORE_REMOTE_PROMPT = PASS     # I16
-REAL_HUMAN_INTERACTIVE_SHELL   = PENDING         # §37 Human Gate 待执行
-AT_CLI_0_2_AUTOMATION          = CLOSED          # 16/16 + 全回归绿; Human Gate 待
-AT_CLI_0_2                     = AUTOMATION_VERIFIED  # Human Gate 闭合后 → COMPLETE
+REAL_HUMAN_INTERACTIVE_SHELL   = PASS            # §37 Human Gate 真机验证 (含 RESIZE gate)
+REMOTE_PTY_RESIZE_HUMAN_GATE   = PASS            # Human RESIZE → remote stty size 变化
+AT_CLI_0_2_AUTOMATION          = CLOSED          # 16/16 + 全回归绿
+AT_CLI_0_2                     = CLOSED          # Human Gate PASS
+
+# --- AT.POSTCLI-0 post-CLI architecture review (NEXT 冻结) ---
+AT_CLI_0_OVERALL_STATUS        = COMPLETE
+SHELL_HOSTED_ADB_CLI           = COMPLETE        # ONESHOT + LIFECYCLE + LIVE_STATUS + INTERACTIVE
+FULL_ADB_CLI                   = ONESHOT+LIFECYCLE+LIVE_STATUS+INTERACTIVE
+POST_CLI_DEPENDENCY_AUDIT      = PASS            # at-engine/adb-engine 无交叉 import; backend 边界正确
+PERSISTENT_EXECUTION_CAPABILITY = MATURE_ENOUGH_FOR_EMULATOR
+TERMINAL_EMULATOR              = NOT_STARTED     # AT Engine 域, 纯 byte-stream, 无 ANSI/screen
+SCREEN_STATE                   = NOT_STARTED     # 同上
+RAW_TERMINAL_UI                = RAW_PREVIEW (DEV) # 保留为 Regression Oracle / Debug / byte evidence
+AT_CONTRACT_STATUS             = DRAFT           # AT.CONTRACT-0 v0 Draft, NOT Final Freeze
+AT_CONTRACT_FREEZE_AUTHORIZED  = NO              # blocker: Emulator/Screen 语义未验证
+HUMAN_UI_STATUS                = DEV_PREVIEW (raw)
+FIRST_RUN_PRODUCTIZATION       = DEFERRED (PRODUCTIZATION_TRACK)
+AG_RAW_TERMINAL_CAPABILITY     = ELIGIBLE        # AT one-shot + persistent byte-stream 已够
+AG_SCREEN_AWARE_TERMINAL       = BLOCKED_BY_EMULATOR
+HUMAN_AGENT_SHARED_SESSION     = DEFERRED
+ADB_ENGINE_BLOCKS_AT_NEXT      = NO              # ADB Engine → independent maintenance track
+ADB_RUNTIME_BLOCKS_AT_NEXT     = NO
+NEXT_MAINLINE                  = AT.EMULATOR-0   # Minimal Terminal Emulator + Minimal Screen State
 
 # --- fresh-install / post-bootstrap 语义（AT.CLI-0.1A.R 归一化，正式冻结）---
 FRESH_INSTALL_ZERO_TOUCH           = NOT_COMPLETE

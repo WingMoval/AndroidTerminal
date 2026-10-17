@@ -1,18 +1,20 @@
 # AT.CLI-0 — Shell-Hosted ADB CLI Vertical Slice (Implementation)
 
-> **AT_CLI_0_OVERALL_STATUS = COMPLETE**（automation；Interactive Human Gate 待执行）
+> **AT_CLI_0_OVERALL_STATUS = COMPLETE**（全 4 slice CLOSED；Interactive Human Gate PASS）
 >
 > | 阶段 | 状态 |
 > |---|---|
 > | EntryPoint Recovery | **COMPLETE** |
 > | One-shot Core (`adb shell <cmd...>`) | **VERIFIED** |
 > | Auto-WD / connection lifecycle (AT.CLI-0.1A) | **COMPLETE** |
-> | Live command-time ADB status (AT.CLI-0.1B) | **VERIFIED / CLOSED** |
-> | Interactive `adb shell` (AT.CLI-0.2) | **VERIFIED**（automation 16/16；Human Gate 待） |
+> | Live command-time ADB status (AT.CLI-0.1B) | **CLOSED** |
+> | Interactive `adb shell` (AT.CLI-0.2) | **CLOSED**（automation 16/16 + Human Gate PASS） |
 >
-> `SHELL_HOSTED_ADB_CLI = ONESHOT + LIFECYCLE + LIVE_STATUS + INTERACTIVE`
-> （automation VERIFIED）。`AT_CLI_0_2_AUTOMATION = CLOSED`；
-> `REAL_HUMAN_INTERACTIVE_SHELL = PENDING`（§37 Human Gate）。
+> `SHELL_HOSTED_ADB_CLI = COMPLETE`（ONESHOT + LIFECYCLE + LIVE_STATUS + INTERACTIVE）。
+> `AT_CLI_0_2 = CLOSED`；`REAL_HUMAN_INTERACTIVE_SHELL = PASS`（§37 Human Gate）。
+>
+> **NEXT = AT.EMULATOR-0**（Minimal Terminal Emulator + Minimal Screen State）— 见
+> `docs/audit/AT.POSTCLI-0_Post_CLI_Architecture_Review.md`。
 
 ---
 
@@ -179,7 +181,7 @@ STATUS_DUPLICATE=NO（单投影路径）/ T_STATUS 保留（非 Human fallback�
 - 详见 `docs/evidence/at_cli_0/LIVE_COMMAND_STATUS_CLOSURE.md`（S1-S9 = 9/9 PASS + 回归全绿 +
   S1 时间戳证明 STATUS_BEFORE_COMMAND_EXIT=REQUIRED）。
 
-## 4. Interactive `adb shell`（AT.CLI-0.2 = **VERIFIED**，Human Gate 待）
+## 4. Interactive `adb shell`（AT.CLI-0.2 = **CLOSED**，Human Gate PASS）
 
 无参 `adb shell` 进入真正的长期 Remote PTY shell（`uid=2000(shell)`，`/dev/pts/*`），
 支持 stdin / persistent cwd+env / Ctrl-C / resize / clean exit 回 Local shell。**REUSE 既有

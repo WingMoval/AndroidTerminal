@@ -1,8 +1,8 @@
 # AT.CLI-0.2 — Interactive `adb shell` Remote PTY Closure
 
-> 状态：**AUTOMATION VERIFIED**（16/16 + 全回归绿）。
-> Human Gate（§37）**待执行** — 见 §12。
+> 状态：**CLOSED**（automation 16/16 + 全回归绿 + Human Gate PASS）。
 > 基线：`c87dd10`（AT.CLI-0.1B docs-only gate closure）。
+> Human Gate（§37）已 PASS — 见 §12。
 
 ## 1. 目标
 
@@ -208,20 +208,33 @@ SECOND_RECOVERY_OWNER              = NO
 `:at-engine` / `:adb-engine` / `:at-backend-adb`，故不机械重跑无因果的
 ADB Backend / Parity / Shellless / Pairing 长套件（§38 scope 报告）。
 
-## 12. Human Gate（§37）— 待执行
+## 12. Human Gate（§37）= **PASS / CLOSED**
 
-自动化全 PASS 后，需 Human 真机手动：
-1. Local `id`（app UID）。
-2. `adb shell` 进 remote prompt。
-3. remote `id`/`tty`/`pwd`（uid=2000(shell)、/dev/pts/*）。
-4. remote `cd /data/local/tmp` + `export HUMAN_INTERACTIVE=YES` + 验证。
+用户真实 Human 真机手动验证（HONOR ALI-AN00 / Android 15），全部子项 PASS：
+
+1. Local `id` → app UID ✓
+2. 无参 `adb shell` → 真实 Remote PTY ✓
+3. remote `id` → uid=2000(shell) / `tty` → /dev/pts/* ✓
+4. persistent cwd + env：`cd /data/local/tmp` + `export HUMAN_INTERACTIVE=YES` +
+   `echo "$HUMAN_INTERACTIVE"` → YES ✓
 5. remote `sleep 30` → 点 CTRL-C → sleep 终止、remote prompt 仍在 →
-   `echo AFTER_CTRL_C`。
-6. remote `stty size` → 点 RESIZE 改尺寸 → `stty size` 变化。
-7. remote `exit` → 回 Local → `id` 回 app UID。
-8. `adb shell id`（one-shot 仍正常）。
+   `echo AFTER_CTRL_C` → AFTER_CTRL_C ✓
+6. remote `stty size` → 点 RESIZE 改 rows/cols → `stty size` 观察到新值
+   **（`REMOTE_PTY_RESIZE_HUMAN_GATE = PASS`）** ✓
+7. remote `exit` → 回 Local → `id` → app UID ✓
+8. `adb shell id`（one-shot 仍正常）→ uid=2000(shell) ✓
 
-**`REAL_HUMAN_INTERACTIVE_SHELL = 待执行`**。
+**正式冻结**：
+
+```
+REAL_HUMAN_INTERACTIVE_SHELL = PASS
+AT.CLI-0.2                   = CLOSED
+AT_CLI_0_OVERALL_STATUS      = COMPLETE
+SHELL_HOSTED_ADB_CLI         = COMPLETE
+FULL_ADB_CLI                 = ONESHOT + LIFECYCLE + LIVE_STATUS + INTERACTIVE
+```
+
+本 Gate 闭合为 docs-only normalization，未修改任何 production code。
 
 ## 13. 已知修复（root cause）
 

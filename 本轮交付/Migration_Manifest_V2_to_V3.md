@@ -272,7 +272,7 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                            语义归一化：FRESH_INSTALL_ZERO_TOUCH=NOT_COMPLETE /
                            FIRST_USE_MANUAL_BOOTSTRAP=REQUIRED / POST_BOOTSTRAP_AUTO_WD=VERIFIED /
                            POST_BOOTSTRAP_ZERO_MANUAL_COLD_READY=VERIFIED（限定 post-bootstrap）；
-                           interactive `adb shell` = VERIFIED (AT.CLI-0.2, automation 16/16, Human Gate pending)；
+                           interactive `adb shell` = CLOSED (AT.CLI-0.2, automation 16/16 + Human Gate PASS)；
                            evidence: docs/evidence/at_cli_0/SELINUX_EXEC_BLOCKER.md +
                            APP_PROCESS_ENTRYPOINT_PROBE.md + ONESHOT_CLOSURE.md +
                                                        **AT.CLI-0.1B LIVE command-time status = VERIFIED**：0.1A 缺口修复
@@ -294,10 +294,32 @@ AT.V3-DEBT-1         = COMPLETE（V2 verified ADB capability parity closure：pa
                             + Args 20/20；
                             STATUS=HOST/SYSTEM TERMINAL EVENT（emitSystemOutput）/
                             STATUS_DUPLICATE=NO / T_STATUS 保留（非 Human fallback）；
+                             **AT.CLI-0.2 Interactive `adb shell` = CLOSED**（automation 16/16
+                             + Human Gate PASS）：无参 `adb shell` 进入真正长期 Remote PTY
+                             （uid=2000，shell,v2,pty:，/dev/pts/*），REUSE 既有 AT/ADB Engine
+                             能力，仅 :app CLI 组合层改动；AdbCliInteractiveTest I1-I16 = 16/16
+                             PASS（真实 Human Local PTY path）+ Human Gate §37 全 PASS（含
+                             REMOTE_PTY_RESIZE_HUMAN_GATE=PASS）+ 回归全绿（LiveStatus 9/9 +
+                             OneShot 15/15 + Lifecycle 11/11 + Bridge 13/13 + SharedSession 13/13
+                             + DynamicSession 9/9 + Programmatic 7/7 + CommonConsumer 3/3 +
+                             HumanPreview 6/6 + AppProcessProbe 6/6 + Args 20/20）；
+                             AT_ENGINE/ADB_PROTOCOL/ADB_NATIVE/ADBRUNTIME/REMOTE_PTY 均未改；
+                             INTERACTIVE_EXIT_CODE=NOT_EXPOSED / TRANSPARENT_RESUME=NO /
+                             INPUT_REPLAY=NO；
+                             **AT.POSTCLI-0 review = COMPLETE**：CLI 全 CLOSED；
+                             POST_CLI_DEPENDENCY_AUDIT=PASS /
+                             PERSISTENT_EXECUTION_CAPABILITY=MATURE_ENOUGH_FOR_EMULATOR /
+                             TERMINAL_EMULATOR=NOT_STARTED / SCREEN_STATE=NOT_STARTED /
+                             AT_CONTRACT_FREEZE_AUTHORIZED=NO / ADB_ENGINE_BLOCKS_AT_NEXT=NO /
+                             AG_RAW_TERMINAL_CAPABILITY=ELIGIBLE /
+                             AG_SCREEN_AWARE_TERMINAL=BLOCKED_BY_EMULATOR /
+                             NEXT=AT.EMULATOR-0（Minimal Terminal Emulator + Minimal Screen
+                             State）；evidence: docs/audit/AT.POSTCLI-0_Post_CLI_Architecture_Review.md；
 ADB_RUNTIME_LIFECYCLE_CLOSURE.md + LIVE_COMMAND_STATUS_CLOSURE.md +
  INTERACTIVE_SHELL_CLOSURE.md）
-    NEXT                  = AT.POSTCLI-0
-                           — CLI 完成后架构复核 + Terminal Emulator / Screen State 进入条件审计
+    NEXT                  = AT.EMULATOR-0
+                           — Minimal Terminal Emulator + Minimal Screen State
+                           （AT.POSTCLI-0 review 已冻结；docs/audit/AT.POSTCLI-0_Post_CLI_Architecture_Review.md）
  ```
 
 > 本文档为 migration map 的记录与总控输入；AT.V3-1 迁移已按授权执行（详见 `docs/implementation/AT.V3-1_ADB_Engine_Extraction_Migration_Baseline.md`）。
