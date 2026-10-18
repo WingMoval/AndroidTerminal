@@ -5,7 +5,7 @@
 //
 //   adb shell <command...>
 //     -> /system/bin/app_process -Djava.class.path=$AT_APP_APK /system/bin
-//            com.androidterminal.app.cli.AdbCliMain shell <command...>
+//            com.androidterminal.app.cli.AtCliMain shell <command...>
 //
 // This is a THIN frontend + IPC client. It does NOT initialize AdbRuntime,
 // read any adb identity, or open any ADB connection itself. It connects the
@@ -22,7 +22,7 @@
 // Production: present in BOTH debug and release (src/main). Distinct from the
 // debug-only CliProbe (src/debug).
 
-package com.androidterminal.app.cli
+package com.at.cli
 
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
@@ -30,9 +30,9 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 
-object AdbCliMain {
+object AtCliMain {
 
-    private const val TAG = "AdbCliMain"
+    private const val TAG = "AtCliMain"
 
     const val BRIDGE_PROTOCOL_VERSION = AdbCliProtocol.VERSION
 
@@ -373,16 +373,28 @@ object AdbCliMain {
                 ((payload[offset + 3].toInt() and 0xff) shl 24)
     }
 
-    /** Best-effort resolve of the app filesDir/cli_bridge.sock path. */
+    /**
+     * Best-effort resolve of the host filesDir/cli_bridge.sock path.
+     *
+     * The shell function (LocalCliBootstrap) ALWAYS sets AT_CLI_BRIDGE_SOCK, so
+     * the env path is the primary source. The fallback is a generic scan of
+     * /data/user/0/<host-pkg>/files for any cli_bridge.sock — host-agnostic
+     * (works for the AndroidTerminal product host OR the consumer test host).
+     * We never hardcode a single product package.
+     */
     private fun resolveSocketPath(): String {
-        // Prefer the app-injected path (the shell function sets AT_CLI_BRIDGE_SOCK).
         val envSock = System.getenv("AT_CLI_BRIDGE_SOCK")
         if (!envSock.isNullOrBlank()) return envSock
-        val pkg = "com.androidterminal.app"
-        for (base in listOf("/data/user/0/$pkg/files", "/data/data/$pkg/files")) {
-            val f = File(base, "cli_bridge.sock")
-            if (f.exists()) return f.absolutePath
+        // Generic fallback: scan /data/user/0/*/files/cli_bridge.sock. The CLI
+        // runs as the host UID, so it can only see its own host's private dir.
+        val base = File("/data/user/0")
+        if (base.isDirectory) {
+            base.listFiles()?.forEach { pkgDir ->
+                val sock = File(pkgDir, "files/cli_bridge.sock")
+                if (sock.exists()) return sock.absolutePath
+            }
         }
-        return File("/data/user/0/$pkg/files", "cli_bridge.sock").absolutePath
+        // Last resort (env not set, scan empty): the primary host path.
+        return File("/data/user/0/com.androidterminal.app/files", "cli_bridge.sock").absolutePath
     }
 }

@@ -4,7 +4,7 @@
 // without real-device round-trips. The real remote-shell behavior is separately
 // verified by AdbCliOneShotTest (Gate F) on-device.
 
-package com.androidterminal.app.cli
+package com.at.cli
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

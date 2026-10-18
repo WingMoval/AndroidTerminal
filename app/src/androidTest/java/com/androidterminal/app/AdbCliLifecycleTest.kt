@@ -10,6 +10,7 @@
 // device; the test detects capability and classifies accordingly.
 
 package com.androidterminal.app
+import com.at.cli.AdbCliBridgeServer
 
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4

@@ -61,6 +61,14 @@ dependencies {
     // ADB Backend -> ADB Engine.
     implementation(project(":adb-engine"))
 
+    // AT.CLI-CONSUMER-0: the App consumes the REUSABLE shell-visible ADB CLI
+    // consumer capability (the `adb` CLI main + same-UID UDS bridge + Local
+    // shell function bootstrap now live in :at-cli, NOT :app). The App provides
+    // an AppCliExecution (ATCliExecution impl) wiring its own AppRuntime /
+    // AdbRuntime / Human status projection. The App no longer OWNS the CLI
+    // mechanism — it only composes it.
+    implementation(project(":at-cli"))
+
     // AT.CONTRACT-0.5: debug-only automated input test (AppDebugInputTest).
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")

@@ -19,7 +19,7 @@
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_setEnv(JNIEnv* env, jclass, jstring key, jstring value) {
+Java_com_at_cli_NativeEnv_setEnv(JNIEnv* env, jclass, jstring key, jstring value) {
     if (!key || !value) return;
     const char* k = env->GetStringUTFChars(key, nullptr);
     const char* v = env->GetStringUTFChars(value, nullptr);
@@ -32,7 +32,7 @@ Java_com_androidterminal_app_cli_NativeEnv_setEnv(JNIEnv* env, jclass, jstring k
 // Returns the fd (>=0) on success, or -1 on failure.
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_createUdsListen(JNIEnv* env, jclass, jstring path) {
+Java_com_at_cli_NativeEnv_createUdsListen(JNIEnv* env, jclass, jstring path) {
     if (!path) return -1;
     const char* p = env->GetStringUTFChars(path, nullptr);
     jint rc = -1;
@@ -61,7 +61,7 @@ Java_com_androidterminal_app_cli_NativeEnv_createUdsListen(JNIEnv* env, jclass, 
 // or -1 on failure. Used for same-UID peer authentication.
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_peerUid(JNIEnv*, jclass, jint fd) {
+Java_com_at_cli_NativeEnv_peerUid(JNIEnv*, jclass, jint fd) {
     struct ucred cred;
     socklen_t len = sizeof(cred);
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0) {
@@ -76,7 +76,7 @@ Java_com_androidterminal_app_cli_NativeEnv_peerUid(JNIEnv*, jclass, jint fd) {
 // on HONOR Android 15, unlike android.net.LocalSocket for arbitrary paths).
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_connectUds(JNIEnv* env, jclass, jstring path) {
+Java_com_at_cli_NativeEnv_connectUds(JNIEnv* env, jclass, jstring path) {
     if (!path) return -1;
     const char* p = env->GetStringUTFChars(path, nullptr);
     jint rc = -1;
@@ -102,7 +102,7 @@ Java_com_androidterminal_app_cli_NativeEnv_connectUds(JNIEnv* env, jclass, jstri
 // A non-blocking-ish read: uses a 15s SO_RCVTIMEO set once per fd (best effort).
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_udsRead(JNIEnv* env, jclass, jint fd, jbyteArray buf) {
+Java_com_at_cli_NativeEnv_udsRead(JNIEnv* env, jclass, jint fd, jbyteArray buf) {
     jsize len = env->GetArrayLength(buf);
     jbyte* b = env->GetByteArrayElements(buf, nullptr);
     int n = (int)read((int)fd, b, (size_t)len);
@@ -113,7 +113,7 @@ Java_com_androidterminal_app_cli_NativeEnv_udsRead(JNIEnv* env, jclass, jint fd,
 // Write buf to fd; returns bytes written or -1.
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_udsWrite(JNIEnv* env, jclass, jint fd, jbyteArray buf) {
+Java_com_at_cli_NativeEnv_udsWrite(JNIEnv* env, jclass, jint fd, jbyteArray buf) {
     jsize len = env->GetArrayLength(buf);
     jbyte* b = env->GetByteArrayElements(buf, nullptr);
     int off = 0;
@@ -133,7 +133,7 @@ Java_com_androidterminal_app_cli_NativeEnv_udsWrite(JNIEnv* env, jclass, jint fd
 // Set a socket recv timeout (ms) so reads cannot block forever.
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_udsSetTimeout(JNIEnv*, jclass, jint fd, jint ms) {
+Java_com_at_cli_NativeEnv_udsSetTimeout(JNIEnv*, jclass, jint fd, jint ms) {
     struct timeval tv;
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
@@ -143,6 +143,6 @@ Java_com_androidterminal_app_cli_NativeEnv_udsSetTimeout(JNIEnv*, jclass, jint f
 // Close a raw fd.
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_androidterminal_app_cli_NativeEnv_udsClose(JNIEnv*, jclass, jint fd) {
+Java_com_at_cli_NativeEnv_udsClose(JNIEnv*, jclass, jint fd) {
     close((int)fd);
 }

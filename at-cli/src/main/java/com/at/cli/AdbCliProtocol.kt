@@ -6,7 +6,7 @@
 //
 // Frame: [type:1][len:4 LE][payload:len]. Binary-safe (arbitrary bytes).
 
-package com.androidterminal.app.cli
+package com.at.cli
 
 import java.io.DataInputStream
 import java.io.DataOutputStream

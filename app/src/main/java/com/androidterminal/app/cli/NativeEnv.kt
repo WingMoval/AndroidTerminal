@@ -1,18 +1,17 @@
-// AT.CLI-0 — JNI helper loader for process environment variables.
+// :app — JNI helper loader for CLI frontend provisioning + debug UDS test.
+//
+// AT.CLI-CONSUMER-0: the bridge server (atcli_env) moved to :at-cli. :app keeps
+// only setenv (CLI provisioning) + the UDS test helpers (debug CliProbe) in
+// atapp_env (app_env.cpp).
+
 package com.androidterminal.app.cli
 
 object NativeEnv {
     init {
-        runCatching { System.loadLibrary("atcli_env") }
+        runCatching { System.loadLibrary("atapp_env") }
     }
 
     external fun setEnv(key: String, value: String)
-
-    /** Create an AF_UNIX SOCK_STREAM listening socket bound to [path]; returns fd or -1. */
-    external fun createUdsListen(path: String): Int
-
-    /** Peer UID of a connected AF_UNIX socket [fd] via SO_PEERCRED; -1 on failure. */
-    external fun peerUid(fd: Int): Int
 
     /** Connect a new AF_UNIX socket to [path] (UDS file); returns fd or -1. */
     external fun connectUds(path: String): Int

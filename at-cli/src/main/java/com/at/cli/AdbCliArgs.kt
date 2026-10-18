@@ -1,6 +1,6 @@
-// AT.CLI-0.1 — AdbCliMain parser + shell-quoting helper (production, pure JVM).
+// AT.CLI-0.1 — AtCliMain parser + shell-quoting helper (production, pure JVM).
 //
-// The outer `/system/bin/sh` already did ONE pass of shell parsing, so AdbCliMain
+// The outer `/system/bin/sh` already did ONE pass of shell parsing, so AtCliMain
 // receives the LOGICAL argv (e.g. `adb shell echo "hello world"` ->
 // ["shell", "echo", "hello world"]). To run that on the REMOTE shell we must
 // re-serialize the logical argv into a remote command line WITHOUT losing
@@ -18,7 +18,7 @@
 // This is verified against the real remote shell in AdbCliOneShotTest (Gate F).
 // Pure JVM — no Android imports — so it is unit-testable on the host.
 
-package com.androidterminal.app.cli
+package com.at.cli
 
 /**
  * Result of parsing the CLI argv (after the outer shell's own parse).

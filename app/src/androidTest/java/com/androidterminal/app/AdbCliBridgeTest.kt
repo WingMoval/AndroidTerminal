@@ -14,12 +14,12 @@
 // a raw UDS (the test plays the role of the shell-hosted `adb` CLI client).
 
 package com.androidterminal.app
+import com.at.cli.AdbCliProtocol
 
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.adb.engine.AdbRuntime
-import com.androidterminal.app.cli.AdbCliProtocol
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

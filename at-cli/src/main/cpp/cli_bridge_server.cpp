@@ -1,4 +1,4 @@
-﻿// AT.CLI-0 鈥?Product CLI Bridge server (native UDS).
+// AT.CLI-0 鈥?Product CLI Bridge server (native UDS).
 //
 // Binds an AF_UNIX SOCK_STREAM socket in the app's private files dir, accepts
 // connections, verifies peer UID == app UID (SO_PEERCRED), and speaks the
@@ -96,7 +96,7 @@ static int read_all(int fd, void* buf, size_t n) {
 // Public: send a frame to a client fd (thread-safe, used by Kotlin push).
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeSendFrame(
+Java_com_at_cli_AdbCliBridgeServer_nativeSendFrame(
     JNIEnv* env, jobject, jint fd, jint type, jbyteArray payload) {
     uint32_t len = payload ? (uint32_t)env->GetArrayLength(payload) : 0;
     jbyte* pb = nullptr;
@@ -267,7 +267,7 @@ static void* accept_thread(void* arg) {
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, jobject, jstring path, jobject handler) {
+Java_com_at_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, jobject, jstring path, jobject handler) {
     if (g_bridge) return -1;
     if (!path) return -1;
     const char* p = env->GetStringUTFChars(path, nullptr);
@@ -321,7 +321,7 @@ Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, job
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_androidterminal_app_cli_AdbCliBridgeServer_nativeStop(JNIEnv* env, jobject) {
+Java_com_at_cli_AdbCliBridgeServer_nativeStop(JNIEnv* env, jobject) {
     if (!g_bridge) return;
     g_bridge->running = 0;
     close(g_bridge->listen_fd);

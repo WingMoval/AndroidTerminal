@@ -43,3 +43,12 @@ include(":adb-only-test-host")
 // persistent terminal is a shell-independent byte-stream session (no
 // :at-backend-local / :at-backend-adb / :adb-engine / :app; no /system/bin/sh).
 include(":at-shellless-test-host")
+// AT.CLI-CONSUMER-0: Reusable Shell-Visible ADB CLI Consumer Capability.
+// Consumer-side module (NOT :app). Hosts the app_process CLI main, the
+// same-UID UDS bridge server, and the Local shell `adb` function bootstrap.
+include(":at-cli")
+// AT.CLI-CONSUMER-0: Independent CLI Consumer Test Host (TEST / VALIDATION
+// ONLY). Proves a NON-AndroidTerminal consumer can obtain the full
+// Local Terminal -> shell-visible adb -> uid=2000(shell) environment without
+// depending on :app or copying the AndroidTerminal identity.
+include(":at-cli-consumer-host")

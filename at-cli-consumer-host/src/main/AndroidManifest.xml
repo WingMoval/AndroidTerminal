@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  :at-cli-consumer-host manifest (AT.CLI-CONSUMER-0). TEST / VALIDATION ONLY.
+
+  A real installed app (has its own UID / private filesDir) so it can:
+    - spawn a Local /system/bin/sh PTY (at-backend-local, same-UID);
+    - bind the same-UID UDS CLI bridge in its OWN private files dir;
+    - launch app_process with its OWN base.apk on the classpath.
+  No Activity / launcher required — instrumentation does not need one.
+
+  Permissions mirror what the product host declares for the ADB lifecycle
+  (mDNS discovery + Auto-WD). The identity is SELF-GENERATED in this host's
+  own private dir (filesDir/at-cli-identity); the AndroidTerminal key is never
+  copied.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="35" />
+
+    <application
+        android:label="AT CLI Consumer Host"
+        android:supportsRtl="true"
+        android:allowBackup="false">
+    </application>
+</manifest>

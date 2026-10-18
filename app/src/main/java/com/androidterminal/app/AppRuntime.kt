@@ -25,12 +25,12 @@ import com.adb.engine.AdbConnectionRequest
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeDiagnostic
 import com.adb.engine.AdbRuntimeState
-import com.androidterminal.app.cli.AdbCliBridgeServer
 import com.androidterminal.app.cli.AdbCliStatusHub
 import com.androidterminal.app.cli.CliFrontendProvisioner
 import com.at.backend.adb.AdbOneShotBackend
 import com.at.backend.adb.AdbPersistentBackend
 import com.at.backend.local.LocalPersistentBackend
+import com.at.cli.AdbCliBridgeServer
 import com.at.engine.ATEngine
 import java.io.File
 
@@ -69,14 +69,21 @@ object AppRuntime {
             dir.mkdirs()
             adbKeyDir = dir.absolutePath
         }
-        // AT.CLI-0: provision the shell-hosted `adb` CLI (asset extract + PATH)
-        // and start the product CLI bridge. Product surface: present in BOTH
-        // debug and release (NOT gated by BuildConfig.DEBUG).
+        // AT.CLI-CONSUMER-0: the product consumes the REUSABLE shell-hosted
+        // `adb` CLI consumer capability (now in :at-cli). Provision the CLI
+        // frontend (asset extract + PATH, product-side) and start the bridge
+        // wired to the product's own AppCliExecution (AppRuntime / AdbRuntime /
+        // Human status projection). Product surface: present in BOTH debug and
+        // release (NOT gated by BuildConfig.DEBUG).
         runCatching {
             CliFrontendProvisioner.provision(app)
             if (cliBridge == null) {
                 val dir = app.filesDir
-                cliBridge = AdbCliBridgeServer(dir)
+                // The bridge routes CLI commands into the product's own shared
+                // composition via AppCliExecution. The bridge binds the
+                // per-connection session id (from HELLO) and passes it to
+                // ensureReady, which projects status to that session.
+                cliBridge = AdbCliBridgeServer(dir, AppCliExecution())
                 cliBridge?.start()
             }
         }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  :at-cli — Reusable Shell-Visible ADB CLI Consumer Capability (AT.CLI-CONSUMER-0).
+
+  Library module. No Activity / service / launcher. The CLI frontend is the
+  app_process-based AtCliMain (Kotlin, launched via the `adb()` shell function
+  injected into a Local /system/bin/sh by LocalCliBootstrap). The same-UID UDS
+  bridge server (atcli_env native lib) binds in the host's private files dir.
+
+  No permissions declared here: the host app declares what it needs. The bridge
+  is private (same-UID SO_PEERCRED auth), never on public TCP, never 0.0.0.0.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+</manifest>

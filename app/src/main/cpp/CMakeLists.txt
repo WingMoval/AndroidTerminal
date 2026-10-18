@@ -1,14 +1,22 @@
-# :app native — AT.CLI-0 shell-hosted `adb` CLI frontend.
+# :app native — AT.CLI-CONSUMER-0.
 #
-# A standalone PIE executable (`adb`) extracted by the app into its private
-# files/bin dir and placed on the Local /system/bin/sh PATH. It speaks the
-# Product CLI Bridge protocol over a Unix Domain Socket to the app process.
-# It does NOT implement ADB; it delegates to AppRuntime -> ATEngine/ADB Backend
-# -> ADB Engine. Shell subcommand only this round.
+# The shell-visible `adb` CLI frontend (app_process AtCliMain) and the same-UID
+# UDS bridge server (atcli_env) now live in the REUSABLE :at-cli module
+# (AT.CLI-CONSUMER-0). :app consumes them via the :at-cli dependency.
+#
+# The legacy native ELF `adb` (adb_cli.cpp) is NO LONGER BUILT: it was the
+# original AT.CLI-0 entrypoint, but SELinux blocks untrusted_app from executing
+# a private files/bin ELF (RC=126). The verified launcher is the app_process
+# shell function (SELECTED_CLI_ENTRYPOINT = APP_PROCESS, AT.CLI-0.1). The ELF
+# source is kept for reference only and is removed from the build.
+#
+# :app keeps a minimal native helper (atapp_env) for the CLI frontend
+# provisioning setenv (CliFrontendProvisioner) and the debug UDS test client
+# (CliProbe). The bridge server itself is in :at-cli (atcli_env).
 
 cmake_minimum_required(VERSION 3.22.1)
 
-project("atAdbCli" LANGUAGES C CXX)
+project("atAppEnv" LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -17,24 +25,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_library(log-lib log)
 
-add_executable(atadb_cli
-    adb_cli.cpp
+# :app keeps only the setenv / UDS-test helpers (the bridge server is in
+# :at-cli). NativeEnv.kt (com.androidterminal.app.cli.NativeEnv) loads this.
+add_library(atapp_env SHARED
+    app_env.cpp
 )
-
-# Static libstdc++ so the executable is self-contained (no host libstdc++ dep).
-set_target_properties(atadb_cli PROPERTIES
-    LINK_FLAGS "-static-libstdc++ -static-libgcc -Wl,-z,relro"
-)
-
-target_link_libraries(atadb_cli
-    log
-)
-
-# JNI helper (setenv + UDS server) loaded by the app. The UDS server binds the
-# Product CLI Bridge socket in the app's private files dir and relays frames to
-# a Kotlin CliBridgeHandler via JNI.
-add_library(atcli_env SHARED
-    native_env.cpp
-    cli_bridge_server.cpp
-)
-target_link_libraries(atcli_env log)
+target_link_libraries(atapp_env log)

@@ -21,7 +21,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import com.androidterminal.app.cli.LocalSessionBootstrap
+import com.at.cli.LocalCliBootstrap
 import java.io.File
 import android.widget.Button
 import android.widget.EditText
@@ -40,6 +40,10 @@ class MainActivity : Activity() {
     private companion object {
         const val DEFAULT_ROWS = 24
         const val DEFAULT_COLS = 80
+        // AT.CLI-CONSUMER-0: the product host's AtCliMain entrypoint (shared in
+        // :at-cli). The Local shell `adb` function launches app_process with
+        // this class on the product's base.apk classpath.
+        const val AtCliConsumerHostMainClass = "com.at.cli.AtCliMain"
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -231,8 +235,9 @@ class MainActivity : Activity() {
                 val apk = AppRuntime.appApkPath()
                 val sock = AppRuntime.cliBridgeSocketPath()
                 // Per-session script so AT_SESSION_ID is unique per Local page.
-                val scriptName = "${LocalSessionBootstrap.BOOTSTRAP_SCRIPT}.${page.pageId}"
-                val script = LocalSessionBootstrap.writeScript(
+                val bootstrap = LocalCliBootstrap(AtCliConsumerHostMainClass)
+                val scriptName = "${LocalCliBootstrap.BOOTSTRAP_SCRIPT}.${page.pageId}"
+                val script = bootstrap.writeScript(
                     scriptPath = File(filesDir, scriptName).absolutePath,
                     apkPath = apk,
                     sockPath = sock,
@@ -243,7 +248,7 @@ class MainActivity : Activity() {
                         "apk=[$apk]\nsock=[$sock]\nscript=[$script]\nsession=${page.pageId}\n"
                     )
                 }
-                LocalSessionBootstrap.sourceLine(script)
+                bootstrap.sourceLine(script)
             }.getOrDefault("")
         } else ""
         // The echo message must be QUOTED: an unquoted `(` (from "(page N)")
