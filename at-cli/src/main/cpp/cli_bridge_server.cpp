@@ -28,6 +28,8 @@ enum {
     T_HELLO = 1, T_HELLO_ACK = 2, T_ONESHOT = 3, T_OUT = 4, T_ERR = 5,
     T_EXIT = 6, T_INTERACTIVE = 7, T_STDIN = 8, T_RESIZE = 9, T_CLOSE = 10,
     T_ERROR = 11,
+    T_STATUS = 12,
+    T_PAIR = 13,  // AT.CONSUMER-BOOTSTRAP-0: adb pair <host>:<port> <code>
 };
 
 struct Bridge {
@@ -42,6 +44,7 @@ struct Bridge {
     jmethodID onInteractiveClose; // (int fd)
     jmethodID pushError;          // (int fd, String msg)
     jmethodID onHello;            // (int fd, int sessionId) — AT.CLI-0.1A
+    jmethodID onPair;             // (int fd, byte[] payload) — AT.CONSUMER-BOOTSTRAP-0
 };
 
 static Bridge* g_bridge = nullptr;
@@ -234,6 +237,14 @@ static void* client_thread(void* arg) {
                 env->CallVoidMethod(g_bridge->handler, g_bridge->onInteractiveClose, (jint)fd);
                 break;
             }
+            case T_PAIR: {
+                // AT.CONSUMER-BOOTSTRAP-0: adb pair. payload = "host:port\0code".
+                jbyteArray ja = env->NewByteArray(len);
+                if (len) env->SetByteArrayRegion(ja, 0, len, (const jbyte*)payload);
+                env->CallVoidMethod(g_bridge->handler, g_bridge->onPair, (jint)fd, ja);
+                env->DeleteLocalRef(ja);
+                break;
+            }
             case T_CLOSE: break;
             default:
                 jstring m = env->NewStringUTF("unexpected frame");
@@ -300,11 +311,13 @@ Java_com_at_cli_AdbCliBridgeServer_nativeStart(JNIEnv* env, jobject, jstring pat
     b->onInteractiveClose = env->GetMethodID(cls, "onInteractiveClose", "(I)V");
     b->pushError = env->GetMethodID(cls, "pushError", "(ILjava/lang/String;)V");
     b->onHello = env->GetMethodID(cls, "onHello", "(II)V");
+    b->onPair = env->GetMethodID(cls, "onPair", "(I[B)V");
     // A null method id would later abort the process ("JNI DETECTED ERROR:
     // mid == null"), so verify all resolved before returning.
     if (env->ExceptionCheck()) { env->ExceptionDescribe(); env->ExceptionClear(); }
     if (!b->onClientAuth || !b->onOneShot || !b->onInteractiveOpen ||
-        !b->onInteractiveData || !b->onInteractiveClose || !b->pushError || !b->onHello) {
+        !b->onInteractiveData || !b->onInteractiveClose || !b->pushError || !b->onHello ||
+        !b->onPair) {
         LOGE_ATCLI("nativeStart: a handler method id failed to resolve");
         return -1;
     }

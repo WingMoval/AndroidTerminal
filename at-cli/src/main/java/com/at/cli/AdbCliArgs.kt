@@ -34,8 +34,12 @@ data class AdbCliParseResult(
     val message: String = "",
     val exitCode: Int = 0,
     val toStderr: Boolean = false,
+    // AT.CONSUMER-BOOTSTRAP-0: for Kind.PAIR, the parsed explicit endpoint + code.
+    val pairHost: String = "",
+    val pairPort: Int = 0,
+    val pairCode: String = "",
 ) {
-    enum class Kind { SHELL, INTERACTIVE, HELP, VERSION, UNSUPPORTED, NO_ARGS }
+    enum class Kind { SHELL, INTERACTIVE, HELP, VERSION, UNSUPPORTED, NO_ARGS, PAIR }
 
     companion object {
         const val UNSUPPORTED_EXIT = 2
@@ -43,8 +47,9 @@ data class AdbCliParseResult(
 
         val HELP_TEXT = "usage: adb shell <command...>\n" +
             "       adb shell              (interactive remote PTY shell)\n" +
+            "       adb pair <host>:<port> <code>\n" +
             "       adb --help | adb version\n" +
-            "AndroidTerminal product CLI (app_process entrypoint; one-shot + interactive)."
+            "AndroidTerminal product CLI (app_process entrypoint; one-shot + interactive + pair)."
 
         const val VERSION_TEXT = "AndroidTerminal adb CLI (app_process entrypoint, bridge protocol v1)"
 
@@ -84,6 +89,7 @@ data class AdbCliParseResult(
                         )
                     }
                 }
+                "pair" -> parsePair(args.copyOfRange(1, args.size))
                 "--help", "-h", "help" ->
                     AdbCliParseResult(kind = Kind.HELP, message = HELP_TEXT, exitCode = 0, toStderr = false)
                 "version" ->
@@ -91,12 +97,73 @@ data class AdbCliParseResult(
                 else ->
                     AdbCliParseResult(
                         kind = Kind.UNSUPPORTED,
-                        message = "adb: unsupported command: $sub (this build supports only `shell <command...>`) " +
+                        message = "adb: unsupported command: $sub (this build supports `shell <command...>` and `pair <host>:<port> <code>`) " +
                             "[AT.CLI-0.1]",
                         exitCode = UNSUPPORTED_EXIT,
                         toStderr = true,
                     )
             }
+        }
+
+        /**
+         * Parse `adb pair <host>:<port> <code>` (AT.CONSUMER-BOOTSTRAP-0).
+         *
+         * Standard form (REQUIRED): `adb pair <host>:<port> <code>`.
+         * The host:port is the EXPLICIT pairing endpoint (the user reads it from
+         * the system "pair device with pairing code" dialog). The code is the
+         * 6-digit pairing code.
+         *
+         * Validation failure (bad args) returns Kind.PAIR with a non-zero
+         * exitCode and an empty pairCode, so the frontend prints usage WITHOUT
+         * triggering the underlying pairing (P3 gate). No shorthand `adb pair
+         * <code>` is implemented (DEFERRED per §4 — keeps scope minimal).
+         */
+        private fun parsePair(rest: Array<String>): AdbCliParseResult {
+            if (rest.size != 2) {
+                return AdbCliParseResult(
+                    kind = Kind.PAIR,
+                    message = "usage: adb pair <host>:<port> <code>",
+                    exitCode = UNSUPPORTED_EXIT,
+                    toStderr = true,
+                )
+            }
+            val endpoint = rest[0]
+            val code = rest[1]
+            val colon = endpoint.lastIndexOf(':')
+            if (colon <= 0 || colon == endpoint.length - 1) {
+                return AdbCliParseResult(
+                    kind = Kind.PAIR,
+                    message = "adb pair: bad endpoint '$endpoint' (expected host:port)",
+                    exitCode = UNSUPPORTED_EXIT,
+                    toStderr = true,
+                )
+            }
+            val host = endpoint.substring(0, colon)
+            val portText = endpoint.substring(colon + 1)
+            val port = portText.toIntOrNull()
+            if (port == null || port <= 0 || port > 65535) {
+                return AdbCliParseResult(
+                    kind = Kind.PAIR,
+                    message = "adb pair: bad port '$portText' (expected 1..65535)",
+                    exitCode = UNSUPPORTED_EXIT,
+                    toStderr = true,
+                )
+            }
+            if (code.isBlank()) {
+                return AdbCliParseResult(
+                    kind = Kind.PAIR,
+                    message = "adb pair: missing pairing code",
+                    exitCode = UNSUPPORTED_EXIT,
+                    toStderr = true,
+                )
+            }
+            return AdbCliParseResult(
+                kind = Kind.PAIR,
+                pairHost = host,
+                pairPort = port,
+                pairCode = code,
+                exitCode = 0,
+            )
         }
 
         /**

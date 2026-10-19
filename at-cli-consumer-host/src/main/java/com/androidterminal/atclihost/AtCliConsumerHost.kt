@@ -133,12 +133,31 @@ object AtCliConsumerHost {
                 onStatusLine("connected")
                 return true
             }
-            // Not READY: run the Runtime-owned ensureReady sequence, forwarding
-            // status lines. The consumer host has no Human UI projection, so
-            // every line goes to the onStatusLine callback (-> T_STATUS
+            // AT.CONSUMER-BOOTSTRAP-0: HONEST first-use signal. No identity ->
+            // the user must pair first (clear message, not a bare "failed").
+            val bootstrap = com.adb.engine.AdbConsumerBootstrap(adbIdentityDir())
+            if (!bootstrap.hasIdentity()) {
+                onStatusLine("pairing required: no ADB identity found")
+                onStatusLine(
+                    "open Settings -> Wireless Debugging -> Pair device with pairing code, " +
+                        "then run: adb pair <host>:<port> <code>"
+                )
+                return false
+            }
+            // Not READY (identity present): run the Runtime-owned ensureReady
+            // sequence, forwarding status lines. The consumer host has no Human
+            // UI projection, so every line goes to onStatusLine (-> T_STATUS
             // fallback to the CLI client).
             val finalState = AdbRuntime.ensureReady(adbIdentityDir()) { line ->
                 onStatusLine(line)
+            }
+            // Conservative post-failure hint (C4): identity exists but connect
+            // failed — offer pairing as a remediation (not an assertion).
+            if (finalState != AdbRuntimeState.READY) {
+                onStatusLine(
+                    "not connected (identity present). If pairing is needed: " +
+                        "adb pair <host>:<port> <code>"
+                )
             }
             return finalState == AdbRuntimeState.READY
         }

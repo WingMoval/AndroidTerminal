@@ -87,6 +87,90 @@ object AtCliMain {
                 if (res.error != null) err.println("adb: $res.error")
                 return processExit(res.exitCode)
             }
+            AdbCliParseResult.Kind.PAIR -> {
+                // AT.CONSUMER-BOOTSTRAP-0: `adb pair <host>:<port> <code>`.
+                // Bad args (validation failed) -> print usage, do NOT pair.
+                if (parsed.pairCode.isBlank()) {
+                    err.println(parsed.message)
+                    return processExit(parsed.exitCode)
+                }
+                val res = bridgePair(parsed.pairHost, parsed.pairPort, parsed.pairCode)
+                if (res == null) {
+                    err.println("adb: bridge unavailable (is the AndroidTerminal app running?)")
+                    return processExit(1)
+                }
+                if (res.stdout.isNotEmpty()) out.print(res.stdout)
+                if (res.stderr.isNotEmpty()) err.print(res.stderr)
+                if (res.error != null) err.println("adb: $res.error")
+                return processExit(res.exitCode)
+            }
+        }
+    }
+
+    /**
+     * Connect the CLI Bridge UDS and run `adb pair` (AT.CONSUMER-BOOTSTRAP-0).
+     *
+     * Sends a dedicated T_PAIR frame (payload = "host:port<0x00>code"); the
+     * bridge routes it to the host's AdbConsumerBootstrap.pair(...) — the
+     * SINGLE pairing boundary. We do NOT call AdbEngine.pair here. Response is
+     * T_OUT (result text) / T_ERR / T_EXIT. Returns null on transport failure.
+     */
+    private fun bridgePair(host: String, port: Int, code: String): OneShotResult? {
+        val sock = resolveSocketPath()
+        val sessionId = resolveSessionId()
+        android.util.Log.i(TAG, "bridgePair: connect $sock endpoint=$host:$port session=$sessionId")
+        val ls = LocalSocket()
+        try {
+            ls.connect(LocalSocketAddress(sock, LocalSocketAddress.Namespace.FILESYSTEM))
+            ls.soTimeout = 30_000 // pairing is fast (no remote exec)
+            android.util.Log.i(TAG, "bridgePair: connected")
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "bridgePair: connect failed: ${e.message}")
+            runCatching { ls.close() }
+            return null
+        }
+        try {
+            val outp: OutputStream = ls.outputStream
+            val inp: InputStream = ls.inputStream
+
+            // HELLO (same as one-shot): version + sessionId.
+            val sessionIdBytes = if (sessionId != null) le32(sessionId) else byteArrayOf()
+            val helloPayload = ByteArray(1 + sessionIdBytes.size)
+            helloPayload[0] = BRIDGE_PROTOCOL_VERSION.toByte()
+            System.arraycopy(sessionIdBytes, 0, helloPayload, 1, sessionIdBytes.size)
+            writeFrame(outp, AdbCliProtocol.T_HELLO, helloPayload)
+            val ack = readFrame(inp) ?: return fail("no HELLO_ACK")
+            if (ack.type != AdbCliProtocol.T_HELLO_ACK) return fail("bad HELLO_ACK type=${ack.type}")
+
+            // PAIR: payload = "host:port" + NUL + code.
+            val endpoint = "$host:$port"
+            val pairPayload = (endpoint + "\u0000" + code).toByteArray(Charsets.UTF_8)
+            writeFrame(outp, AdbCliProtocol.T_PAIR, pairPayload)
+            android.util.Log.i(TAG, "bridgePair: PAIR sent, waiting for frames")
+
+            var stdout = StringBuilder()
+            var stderr = StringBuilder()
+            var exitCode = 1
+            var error: String? = null
+            while (true) {
+                val f = readFrame(inp) ?: break
+                android.util.Log.d(TAG, "bridgePair: frame type=${f.type} len=${f.payload.size}")
+                when (f.type) {
+                    AdbCliProtocol.T_OUT -> stdout.append(String(f.payload, Charsets.UTF_8))
+                    AdbCliProtocol.T_ERR -> stderr.append(String(f.payload, Charsets.UTF_8))
+                    AdbCliProtocol.T_ERROR -> error = String(f.payload, Charsets.UTF_8)
+                    AdbCliProtocol.T_EXIT -> {
+                        exitCode = if (f.payload.size >= 4) f.le32(0) else 1
+                        break
+                    }
+                    else -> { /* ignore unknown */ }
+                }
+            }
+            return OneShotResult(stdout.toString(), stderr.toString(), exitCode, error, status = "")
+        } catch (e: Exception) {
+            return fail(e.message ?: e.javaClass.simpleName)
+        } finally {
+            runCatching { ls.close() }
         }
     }
 

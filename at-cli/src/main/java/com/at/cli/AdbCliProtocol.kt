@@ -33,6 +33,12 @@ object AdbCliProtocol {
     // frames keep their tags/semantics. Backward-compatible: a client that does
     // not know tag 12 simply ignores it (its readFrame loop has an else-ignore).
     const val T_STATUS = 12
+    // AT.CONSUMER-CONSUMER-BOOTSTRAP-0: client -> server `adb pair` request.
+    // Payload = "host:port<0x00>code" (host+port as the user typed, NUL, code).
+    // The bridge routes this to the host's AdbConsumerBootstrap.pair(...).
+    // Reuses T_OUT / T_ERR / T_EXIT for the response (pair result text + exit).
+    // Additive (tag 13 was free); existing frames keep their tags/semantics.
+    const val T_PAIR = 13
 
     const val MAX_FRAME = 1 shl 20 // 1 MiB
 

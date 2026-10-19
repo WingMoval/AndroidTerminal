@@ -167,4 +167,73 @@ class AdbCliArgsTest {
         assertTrue(remote.contains("'x'\"'\"'y'"))
         assertTrue(remote.contains("'\$z'"))
     }
+
+    // ------------------------------------------------------------------
+    // AT.CONSUMER-BOOTSTRAP-0: `adb pair <host>:<port> <code>` parsing (P3).
+    // ------------------------------------------------------------------
+
+    @Test
+    fun parsePairValid() {
+        val r = AdbCliParseResult.parse(arrayOf("pair", "127.0.0.1:42433", "123456"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(0, r.exitCode)
+        assertEquals("127.0.0.1", r.pairHost)
+        assertEquals(42433, r.pairPort)
+        assertEquals("123456", r.pairCode)
+    }
+
+    @Test
+    fun parsePairIpv6Host() {
+        // host with a colon is still parsed (last colon separates port).
+        val r = AdbCliParseResult.parse(arrayOf("pair", "192.168.137.44:38619", "738710"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(0, r.exitCode)
+        assertEquals("192.168.137.44", r.pairHost)
+        assertEquals(38619, r.pairPort)
+        assertEquals("738710", r.pairCode)
+    }
+
+    @Test
+    fun parsePairNoArgs() {
+        // `adb pair` (no endpoint/code) -> usage, exit 2, empty code.
+        val r = AdbCliParseResult.parse(arrayOf("pair"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(AdbCliParseResult.UNSUPPORTED_EXIT, r.exitCode)
+        assertTrue(r.toStderr)
+        assertTrue(r.pairCode.isBlank())
+    }
+
+    @Test
+    fun parsePairBadEndpoint() {
+        // `adb pair foo` -> bad endpoint (no colon), exit 2.
+        val r = AdbCliParseResult.parse(arrayOf("pair", "foo", "123456"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(AdbCliParseResult.UNSUPPORTED_EXIT, r.exitCode)
+        assertTrue(r.pairCode.isBlank())
+    }
+
+    @Test
+    fun parsePairBadPort() {
+        // `adb pair host:notaport 123456` -> bad port, exit 2.
+        val r = AdbCliParseResult.parse(arrayOf("pair", "host:notaport", "123456"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(AdbCliParseResult.UNSUPPORTED_EXIT, r.exitCode)
+        assertTrue(r.pairCode.isBlank())
+    }
+
+    @Test
+    fun parsePairPortOutOfRange() {
+        // port > 65535 -> exit 2.
+        val r = AdbCliParseResult.parse(arrayOf("pair", "host:70000", "123456"))
+        assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
+        assertEquals(AdbCliParseResult.UNSUPPORTED_EXIT, r.exitCode)
+        assertTrue(r.pairCode.isBlank())
+    }
+
+    @Test
+    fun parsePairHelpMentionsPair() {
+        val r = AdbCliParseResult.parse(arrayOf("--help"))
+        assertEquals(AdbCliParseResult.Kind.HELP, r.kind)
+        assertTrue(r.message.contains("adb pair <host>:<port> <code>"))
+    }
 }

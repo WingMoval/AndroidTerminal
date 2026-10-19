@@ -22,6 +22,7 @@ package com.androidterminal.app
 
 import android.content.Context
 import com.adb.engine.AdbConnectionRequest
+import com.adb.engine.AdbConsumerBootstrap
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeDiagnostic
 import com.adb.engine.AdbRuntimeState
@@ -115,6 +116,16 @@ object AppRuntime {
 
     /** Drive the single AdbRuntime auto-connect (READY gate). */
     fun connectAuto(): AdbRuntimeDiagnostic = AdbRuntime.connectAuto(adbIdentityDir())
+
+    /**
+     * The product's reusable ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0).
+     *
+     * ONE shared instance bound to the product's own app-private identity dir.
+     * PairActivity (and any product surface) uses this for first-use pairing —
+     * it does NOT call AdbEngine.pair directly. The bootstrap is the single
+     * pairing boundary shared with the CLI `adb pair` and the consumer host.
+     */
+    fun consumerBootstrap(): AdbConsumerBootstrap = AdbConsumerBootstrap(adbIdentityDir())
 
     /** ATEngine with the Local backend (Local PTY -> /system/bin/sh). */
     fun localEngine(): ATEngine = ATEngine(oneShot = null, persistent = LocalPersistentBackend())

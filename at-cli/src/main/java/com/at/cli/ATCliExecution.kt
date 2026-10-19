@@ -20,6 +20,7 @@
 
 package com.at.cli
 
+import com.adb.engine.AdbConsumerBootstrap
 import com.at.engine.ATEngine
 
 /**
@@ -77,4 +78,16 @@ interface ATCliExecution {
      * exposed for host-side bootstrap surfaces (e.g. `adb pair` delegation).
      */
     fun adbIdentityDir(): String
+
+    /**
+     * The host's REUSABLE ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0).
+     *
+     * The bridge routes the CLI `adb pair <host>:<port> <code>` command here
+     * (via a dedicated T_PAIR frame). The host supplies a bootstrap bound to
+     * its OWN app-private identity dir. The bridge does NOT call AdbEngine.pair
+     * directly — the bootstrap is the single pairing boundary shared with the
+     * product UI and the consumer host.
+     */
+    fun consumerBootstrap(): AdbConsumerBootstrap =
+        AdbConsumerBootstrap(adbIdentityDir())
 }

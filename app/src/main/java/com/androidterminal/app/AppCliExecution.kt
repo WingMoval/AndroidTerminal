@@ -61,12 +61,40 @@ class AppCliExecution : ATCliExecution {
             return true
         }
 
+        // AT.CONSUMER-BOOTSTRAP-0: HONEST first-use signal. If the consumer has
+        // NO usable identity (no key material), the Runtime's generic "connection
+        // failed" is misleading — the real reason is "you need to pair first".
+        // Classify via the reusable bootstrap BEFORE running the cold sequence,
+        // and surface a clear pairing-required message (UX: the user must know to
+        // open Settings -> Wireless Debugging -> Pair).
+        val bootstrap = consumerBootstrap()
+        if (!bootstrap.hasIdentity()) {
+            emitStatus(sid, onStatusLine, "pairing required: no ADB identity found")
+            emitStatus(
+                sid, onStatusLine,
+                "open Settings -> Wireless Debugging -> Pair device with pairing code, " +
+                    "then run: adb pair <host>:<port> <code>"
+            )
+            return false
+        }
+
         // COLD PATH: run the Runtime-owned ensureReady sequence, forwarding
         // INTERMEDIATE status lines LIVE (Host projection for the bound session
         // + T_STATUS fallback via onStatusLine). "connected" is owned by the
         // READY lifecycle transition — NOT re-emitted here (no duplicate).
         val finalState = AdbRuntime.ensureReady(AppRuntime.adbIdentityDir()) { line ->
             if (line != "connected") emitStatus(sid, onStatusLine, line)
+        }
+        // Conservative post-failure classification (C4): identity EXISTS but the
+        // connect failed. Do NOT assert "must pair" (a Boolean failure is not
+        // auth evidence), but offer pairing as a remediation so the user has a
+        // clear next step instead of a bare "connection failed".
+        if (finalState != AdbRuntimeState.READY) {
+            emitStatus(
+                sid, onStatusLine,
+                "not connected (identity present). If pairing is needed: " +
+                    "adb pair <host>:<port> <code>"
+            )
         }
         return finalState == AdbRuntimeState.READY
     }

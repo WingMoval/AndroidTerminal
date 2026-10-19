@@ -206,6 +206,68 @@ class AdbCliBridgeServer(
             return true
         }
 
+        /**
+         * AT.CONSUMER-BOOTSTRAP-0: `adb pair <host>:<port> <code>` (T_PAIR).
+         *
+         * Payload = "host:port" + NUL + code. Routes to the host's REUSABLE
+         * AdbConsumerBootstrap.pair(...) — the SINGLE pairing boundary. The
+         * bridge does NOT call AdbEngine.pair directly. Response reuses T_OUT
+         * (human-readable result text) + T_EXIT (0 = success, nonzero = fail).
+         *
+         * The pairing code is a short-lived secret: it is NOT logged here
+         * (only host:port) and is discarded after the single pair call.
+         */
+        fun onPair(fd: Int, payload: ByteArray) {
+            val text = String(payload, Charsets.UTF_8)
+            val nulIdx = text.indexOf("\u0000")
+            if (nulIdx <= 0) {
+                sendFrame(fd, AdbCliProtocol.T_ERR, "adb pair: malformed payload".toByteArray(Charsets.UTF_8))
+                sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(2))
+                return
+            }
+            val endpoint = text.substring(0, nulIdx)
+            val code = text.substring(nulIdx + 1)
+            val colon = endpoint.lastIndexOf(':')
+            if (colon <= 0 || colon == endpoint.length - 1) {
+                sendFrame(fd, AdbCliProtocol.T_ERR, "adb pair: bad endpoint '$endpoint'".toByteArray(Charsets.UTF_8))
+                sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(2))
+                return
+            }
+            val host = endpoint.substring(0, colon)
+            val port = endpoint.substring(colon + 1).toIntOrNull()
+            if (port == null || port <= 0 || port > 65535) {
+                sendFrame(fd, AdbCliProtocol.T_ERR, "adb pair: bad port".toByteArray(Charsets.UTF_8))
+                sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(2))
+                return
+            }
+            android.util.Log.i(TAG, "onPair: host=$host port=$port (code redacted)")
+            val r = try {
+                execution.consumerBootstrap().pair(host, port, code)
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "onPair: bootstrap.pair threw: ${e.message}")
+                com.adb.engine.AdbPairingResultV2(
+                    success = false,
+                    outcome = com.adb.engine.AdbPairingResultV2.Outcome.FAILED,
+                    error = e.message ?: "pairing failed",
+                )
+            }
+            // Human-readable result (code is NEVER included).
+            val outText = when (r.outcome) {
+                com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
+                    "pairing succeeded (guid=${r.deviceGuid})\n"
+                com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
+                    "pairing rejected${if (r.error.isNotBlank()) ": ${r.error}" else ""}\n"
+                com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
+                    "pairing service not found\n"
+                com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
+                    "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
+                com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
+                    "pairing failed${if (r.error.isNotBlank()) ": ${r.error}" else ""}\n"
+            }
+            sendFrame(fd, AdbCliProtocol.T_OUT, outText.toByteArray(Charsets.UTF_8))
+            sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(if (r.success) 0 else 1))
+        }
+
         /** Forward CLI stdin / resize to the session. */
         fun onInteractiveData(fd: Int, type: Int, payload: ByteArray) {
             val s = sessions[fd] ?: return

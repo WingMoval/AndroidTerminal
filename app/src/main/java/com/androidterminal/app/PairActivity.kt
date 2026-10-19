@@ -3,15 +3,23 @@
 // A NORMAL Activity (NOT a floating overlay / NOT freeform / NOT split-screen).
 // The user reads the 6-digit pairing code from the SYSTEM "pair device with
 // pairing code" dialog, then enters it HERE. On submit, the app drives the
-// already-verified pairing primitive:
+// REUSABLE ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0):
 //
-//   AppRuntime.initialize -> AdbRuntime.discoverPairing -> AdbEngine.pair
+//   AppRuntime.initialize -> AppRuntime.consumerBootstrap()
+//       -> AdbConsumerBootstrap.pairDiscovered(code)
 //
-// This is a one-time developer/user provisioning input channel, NOT First-run
-// product onboarding (that is AT.FIRSTRUN-0). After pairing, the app's own
-// identity is trusted and connectAuto reaches READY without re-pairing.
+// The bootstrap is the SINGLE pairing boundary shared with the CLI `adb pair`
+// and the consumer host. PairActivity does NOT call AdbEngine.pair directly
+// (PAIR_ACTIVITY_DIRECT_ADBENGINE_PAIR = NO). It only:
+//   - shows the PAIRING_REQUIRED state,
+//   - runs discovery (auto host/port — the user only enters the 6-digit code),
+//   - handles the 0 / 1 / N endpoint cases,
+//   - triggers pairing via the bootstrap,
+//   - then connects and reports READY.
 //
 // No overlay / accessibility / magic-window / freeform code lives here.
+// The pairing CODE is a short-lived secret: it is never logged, persisted, or
+// written to long-term storage.
 
 package com.androidterminal.app
 
@@ -23,9 +31,11 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
-import com.adb.engine.AdbEngine
-import com.adb.engine.AdbRuntime
+import com.adb.engine.AdbBootstrapState
+import com.adb.engine.AdbConsumerBootstrap
+import com.adb.engine.AdbPairingResultV2
 import com.adb.engine.AdbRuntimeState
 
 class PairActivity : Activity() {
@@ -34,10 +44,12 @@ class PairActivity : Activity() {
     private lateinit var codeInput: EditText
     private lateinit var statusText: TextView
     private lateinit var pairButton: Button
+    private lateinit var bootstrap: AdbConsumerBootstrap
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppRuntime.initialize(applicationContext)
+        bootstrap = AppRuntime.consumerBootstrap()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -76,14 +88,31 @@ class PairActivity : Activity() {
             text = "配对"
         }
 
+        val scroll = ScrollView(this).apply { addView(root) }
         root.addView(title)
         root.addView(hintText)
         root.addView(codeInput)
         root.addView(statusText)
         root.addView(pairButton)
-        setContentView(root)
+        setContentView(scroll)
+
+        // Show the current consumer readiness projection (honest classification).
+        refreshStateLabel()
 
         pairButton.setOnClickListener { doPair() }
+    }
+
+    /** Reflect the consumer bootstrap state in the status area (read-only). */
+    private fun refreshStateLabel() {
+        val state = bootstrap.bootstrapState()
+        statusText.text = when (state) {
+            AdbBootstrapState.READY -> "已连接（ADB READY）"
+            AdbBootstrapState.PAIRING_REQUIRED -> "ADB 尚未完成首次配对"
+            AdbBootstrapState.USER_ACTION_REQUIRED_WD -> "请先开启：设置 → 无线调试"
+            AdbBootstrapState.ENDPOINT_NOT_FOUND -> "未发现 ADB 连接端点"
+            AdbBootstrapState.CONNECT_FAILED -> "未连接（可尝试重新配对）"
+            AdbBootstrapState.NOT_READY -> "ADB 运行时未初始化"
+        }
     }
 
     private fun doPair() {
@@ -95,35 +124,40 @@ class PairActivity : Activity() {
         pairButton.isEnabled = false
         statusText.text = "正在发现配对服务..."
         Thread {
-            val result = try {
-                // 1. Discover the pairing service (system dialog must be open).
-                val endpoints = AdbRuntime.discoverPairing(10_000)
-                if (endpoints.isEmpty()) {
-                    "FAIL: 未发现配对服务 — 请保持系统「使用配对码配对设备」弹窗前台，再重试"
-                } else {
-                    val ep = endpoints.first()
-                    val host = ep.host ?: "127.0.0.1"
-                    // 2. Pair with the app's own identity (same keyDir as connectAuto).
-                    val r = AdbEngine.pair(host, ep.port, code, AppRuntime.adbIdentityDir())
-                    if (r.success) {
-                        // 3. Auto-connect with the now-trusted identity.
-                        val diag = AppRuntime.connectAuto()
-                        if (AppRuntime.adbState() == AdbRuntimeState.READY) {
-                            "配对成功 — ADB READY (guid=${r.deviceGuid})"
-                        } else {
-                            "配对成功但连接未 READY: ${diag.code} ${diag.message}"
-                        }
+            // Pair through the REUSABLE bootstrap (single pairing boundary).
+            // pairDiscovered handles 0/1/N endpoints; the user only supplies
+            // the 6-digit code. The bootstrap (not this Activity) calls
+            // AdbEngine.pair.
+            val result = runCatching { bootstrap.pairDiscovered(code) }.getOrElse { t ->
+                AdbPairingResultV2(
+                    success = false,
+                    outcome = AdbPairingResultV2.Outcome.FAILED,
+                    error = t.message ?: "pairing threw",
+                )
+            }
+            val message = when (result.outcome) {
+                AdbPairingResultV2.Outcome.SUCCESS -> {
+                    // Pairing succeeded -> connect the now-trusted identity.
+                    val diag = AppRuntime.connectAuto()
+                    if (AppRuntime.adbState() == AdbRuntimeState.READY) {
+                        "配对成功 — ADB READY (guid=${result.deviceGuid})"
                     } else {
-                        "配对失败: ${r.error}"
+                        "配对成功但连接未 READY: ${diag.code} ${diag.message}"
                     }
                 }
-            } catch (t: Throwable) {
-                "异常: ${t.message}"
+                AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
+                    "未发现无线调试配对服务\n\n请确认：\n系统「使用配对码配对设备」窗口仍处于打开状态\n\n[点配对 重新检测]"
+                AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
+                    "发现多个配对端点，请在高级模式下手动选择 host:port"
+                AdbPairingResultV2.Outcome.REJECTED ->
+                    "配对被拒绝（配对码错误或已过期）：${result.error.ifBlank { "无详情" }}"
+                AdbPairingResultV2.Outcome.FAILED ->
+                    "配对失败：${result.error.ifBlank { "未知错误" }}"
             }
             mainHandler.post {
-                statusText.text = result
+                statusText.text = message
                 pairButton.isEnabled = true
-                if (result.startsWith("配对成功")) {
+                if (message.startsWith("配对成功")) {
                     finish()
                 }
             }
