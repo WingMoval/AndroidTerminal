@@ -24,11 +24,27 @@ Concrete Backend
 Execution Provider
 ```
 
-**V4 原因**：BREAKING_MODULE_REPARTITION + CONSUMER_BOUNDARY_PHYSICALIZATION + COMPOSITION_ROOT_REFOUNDATION + DEPENDENCY_GRAPH_CLEANUP。
+**V3 Canonical Architecture** = **PRESERVED**（AT Engine / ADB Engine / Backend 的 canonical responsibilities 不重新讨论）。
 
-**V4 不是**：rewrite / new execution engine / new ADB implementation / new PTY implementation。
+**V3 clean architecture migration** = **VALID**（V3 从 V2 迁移 verified implementation 的过程是有效的）。
 
-**V4 是**：PHYSICAL ARCHITECTURE GENERATION。
+**V4_TRIGGER** =
+POST_V3_CAPABILITY_PLACEMENT_DRIFT
++ CONSUMER_BOUNDARY_NOT_FULLY_PHYSICALIZED
++ COMMON_COMPOSITION_DUPLICATION
+
+**V4 = CANONICAL_ARCHITECTURE_NORMALIZATION + PHYSICAL_BOUNDARY_CLOSURE**
+
+**V4 不是**：
+- NEW AT ARCHITECTURE
+- rewrite / new execution engine / new ADB implementation / new PTY implementation
+- 重新讨论 AT Engine / ADB Engine / Backend 的 canonical responsibilities
+
+**V4 是**：
+- 物理化 V3 已定义的 canonical architecture
+- 修正 post-V3 capability placement drift
+- 闭合 consumer boundary（Gradle module / dependency direction / compile-time enforcement）
+- 消除 common composition duplication
 
 ---
 
@@ -81,11 +97,14 @@ Layer 2: AT Engine Public API
   └── :at-engine-api (public consumer contract)
 
 Layer 3: AT Engine Implementation
-  └── :at-engine (engine implementation + backend SPI)
+  └── :at-engine (engine implementation)
+
+Layer 3/4 implementation contract:
+  └── :at-engine-spi (backend SPI — contracts/interfaces ONLY)
 
 Layer 4: Backend Adapter
-  ├── :at-backend-local (Local backend)
-  └── :at-backend-adb (ADB backend)
+  ├── :at-backend-local (Local backend — concrete implementations)
+  └── :at-backend-adb (ADB backend — concrete implementations)
 
 Layer 5: Execution Provider
   ├── Local PTY (/system/bin/sh -i)
@@ -94,6 +113,11 @@ Layer 5: Execution Provider
 Android Composition Layer (assembly root):
   └── :at-composition-android (Context / identity / AdbRuntime init / backend construction)
 ```
+
+**关键区分**：
+- `:at-engine-spi` = **backend SPI**（contracts/interfaces ONLY，不包含 concrete implementations）
+- `:at-backend-local` / `:at-backend-adb` = **concrete backend implementations**（实现 `:at-engine-spi` 的 interfaces）
+- `:at-engine` = **engine implementation**（execution orchestration / session implementation，不依赖 concrete backends）
 
 ---
 

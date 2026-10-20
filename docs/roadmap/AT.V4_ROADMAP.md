@@ -36,26 +36,30 @@
 
 **Status**: OPEN
 
+**第一目标**：**PHYSICAL EXTRACTION OF EXISTING VERIFIED CONTRACTS**（只移动 V3 已存在的 verified contracts，不设计新 public semantic API）。
+
 **Scope**:
 - 创建 `:at-engine-api` module（pure contract / facade）
-- 创建 `:at-engine-spi` module（backend SPI）
-- 移动 public types 到 `:at-engine-api`：
+- 创建 `:at-engine-spi` module（backend SPI — **contracts/interfaces ONLY**）
+- 移动 V3 已存在的 public execution/session contract 到 `:at-engine-api`：
   - `ATEngine`（facade）
   - `ATExecutionRequest` / `ATExecutionResult` / `ATExecutionOutcome`
   - `ATTerminalSession` / `ATSessionEvent` / `ATSessionState`
   - `Launch` / `ATOpenSessionResult`
-  - `ATProviderControl` / `ATStatus` / `ATPairingResult` / `ATPairingDiscovery` / `ATDiagnostic`
-- 移动 backend SPI 到 `:at-engine-spi`：
+- 移动 V3 已存在的 backend SPI 到 `:at-engine-spi`：
   - `ATOneShotBackend`
   - `ATPersistentBackend`
+- **不得在 V4-1 实现**（PROVISIONAL / DESIGN_REQUIRED）：
+  - `ATProviderControl` / `ATStatus` / `ATPairingResult` / `ATPairingDiscovery` / `ATDiagnostic`
+  - prepare/status/control-plane 新接口
 - 更新 `settings.gradle.kts`（新增 `:at-engine-api` / `:at-engine-spi`）
 - 更新 `:at-engine` / `:at-backend-local` / `:at-backend-adb` / `:at-cli` 的 `build.gradle.kts`（依赖新 module）
 - 验证：`:at-engine-api` 不包含 `:adb-engine` / `:at-backend-*` types
-- 验证：`:at-engine-spi` 不包含 Android Context / ADB internals
+- 验证：`:at-engine-spi` 不包含 Android Context / ADB internals / concrete implementations
 
 **Deliverables**:
 - `:at-engine-api` module（Kotlin source + build.gradle.kts）
-- `:at-engine-spi` module（Kotlin source + build.gradle.kts）
+- `:at-engine-spi` module（Kotlin source + build.gradle.kts，**contracts/interfaces ONLY**）
 - 更新后的 `:at-engine` / `:at-backend-local` / `:at-backend-adb` / `:at-cli`（依赖新 module）
 - 更新后的 `settings.gradle.kts`
 
@@ -63,7 +67,8 @@
 - `:at-engine-api` / `:at-engine-spi` 可以正常构建
 - `:at-engine` / `:at-backend-local` / `:at-backend-adb` / `:at-cli` 可以正常构建（依赖新 module）
 - `:at-engine-api` 不包含 forbidden types
-- `:at-engine-spi` 不包含 Android Context / ADB internals
+- `:at-engine-spi` 不包含 Android Context / ADB internals / concrete implementations
+- **V4-1 不引入新 public semantic API**（只物理迁移 existing verified contracts）
 
 ---
 
@@ -102,19 +107,22 @@
 **Status**: OPEN
 
 **Scope**:
-- 迁移 `LocalOneShotBackend` / `LocalPersistentBackend` 到 `:at-engine-spi`（或保持 `:at-backend-local`，但依赖 `:at-engine-spi`）
-- 迁移 `AdbOneShotBackend` / `AdbPersistentBackend` 到 `:at-engine-spi`（或保持 `:at-backend-adb`，但依赖 `:at-engine-spi`）
-- 验证：backend implementations 实现 `:at-engine-spi` SPI
+- 验证 `LocalOneShotBackend` / `LocalPersistentBackend` 实现 `:at-engine-spi` 的 `ATOneShotBackend` / `ATPersistentBackend` interfaces
+- 验证 `AdbOneShotBackend` / `AdbPersistentBackend` 实现 `:at-engine-spi` 的 `ATOneShotBackend` / `ATPersistentBackend` interfaces
+- **Concrete backend implementations 留在原 module**：
+  - `LocalOneShotBackend` / `LocalPersistentBackend` / `LocalPtySession` → **remain `:at-backend-local`**
+  - `AdbOneShotBackend` / `AdbPersistentBackend` → **remain `:at-backend-adb`**
 - 验证：`:at-engine` 不依赖 concrete backend
 - 验证：`:at-composition-android` 可以注入 backend instances 到 `:at-engine`
 
 **Deliverables**:
-- 更新后的 `:at-backend-local` / `:at-backend-adb`（依赖 `:at-engine-spi`）
+- 更新后的 `:at-backend-local` / `:at-backend-adb`（依赖 `:at-engine-spi`，实现 interfaces）
 - 更新后的 `:at-engine`（不依赖 concrete backend）
 - 更新后的 `:at-composition-android`（注入 backend instances）
 
 **Gate**:
-- Backend implementations 实现 `:at-engine-spi` SPI
+- Backend implementations 实现 `:at-engine-spi` 的 interfaces
+- **Concrete backend implementations 留在 `:at-backend-local` / `:at-backend-adb`**（不迁入 `:at-engine-spi`）
 - `:at-engine` 不依赖 concrete backend
 - `:at-composition-android` 可以注入 backend instances
 - One-shot / persistent 命令可以正常执行（Local / ADB）

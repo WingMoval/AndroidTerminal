@@ -8,15 +8,23 @@
 
 ## 1. Why V4 Exists
 
-V3 execution architecture 已验证完成（one-shot / persistent / Local / ADB / CLI / pairing / recovery 全部 PASS），但 **physical architecture 存在结构性问题**：
+V3 **canonical architecture** 已验证完成（AT Engine / ADB Engine / Backend 的 responsibilities / ownership / semantics 全部 PASS），但 **post-V3 capability placement** 存在 drift：
 
-1. **CURRENT_PHYSICAL_LAYER2 = PARTIAL**：Consumer 可以直接 import `AdbRuntime` / `AdbConsumerBootstrap` / `AdbEngine` / backend classes，没有 compile-time boundary。
-2. **CONSUMER_CURRENTLY_CONSTRUCTS_BACKENDS = YES**：Consumer 自己构造 `ATEngine(oneShot = AdbOneShotBackend(...), persistent = AdbPersistentBackend(...))`，需要理解 ADB lifecycle / backend construction。
-3. **CONSUMER_CURRENTLY_PROPAGATES_IDENTITYDIR = YES**：Consumer 在多个地方传播 `identityDir`（`AdbRuntime.connectAuto` / `AdbConsumerBootstrap` / `AdbConnectionRequest` / CLI execution），容易出错。
-4. **AT_ENGINE_MODULE_ROLE = C. API + implementation mixed module**：`:at-engine` 同时包含 public contract types + backend-facing abstractions，语义不清。
-5. **APP_RUNTIME_VS_CONSUMER_HOST_DUPLICATION_MATRIX = HIGH**：`AppRuntime` 与 `AtCliConsumerHost` ~70% 逻辑重复（`AdbRuntime.initialize` / `identityDir` / `localEngine()` / `adbEngine()` / `connectAuto()` / `consumerBootstrap()`）。
+1. **POST_V3_CAPABILITY_PLACEMENT_DRIFT**：Consumer 可以直接 import `AdbRuntime` / `AdbConsumerBootstrap` / `AdbEngine` / backend classes，没有 compile-time boundary。
+2. **CONSUMER_BOUNDARY_NOT_FULLY_PHYSICALIZED**：Consumer 自己构造 `ATEngine(oneShot = AdbOneShotBackend(...), persistent = AdbPersistentBackend(...))`，需要理解 ADB lifecycle / backend construction。
+3. **COMMON_COMPOSITION_DUPLICATION**：`AppRuntime` 与 `AtCliConsumerHost` ~70% 逻辑重复（`AdbRuntime.initialize` / `identityDir` / `localEngine()` / `adbEngine()` / `connectAuto()` / `consumerBootstrap()`）。
 
-**V4 目标**：在不改变 V3 已验证能力语义的前提下，重新建立正确的物理依赖结构，使 Consumer 不再需要理解 ADB internals / backend construction / identity propagation。
+**V4 目标**：在不改变 V3 canonical architecture（AT Engine / ADB Engine / Backend 的 responsibilities / ownership / semantics）的前提下，物理化 consumer boundary + 消除 composition duplication + 建立正确的 dependency graph。
+
+**V4 不重新讨论**：
+- AT Engine / ADB Engine / Backend 的 canonical responsibilities
+- AdbRuntime UNIQUE lifecycle ownership
+- AdbRecoveryCoordinator UNIQUE recovery ownership
+- AdbEngine.pair pairing primitive
+- Local / ADB / CLI semantics
+- PTY semantics
+- Pairing semantics
+- Recovery semantics
 
 ---
 
@@ -198,16 +206,20 @@ V3_REPO            = D:\codebank\AndCode\AndroidTerminal-V3
 
 | Module | Responsibility | Layer |
 |---|---|---|
-| `:at-engine-api` | Public consumer contract（execution request/result / session contract / readiness / pairing / diagnostics） | Layer-2 |
-| `:at-engine-spi` | Backend implementation contract（`ATOneShotBackend` / `ATPersistentBackend` / future provider control SPI） | Layer-3/4 |
-| `:at-engine` | Engine implementation（execution orchestration / session implementation / backend wiring） | Layer-3 |
-| `:at-backend-local` | Local backend implementation（`LocalOneShotBackend` / `LocalPersistentBackend` / `LocalPtySession`） | Layer-4 |
-| `:at-backend-adb` | ADB backend implementation（`AdbOneShotBackend` / `AdbPersistentBackend`） | Layer-4 |
+| `:at-engine-api` | Public consumer contract（execution request/result / session contract） | Layer-2 |
+| `:at-engine-spi` | Backend SPI（**contracts/interfaces ONLY**：`ATOneShotBackend` / `ATPersistentBackend` / future backend/provider SPI） | Layer-3/4 implementation contract |
+| `:at-engine` | Engine implementation（execution orchestration / session implementation，**不依赖 concrete backends**） | Layer-3 |
+| `:at-backend-local` | Local backend **concrete implementations**（`LocalOneShotBackend` / `LocalPersistentBackend` / `LocalPtySession`，实现 `:at-engine-spi`） | Layer-4 |
+| `:at-backend-adb` | ADB backend **concrete implementations**（`AdbOneShotBackend` / `AdbPersistentBackend`，实现 `:at-engine-spi`） | Layer-4 |
 | `:adb-engine` | ADB provider engine（`AdbEngine` / `AdbRuntime` / `AdbConsumerBootstrap` / `AdbRecoveryCoordinator`） | Layer-5 |
 | `:at-composition-android` | Android composition root（Context / identity / AdbRuntime init / backend construction / engine construction） | Assembly |
 | `:at-cli` | CLI frontend（shell-visible `adb` / same-UID UDS bridge / Local shell `adb` function bootstrap） | Frontend |
 | `:app` | AT Product App（Human UI / Product logic） | Layer-1 |
 | `:at-cli-consumer-host` | Reference consumer（TEST / VALIDATION ONLY） | Layer-1 |
+
+**关键区分**：
+- `:at-engine-spi` = **contracts/interfaces ONLY**（不包含 concrete implementations）
+- `:at-backend-local` / `:at-backend-adb` = **concrete implementations**（实现 `:at-engine-spi` 的 interfaces）
 
 ---
 
@@ -215,15 +227,17 @@ V3_REPO            = D:\codebank\AndCode\AndroidTerminal-V3
 
 **`:at-engine-api`** 作为 Layer-2 public consumer contract。
 
-**普通 Consumer 只应该看到**：
-- Execution request / result
-- Terminal session contract
-- Session state / events
-- Execution target / intention
-- Readiness / status
+**普通 Consumer 只应该看到**（V3 已验证的 existing public contract）：
+- Execution request / result（`ATExecutionRequest` / `ATExecutionResult` / `ATExecutionOutcome`）
+- Terminal session contract（`ATTerminalSession` / `ATSessionEvent` / `ATSessionState`）
+- Execution target / intention（`Launch` / `ATOpenSessionResult`）
+
+**PROVISIONAL / DESIGN_REQUIRED**（V3 无对应已验证 public contract，V4-1 不实现）：
+- Readiness / status（`ATStatus`）
 - Structured user-action-required
-- Bootstrap / pairing semantic result
-- Diagnostic semantic projection
+- Bootstrap / pairing semantic result（`ATPairingResult` / `ATPairingDiscovery`）
+- Diagnostic semantic projection（`ATDiagnostic`）
+- `ATProviderControl` / prepare/status/control-plane 新接口
 
 **不得看到**：
 - `AdbRuntime` / `AdbEngine` / `AdbConsumerBootstrap`
