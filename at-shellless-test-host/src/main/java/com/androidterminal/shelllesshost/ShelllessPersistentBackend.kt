@@ -1,4 +1,4 @@
-// AT.TERM-0 — shellless persistent backend (VALIDATION ONLY).
+﻿// AT.TERM-0 鈥?shellless persistent backend (VALIDATION ONLY).
 //
 // Implements the AT Engine ATPersistentBackend contract backed by a REAL
 // Android PTY whose child is a NON-shell interactive program (the in-process
@@ -18,6 +18,7 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 
 /** Shared validation constants (VALIDATION ONLY). */
 internal object Sl {
@@ -28,7 +29,7 @@ internal object Sl {
 
 class ShelllessPersistentBackend : ATPersistentBackend {
 
-    override fun openSession(launch: ATPersistentBackend.Launch): ATOpenSessionResult {
+    override fun openSession(launch: ATSessionLaunch): ATOpenSessionResult {
         // Opaque launch selector: only "probe" is valid. Never sh -c / exec.
         val cmd = launch.command.trim()
         if (cmd != Sl.PROBE_COMMAND && cmd != "") {
@@ -188,3 +189,5 @@ internal class ShelllessSession(
         listener?.invoke(ATSessionEvent.Closed)
     }
 }
+
+

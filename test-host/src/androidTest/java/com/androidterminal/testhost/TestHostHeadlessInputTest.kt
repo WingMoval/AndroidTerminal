@@ -1,11 +1,11 @@
-// Test Host — headless input regression (AT.CONTRACT-0.5 T2).
+﻿// Test Host 鈥?headless input regression (AT.CONTRACT-0.5 T2).
 //
 // Independent consumer: no Human UI. Proves the AT Engine public boundary can
 // be driven programmatically (create session, write bytes, capture output)
 // exactly as the headless path is expected to behave.
 //
-// Uses the SAME contract as Human UI: AT Engine → LocalPersistentBackend →
-// Local PTY → /system/bin/sh. No LocalPtyNative/JNI access.
+// Uses the SAME contract as Human UI: AT Engine 鈫?LocalPersistentBackend 鈫?
+// Local PTY 鈫?/system/bin/sh. No LocalPtyNative/JNI access.
 
 package com.androidterminal.testhost
 
@@ -17,6 +17,8 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,9 +39,9 @@ class TestHostHeadlessInputTest {
     @Test
     fun headlessWriteAndCapture() {
         val output = StringBuilder()
-        val engine = ATEngine(oneShot = null, persistent = LocalPersistentBackend())
+        val engine = DefaultATEngine(oneShot = null, persistent = LocalPersistentBackend())
         val r = engine.openSession(
-            ATPersistentBackend.Launch(command = "/system/bin/sh", initialRows = 24, initialCols = 80),
+            ATSessionLaunch(command = "/system/bin/sh", initialRows = 24, initialCols = 80),
         )
         assertTrue("open should succeed, got $r", r is ATOpenSessionResult.Success)
         val session: ATTerminalSession = (r as ATOpenSessionResult.Success).session
@@ -58,3 +60,6 @@ class TestHostHeadlessInputTest {
         assertEquals(ATSessionState.CLOSED, session.state)
     }
 }
+
+
+

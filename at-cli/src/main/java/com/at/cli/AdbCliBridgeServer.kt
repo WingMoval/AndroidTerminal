@@ -1,11 +1,11 @@
-// AT.CLI-CONSUMER-0 — Reusable CLI Bridge server (same-UID UDS, host-agnostic).
+﻿// AT.CLI-CONSUMER-0 鈥?Reusable CLI Bridge server (same-UID UDS, host-agnostic).
 //
 // Thin Kotlin wrapper over a native UDS server (cli_bridge_server.cpp) that
 // binds in the host's private files dir, verifies peer UID == host UID
 // (SO_PEERCRED), and speaks the length-prefixed CLI Bridge protocol v1.
 //
 // REUSABLE: the [ATCliBridgeHandler] delegates to a host-provided
-// [ATCliExecution] — NOT to any AndroidTerminal :app concrete class. The host
+// [ATCliExecution] 鈥?NOT to any AndroidTerminal :app concrete class. The host
 // (product app / test consumer host / future AG adapter host) wires its OWN
 // shared ATEngine + AdbRuntime into the bridge. There is NEVER a second
 // AdbRuntime / AT Engine / identity: the bridge is a thin frontend over the
@@ -16,8 +16,8 @@
 //
 // Lifecycle status (checking / connected / user-action-required) is surfaced
 // through the host's [ATCliExecution.ensureReady] onStatusLine callback:
-//   - :app → Host/SYSTEM terminal projection to the bound Local session.
-//   - consumer host → T_STATUS fallback (buffered to the CLI client stderr).
+//   - :app 鈫?Host/SYSTEM terminal projection to the bound Local session.
+//   - consumer host 鈫?T_STATUS fallback (buffered to the CLI client stderr).
 //
 // Present in BOTH debug and release builds (NOT gated by BuildConfig.DEBUG).
 // Independent from any AT.DEBUG-0 DebugBridge (no port/protocol reuse).
@@ -119,7 +119,7 @@ class AdbCliBridgeServer(
          * The host emits intermediate status lines via onStatusLine; this bridge
          * forwards each line to the bound client as a T_STATUS frame (the
          * non-Human / short-lived CLI client path). The host's ensureReady is
-         * the SINGLE readiness owner — no CLI-owned polling loop.
+         * the SINGLE readiness owner 鈥?no CLI-owned polling loop.
          */
         private fun ensureReady(fd: Int): Boolean {
             val sid = fdSession[fd] ?: 0
@@ -179,7 +179,7 @@ class AdbCliBridgeServer(
             if (!ensureReady(fd)) return false
             val result = try {
                 execution.adbEngine().openSession(
-                    com.at.engine.ATPersistentBackend.Launch(command = "", initialRows = rows, initialCols = cols)
+                    com.at.engine.ATSessionLaunch(command = "", initialRows = rows, initialCols = cols)
                 )
             } catch (e: Exception) {
                 com.at.engine.ATOpenSessionResult.Failure("openSession: ${e.message}")
@@ -193,7 +193,7 @@ class AdbCliBridgeServer(
                     is com.at.engine.ATSessionEvent.Data -> sendFrame(fd, AdbCliProtocol.T_OUT, ev.bytes)
                     is com.at.engine.ATSessionEvent.Exited -> sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(ev.exitCode))
                     // The ADB backend signals a natural remote-shell exit as Eof
-                    // (stream end) — the shell-v2 facade does not carry a shell
+                    // (stream end) 鈥?the shell-v2 facade does not carry a shell
                     // exit code (INTERACTIVE_EXIT_CODE = NOT_EXPOSED). Map
                     // Eof -> T_EXIT so the CLI frontend closes the relay.
                     is com.at.engine.ATSessionEvent.Eof -> sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(0))
@@ -210,7 +210,7 @@ class AdbCliBridgeServer(
          * AT.CONSUMER-BOOTSTRAP-0: `adb pair <host>:<port> <code>` (T_PAIR).
          *
          * Payload = "host:port" + NUL + code. Routes to the host's REUSABLE
-         * AdbConsumerBootstrap.pair(...) — the SINGLE pairing boundary. The
+         * AdbConsumerBootstrap.pair(...) 鈥?the SINGLE pairing boundary. The
          * bridge does NOT call AdbEngine.pair directly. Response reuses T_OUT
          * (human-readable result text) + T_EXIT (0 = success, nonzero = fail).
          *
@@ -292,7 +292,7 @@ class AdbCliBridgeServer(
          * Host-layer resize relay. When the host resizes a Local session that is
          * currently hosting an active `adb shell` interactive, forward the new
          * rows/cols to the inner Remote PTY. No-op if no active interactive.
-         * This is host/CLI composition — the AT Engine never learns about
+         * This is host/CLI composition 鈥?the AT Engine never learns about
          * "nested adb shell".
          */
         fun relayResize(sessionId: Int, rows: Int, cols: Int) {
@@ -331,3 +331,4 @@ private fun ByteArray.le32At(offset: Int): Int =
     ((this[offset + 1].toInt() and 0xff) shl 8) or
     ((this[offset + 2].toInt() and 0xff) shl 16) or
     ((this[offset + 3].toInt() and 0xff) shl 24)
+

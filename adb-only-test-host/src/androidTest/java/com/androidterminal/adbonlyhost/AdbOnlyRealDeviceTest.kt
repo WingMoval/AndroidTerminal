@@ -1,4 +1,4 @@
-// ADB-only Test Host — real-device G-gate harness (AT.V3-2.3 §57).
+﻿// ADB-only Test Host 鈥?real-device G-gate harness (AT.V3-2.3 搂57).
 //
 // Runs on the real device (stable Wi-Fi / hotspot, Wireless Debugging ON,
 // trusted adb identity available). Uses the ADB-only consumer composition
@@ -41,6 +41,7 @@ import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -96,7 +97,7 @@ class AdbOnlyRealDeviceTest {
             wd == AdbWirelessDebuggingState.ENABLED || wd == AdbWirelessDebuggingState.UNKNOWN)
 
         // G3: connectAuto WITHOUT explicit endpoint. The consumer does NOT know
-        // the port — discovery finds it.
+        // the port 鈥?discovery finds it.
         val diag = host.connectAuto(keyDir)
         assertEquals("connectAuto should be READY, got ${host.readinessState()} ($diag)",
             AdbRuntimeState.READY, host.readinessState())
@@ -145,7 +146,7 @@ class AdbOnlyRealDeviceTest {
         val eng = AdbOnlyHost.engine()
 
         // G8: one persistent session.
-        val sA = (eng.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
+        val sA = (eng.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
         val capA = Cap(); sA.setListener(capA)
         sA.write("echo PERSIST_OK\n".toByteArray())
         await(3000) { capA.out.contains("PERSIST_OK") }
@@ -154,8 +155,8 @@ class AdbOnlyRealDeviceTest {
         sA.close(true)
 
         // G9: multi-session (B + C) on the SAME connection.
-        val sB = (eng.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
-        val sC = (eng.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
+        val sB = (eng.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
+        val sC = (eng.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80)) as ATOpenSessionResult.Success).session
         val capB = Cap(); sB.setListener(capB)
         val capC = Cap(); sC.setListener(capC)
         sB.write("echo SB\n".toByteArray())
@@ -295,7 +296,7 @@ class AdbOnlyRealDeviceTest {
         }
 
         // Open a persistent session after the (possibly rotated) recovery.
-        val s = (eng.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80))
+        val s = (eng.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80))
             as ATOpenSessionResult.Success).session
         val cap = Cap(); s.setListener(cap)
         s.write("echo PERSIST_RECOVERED\n".toByteArray())
@@ -327,3 +328,5 @@ class AdbOnlyRealDeviceTest {
         const val CYCLE_WINDOW_MS = 10_000L
     }
 }
+
+

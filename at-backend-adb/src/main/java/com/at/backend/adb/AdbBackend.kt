@@ -1,4 +1,4 @@
-// ADB Backend — real AT Engine execution provider over the ADB Engine.
+﻿// ADB Backend 鈥?real AT Engine execution provider over the ADB Engine.
 //
 // AT.V3-2. Implements the AT Engine backend contracts using the V3 ADB Engine
 // (already independently verified in AT.V3-1). This is a thin Adapter:
@@ -25,6 +25,7 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 import java.nio.charset.StandardCharsets
 
 /**
@@ -47,7 +48,7 @@ class AdbOneShotBackend(
      * AT.V3-2.3 (operation-driven recovery): in the AUTO lifecycle path the
      * connection is established by [AdbRuntime.connectAuto] (consumer never
      * knows the port). The backend's connection request then carries a
-     * placeholder port (0) meaning "reuse the lifecycle connection only" —
+     * placeholder port (0) meaning "reuse the lifecycle connection only" 鈥?
      * NEVER eagerly connect to port 0. If the connection is not ONLINE, return
      * false and let the operation fail with TRANSPORT_ERROR, after which
      * [AdbRuntime.onOperationResult] runs bounded connection recovery
@@ -92,7 +93,7 @@ class AdbOneShotBackend(
         // AUTO path (port == 0) or online explicit path: run the operation. On a
         // dead connection executeShell returns TRANSPORT_ERROR, after which we
         // signal AdbRuntime for bounded connection recovery. The ORIGINAL
-        // failure below is returned unchanged — no transparent command replay.
+        // failure below is returned unchanged 鈥?no transparent command replay.
         val r = AdbEngine.executeShell(request.command, request.timeoutMs)
         if (r.status != AdbShellStatus.COMPLETED) {
             AdbRuntime.onOperationResult(transportLost = true)
@@ -119,7 +120,7 @@ class AdbPersistentBackend(
         return false
     }
 
-    override fun openSession(launch: ATPersistentBackend.Launch): ATOpenSessionResult {
+    override fun openSession(launch: ATSessionLaunch): ATOpenSessionResult {
         val connected = ensureConnected()
         if (!connected && connection.port > 0) {
             return ATOpenSessionResult.Failure("ADB connect failed for ${connection.host}:${connection.port}")
@@ -152,7 +153,7 @@ class AdbPersistentBackend(
  *
  * State model (matching Local):
  *   open -> ACTIVE
- *   read()==-1 (stream end) -> EXITED (or EOF) — the Kotlin ADB facade does not
+ *   read()==-1 (stream end) -> EXITED (or EOF) 鈥?the Kotlin ADB facade does not
  *                              expose the shell-v2 exit frame, so a stream end
  *                              with an ACTIVE session is treated as EXITED.
  *   close() -> CLOSED
@@ -234,3 +235,4 @@ class AdbTerminalSession internal constructor(
         readerThread = null
     }
 }
+

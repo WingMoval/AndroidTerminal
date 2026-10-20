@@ -1,4 +1,4 @@
-// AndroidTerminal V3 — Programmatic ADB Consumer validation (AT.HUMAN-ADB-0).
+﻿// AndroidTerminal V3 鈥?Programmatic ADB Consumer validation (AT.HUMAN-ADB-0).
 //
 // Drives the FULL Human ADB scenario through the RESERVED programmatic path:
 //   AppRuntime (composition root) -> ATEngine -> AdbPersistentBackend -> adbd
@@ -6,9 +6,9 @@
 // NO UI / NO IME / NO uiautomator / NO screen coordinates. Command results come
 // from ATTerminalSession output/events. This is the "Debug consumer" of the one
 // common AT consumer path, exercising the same ATEngine + backend semantics the
-// Human UI uses — proving the programmatic path is a first-class consumer.
+// Human UI uses 鈥?proving the programmatic path is a first-class consumer.
 //
-// Covers §24-§33: principal, cwd, env, Ctrl-C, resize, multi-session, isolation,
+// Covers 搂24-搂33: principal, cwd, env, Ctrl-C, resize, multi-session, isolation,
 // inactive buffering, close isolation, Local+ADB coexistence.
 
 package com.androidterminal.app
@@ -21,6 +21,7 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,7 +33,7 @@ class ProgrammaticAdbConsumerTest {
 
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    /** Thin adapter over ATEngine — the programmatic consumer. No Android UI. */
+    /** Thin adapter over ATEngine 鈥?the programmatic consumer. No Android UI. */
     private class Consumer {
         val events = ConcurrentLinkedQueue<ATSessionEvent>()
         private val output = StringBuilder()
@@ -48,7 +49,7 @@ class ProgrammaticAdbConsumerTest {
 
         fun open(engine: com.at.engine.ATEngine, command: String, rows: Int = 24, cols: Int = 80): Boolean {
             val r = engine.openSession(
-                ATPersistentBackend.Launch(command = command, initialRows = rows, initialCols = cols),
+                ATSessionLaunch(command = command, initialRows = rows, initialCols = cols),
             )
             return when (r) {
                 is ATOpenSessionResult.Success -> {
@@ -83,7 +84,7 @@ class ProgrammaticAdbConsumerTest {
         return AppRuntime.adbState() == AdbRuntimeState.READY
     }
 
-    // §24 principal: id -> uid=2000(shell)
+    // 搂24 principal: id -> uid=2000(shell)
     @Test
     fun principalUid2000() {
         assertTrue("ADB READY", ready())
@@ -95,7 +96,7 @@ class ProgrammaticAdbConsumerTest {
         c.close()
     }
 
-    // §25 persistent cwd
+    // 搂25 persistent cwd
     @Test
     fun persistentCwd() {
         assertTrue("ADB READY", ready())
@@ -109,7 +110,7 @@ class ProgrammaticAdbConsumerTest {
         c.close()
     }
 
-    // §26 persistent env
+    // 搂26 persistent env
     @Test
     fun persistentEnv() {
         assertTrue("ADB READY", ready())
@@ -123,7 +124,7 @@ class ProgrammaticAdbConsumerTest {
         c.close()
     }
 
-    // §28 Ctrl-C
+    // 搂28 Ctrl-C
     @Test
     fun ctrlC() {
         assertTrue("ADB READY", ready())
@@ -140,7 +141,7 @@ class ProgrammaticAdbConsumerTest {
         c.close()
     }
 
-    // §29 resize isolation
+    // 搂29 resize isolation
     @Test
     fun resizeIsolation() {
         assertTrue("ADB READY", ready())
@@ -160,7 +161,7 @@ class ProgrammaticAdbConsumerTest {
         c2.close()
     }
 
-    // §30 multi-session + §31 inactive buffering
+    // 搂30 multi-session + 搂31 inactive buffering
     @Test
     fun multiSessionIsolation() {
         assertTrue("ADB READY", ready())
@@ -180,7 +181,7 @@ class ProgrammaticAdbConsumerTest {
         b.close()
     }
 
-    // §33 Local + ADB coexistence
+    // 搂33 Local + ADB coexistence
     @Test
     fun localAdbCoexistence() {
         assertTrue("ADB READY", ready())
@@ -203,3 +204,5 @@ class ProgrammaticAdbConsumerTest {
         adb.close()
     }
 }
+
+

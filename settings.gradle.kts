@@ -31,7 +31,9 @@ dependencyResolutionManagement {
 rootProject.name = "AndroidTerminal"
 
 include(":adb-engine")
-include(":at-engine")
+include(":at-engine-api")  // V4-1: Public consumer contract (Layer-2)
+include(":at-engine-spi")  // V4-1: Backend SPI (Layer-3/4 implementation contract)
+include(":at-engine")      // V4-1: Engine implementation (Layer-3)
 include(":at-backend-local")
 include(":at-backend-adb")
 include(":app")

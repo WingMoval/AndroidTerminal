@@ -1,4 +1,4 @@
-// AT Engine — contract semantic unit tests (AT.CONTRACT-0).
+﻿// AT Engine 鈥?contract semantic unit tests (AT.CONTRACT-0).
 //
 // These test the CONTRACT SEMANTICS only (no runtime): result-channel
 // separation, exit-vs-failure distinction, session lifecycle vocabulary,
@@ -44,10 +44,10 @@ class ATExecutionContractTest {
 
     @Test
     fun engineWithoutBackendReturnsUnsupported() {
-        val engine = ATEngine.empty()
+        val engine = com.at.engine.impl.DefaultATEngine(null, null)
         val r = engine.execute(ATExecutionRequest(command = "id"))
         assertEquals(ATExecutionOutcome.UNSUPPORTED, r.outcome)
-        val s = engine.openSession(ATPersistentBackend.Launch(command = "/system/bin/sh"))
+        val s = engine.openSession(ATSessionLaunch(command = "/system/bin/sh"))
         assertTrue(s is ATOpenSessionResult.Failure)
     }
 }

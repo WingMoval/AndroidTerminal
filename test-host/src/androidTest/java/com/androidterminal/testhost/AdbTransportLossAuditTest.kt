@@ -1,4 +1,4 @@
-// Test Host — AT.V3-3 ADB transport-loss audit (run ONLY with host-side
+﻿// Test Host 鈥?AT.V3-3 ADB transport-loss audit (run ONLY with host-side
 // orchestration).
 //
 // Scenario:
@@ -28,6 +28,8 @@ import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -72,11 +74,11 @@ class AdbTransportLossAuditTest {
     @Test(timeout = 240_000)
     fun t1_adbTransportLossSessionSignal() {
         assertTrue("connect", AdbEngine.connect(host, port, keyDir))
-        val engine = com.at.engine.ATEngine(
+        val engine = com.at.engine.DefaultATEngine(
             AdbOneShotBackend(AdbConnectionRequest(host, port, keyDir)),
             AdbPersistentBackend(AdbConnectionRequest(host, port, keyDir)),
         )
-        val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r = engine.openSession(ATSessionLaunch(command = ""))
         assertTrue("open session", r is ATOpenSessionResult.Success)
         val s = (r as ATOpenSessionResult.Success).session
         val cap = Cap()
@@ -122,3 +124,6 @@ class AdbTransportLossAuditTest {
         )
     }
 }
+
+
+

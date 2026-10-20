@@ -290,8 +290,8 @@ Android Composition Layer (assembly root):
 
 | Gap | Status |
 |---|---|
-| `:at-engine-api` module creation | OPEN（V4-1） |
-| `:at-engine-spi` module creation | OPEN（V4-1） |
+| `:at-engine-api` module creation | COMPLETED（V4-1） |
+| `:at-engine-spi` module creation | COMPLETED（V4-1） |
 | `:at-composition-android` module creation | OPEN（V4-2） |
 | Backend SPI implementation migration | OPEN（V4-3） |
 | CLI / Product App migration | OPEN（V4-4） |
@@ -302,7 +302,9 @@ Android Composition Layer (assembly root):
 
 ## P. Next Task
 
-**AT.V4-1**：公共 API / SPI 骨架（创建 `:at-engine-api` + `:at-engine-spi` module，移动 public types）。
+**AT.V4-1**：COMPLETED — 公共 API / SPI 骨架（创建 `:at-engine-api` + `:at-engine-spi` module，移动 public types）。
+
+**AT.V4-2**：OPEN — 创建 `:at-composition-android`（composition root）。
 
 **NEXT_OPEN_AUTHORIZED = NO**（等待 Controller Review）。
 

@@ -37,6 +37,9 @@ android {
 
 dependencies {
     // Test Host consumes the AT Engine public boundary + backends.
+    // V4-1: TRANSITIONAL_DIRECT_DEPENDENCIES (will be removed in AT.V4-4)
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))

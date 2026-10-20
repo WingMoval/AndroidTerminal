@@ -34,6 +34,8 @@ android {
 
 dependencies {
     // ADB Backend implements AT Engine contracts and consumes ADB Engine.
-    implementation(project(":at-engine"))
+    // V4-1: ADB backend depends on public API + backend SPI + ADB engine
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":adb-engine"))
 }

@@ -51,7 +51,9 @@ android {
 
 dependencies {
     // Local Backend implements AT Engine backend contracts.
-    implementation(project(":at-engine"))
+    // V4-1: Local backend depends on public API + backend SPI (NOT concrete engine)
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
 
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")

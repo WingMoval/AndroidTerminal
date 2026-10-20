@@ -1,4 +1,4 @@
-// :at-cli-consumer-host — consumer composition root (AT.CLI-CONSUMER-0).
+﻿// :at-cli-consumer-host 鈥?consumer composition root (AT.CLI-CONSUMER-0).
 //
 // TEST / VALIDATION ONLY. A NON-AndroidTerminal consumer that wires:
 //   - its OWN AdbRuntime (identity = filesDir/at-cli-identity, self-generated);
@@ -29,6 +29,7 @@ import com.at.cli.AdbCliBridgeServer
 import com.at.cli.ATCliExecution
 import com.at.cli.LocalCliBootstrap
 import com.at.engine.ATEngine
+import com.at.engine.impl.DefaultATEngine
 import java.io.File
 
 /**
@@ -97,13 +98,13 @@ object AtCliConsumerHost {
     fun cliBootstrap(): LocalCliBootstrap = LocalCliBootstrap(CLI_MAIN_CLASS)
 
     /** The host's own AT composition (Local backend). */
-    fun localEngine(): ATEngine = ATEngine(oneShot = null, persistent = LocalPersistentBackend())
+    fun localEngine(): ATEngine = DefaultATEngine(oneShot = null, persistent = LocalPersistentBackend())
 
     /** The host's own AT composition (ADB backend; reuses AdbRuntime conn). */
     fun adbEngine(): ATEngine {
         val kd = keyDir ?: error("AtCliConsumerHost.initialize(context) not called")
         val placeholder = AdbConnectionRequest("127.0.0.1", 0, kd)
-        return ATEngine(
+        return DefaultATEngine(
             oneShot = AdbOneShotBackend(placeholder),
             persistent = AdbPersistentBackend(placeholder),
         )
@@ -152,7 +153,7 @@ object AtCliConsumerHost {
                 onStatusLine(line)
             }
             // Conservative post-failure hint (C4): identity exists but connect
-            // failed — offer pairing as a remediation (not an assertion).
+            // failed 鈥?offer pairing as a remediation (not an assertion).
             if (finalState != AdbRuntimeState.READY) {
                 onStatusLine(
                     "not connected (identity present). If pairing is needed: " +
@@ -170,3 +171,5 @@ object AtCliConsumerHost {
         runCatching { cliBridge?.stop() }
     }
 }
+
+

@@ -1,11 +1,11 @@
-// AndroidTerminal V3 — App-layer composition root (AT.HUMAN-ADB-0).
+﻿// AndroidTerminal V3 鈥?App-layer composition root (AT.HUMAN-ADB-0).
 //
 // The single process-scoped composition point that wires the ADB lifecycle and
 // builds the AT Engine with a selected backend. It is the "one execution core
 // path" owner for :app:
 //
-//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  ← THIS
-//   - terminal execution owner = ATEngine -> selected backend       ← built here
+//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  鈫?THIS
+//   - terminal execution owner = ATEngine -> selected backend       鈫?built here
 //
 // Both the Human UI (MainActivity) and the Debug/Test consumer (instrumentation
 // harness) obtain their ATEngine from THIS object, so Human and Debug share the
@@ -13,7 +13,7 @@
 // AdbRuntime / ADB connection owner per process.
 //
 // The App owns its own persistent ADB identity in private storage
-// (filesDir/adb_identity) — never a copied PC adbkey, never packaged.
+// (filesDir/adb_identity) 鈥?never a copied PC adbkey, never packaged.
 //
 // SessionBackendKind is App/UI composition only (provider identity), NOT an
 // AT domain contract.
@@ -33,6 +33,7 @@ import com.at.backend.adb.AdbPersistentBackend
 import com.at.backend.local.LocalPersistentBackend
 import com.at.cli.AdbCliBridgeServer
 import com.at.engine.ATEngine
+import com.at.engine.impl.DefaultATEngine
 import java.io.File
 
 /** App/UI backend kind (provider identity; NOT an AT domain contract). */
@@ -121,14 +122,14 @@ object AppRuntime {
      * The product's reusable ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0).
      *
      * ONE shared instance bound to the product's own app-private identity dir.
-     * PairActivity (and any product surface) uses this for first-use pairing —
+     * PairActivity (and any product surface) uses this for first-use pairing 鈥?
      * it does NOT call AdbEngine.pair directly. The bootstrap is the single
      * pairing boundary shared with the CLI `adb pair` and the consumer host.
      */
     fun consumerBootstrap(): AdbConsumerBootstrap = AdbConsumerBootstrap(adbIdentityDir())
 
     /** ATEngine with the Local backend (Local PTY -> /system/bin/sh). */
-    fun localEngine(): ATEngine = ATEngine(oneShot = null, persistent = LocalPersistentBackend())
+    fun localEngine(): ATEngine = DefaultATEngine(oneShot = null, persistent = LocalPersistentBackend())
 
     /**
      * ATEngine with the ADB backend (reuses the AdbRuntime connection).
@@ -137,12 +138,12 @@ object AppRuntime {
      *
      * AT.CLI-0: also wires the one-shot backend so the shell-hosted `adb` CLI
      * (and any App consumer) can run `adb shell <cmd>` one-shot executions
-     * through the SAME AdbRuntime / ADB Engine. App-layer composition only —
+     * through the SAME AdbRuntime / ADB Engine. App-layer composition only 鈥?
      * no AT/ADB Engine change.
      */
     fun adbEngine(): ATEngine {
         val placeholder = AdbConnectionRequest("127.0.0.1", 0, adbIdentityDir())
-        return ATEngine(
+        return DefaultATEngine(
             oneShot = AdbOneShotBackend(placeholder),
             persistent = AdbPersistentBackend(placeholder),
         )
@@ -156,10 +157,10 @@ object AppRuntime {
     fun cliBridge(): AdbCliBridgeServer? = cliBridge
 
     /**
-     * AT.CLI-0.2: app-layer resize relay (§20). When the Human resizes a Local
+     * AT.CLI-0.2: app-layer resize relay (搂20). When the Human resizes a Local
      * session, forward the new size to the inner Remote PTY if that session is
      * currently hosting an active `adb shell` interactive. No-op otherwise.
-     * App/CLI composition — the AT Engine is never told about "nested adb shell".
+     * App/CLI composition 鈥?the AT Engine is never told about "nested adb shell".
      */
     fun relayInteractiveResize(sessionId: Int, rows: Int, cols: Int) {
         runCatching { cliBridge?.relayInteractiveResize(sessionId, rows, cols) }
@@ -171,7 +172,7 @@ object AppRuntime {
      * AT.CLI-0.1A: bind the session registry to the ADB lifecycle status hub and
      * start its read-only AdbRuntime listener. Idempotent. The hub observes the
      * single AdbRuntime and fans out `[adb] ...` status to Local sessions that
-     * have used adb. Host orchestration only — NOT a lifecycle/recovery owner.
+     * have used adb. Host orchestration only 鈥?NOT a lifecycle/recovery owner.
      */
     fun initStatusHub(registry: AppSessionRegistry) {
         // Always (re)create the hub with the LATEST registry: if the Activity
@@ -204,7 +205,7 @@ object AppRuntime {
 
     /**
      * AT.CLI-0.1B: emit a command-time ADB status line to a specific Local
-     * session (the one running `adb shell <cmd>`). HOST/SYSTEM terminal event —
+     * session (the one running `adb shell <cmd>`). HOST/SYSTEM terminal event 鈥?
      * does NOT go through the short-lived AdbCliMain process. The Human sees it
      * immediately as ensureReady progresses (live projection, not end-of-command
      * buffered replay).
@@ -212,3 +213,5 @@ object AppRuntime {
     fun emitAdbCommandStatus(sessionId: Int, status: String) =
         statusHub?.emitCommandStatus(sessionId, status)
 }
+
+

@@ -1,11 +1,11 @@
-// Local Backend — persistent terminal vertical slice instrumentation test.
+﻿// Local Backend 鈥?persistent terminal vertical slice instrumentation test.
 //
 // AT.PERSIST-0. Exercises the REAL call chain on-device:
 //
 //   Test -> ATEngine -> ATPersistentBackend -> Local Backend -> Local PTY
 //          -> /system/bin/sh -i
 //
-// Verifies P1–P10 (real PTY / principal / persistent I/O / cwd / env / stdin /
+// Verifies P1鈥揚10 (real PTY / principal / persistent I/O / cwd / env / stdin /
 // Ctrl-C / resize / process exit / explicit close + cleanup).
 //
 // Requires a connected device. Status is recorded in the report; this file is
@@ -21,6 +21,8 @@ import com.at.engine.ATExecutionOutcome
 import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionState
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,14 +33,14 @@ class LocalPersistentSliceTest {
 
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    private fun openEngine(): ATEngine = ATEngine(
+    private fun openEngine(): ATEngine = DefaultATEngine(
         oneShot = LocalOneShotBackend(),
         persistent = LocalPersistentBackend(),
     )
 
     private fun openSession(engine: ATEngine): com.at.engine.ATTerminalSession {
         val r = engine.openSession(
-            ATPersistentBackend.Launch(
+            ATSessionLaunch(
                 command = "/system/bin/sh",
                 initialRows = 24,
                 initialCols = 80,
@@ -190,3 +192,6 @@ class LocalPersistentSliceTest {
         assertTrue("stdout LOCAL_OK, got: ${r.stdout}", r.stdout.contains("LOCAL_OK"))
     }
 }
+
+
+

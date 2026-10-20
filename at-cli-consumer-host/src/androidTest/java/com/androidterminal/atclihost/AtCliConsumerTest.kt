@@ -1,4 +1,4 @@
-// :at-cli-consumer-host — AT.CLI-CONSUMER-0 real-device gates (C1-C10 + identity).
+﻿// :at-cli-consumer-host 鈥?AT.CLI-CONSUMER-0 real-device gates (C1-C10 + identity).
 //
 // TEST / VALIDATION ONLY. Proves an INDEPENDENT (non-:app) consumer can obtain
 // the full "Local Terminal -> shell-visible adb -> uid=2000(shell)" environment
@@ -6,7 +6,7 @@
 //
 // Path under test (same underlying runtime):
 //   AtCliConsumerHost (this APK's UID)
-//     -> ATEngine (Local backend) -> /system/bin/sh
+//     -> DefaultATEngine(Local backend) -> /system/bin/sh
 //        -> `adb shell ...` (shell fn -> app_process -> AtCliMain in :at-cli)
 //           -> same-UID UDS bridge (AdbCliBridgeServer in :at-cli)
 //              -> AtCliConsumerHost.adbEngine() (ADB backend)
@@ -15,7 +15,7 @@
 // IMPORTANT (C1 read/listener model): the Local PTY session supports ONE active
 // consumption mode. We install a SINGLE listener for the session's lifetime
 // (the reader thread captures it at start). [runCmd] resets the shared buffer
-// and reads the delta — it does NOT re-install the listener (which would leave
+// and reads the delta 鈥?it does NOT re-install the listener (which would leave
 // the reader thread holding a stale reference).
 
 package com.androidterminal.atclihost
@@ -32,6 +32,8 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATTerminalSession
 import com.at.engine.ATEngine
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -73,7 +75,7 @@ class AtCliConsumerTest {
         // A "copied" key means the consumer host's public key BODY (the actual
         // key material, before the trailing comment) matches the AndroidTerminal
         // product app's key. The trailing comment ("androidterminal@app") is a
-        // LABEL that AdbEngine writes into EVERY generated key — it is NOT
+        // LABEL that AdbEngine writes into EVERY generated key 鈥?it is NOT
         // evidence of copying. So compare the body only.
         val hostBody = if (pub.exists()) pub.readText().trim().split(" ")[0] else ""
         val appPub = File("/data/data/com.androidterminal.app/files/adb_identity/adbkey.pub")
@@ -86,7 +88,7 @@ class AtCliConsumerTest {
     }
 
     // ------------------------------------------------------------------
-    // AT.CONSUMER-BOOTSTRAP-0 gates (B1-B5) — acceptance path via the
+    // AT.CONSUMER-BOOTSTRAP-0 gates (B1-B5) 鈥?acceptance path via the
     // REUSABLE AdbConsumerBootstrap (NOT AdbEngine.pair directly).
     // ------------------------------------------------------------------
 
@@ -95,7 +97,7 @@ class AtCliConsumerTest {
         get() = AtCliConsumerHost.cliExecution().consumerBootstrap()
 
     /**
-     * B1 — NEW_IDENTITY: with a fresh (no identity) consumer, bootstrapState()
+     * B1 鈥?NEW_IDENTITY: with a fresh (no identity) consumer, bootstrapState()
      * must classify PAIRING_REQUIRED (honest, evidence-backed: no key material).
      *
      * The test CANNOT clear the host's identity from inside (same-UID private
@@ -127,7 +129,7 @@ class AtCliConsumerTest {
     }
 
     /**
-     * B2 — DISCOVERY: the bootstrap's discoverPairing returns a structured
+     * B2 鈥?DISCOVERY: the bootstrap's discoverPairing returns a structured
      * result. When the system pairing screen is open it finds >=1 endpoint;
      * when closed, serviceNotFound. Records host/port (NEVER the code).
      */
@@ -149,8 +151,8 @@ class AtCliConsumerTest {
     }
 
     /**
-     * B3 — PAIR: with a 6-digit code, the bootstrap pairs (via the SINGLE
-     * AdbConsumerBootstrap boundary — NOT AdbEngine.pair directly) and
+     * B3 鈥?PAIR: with a 6-digit code, the bootstrap pairs (via the SINGLE
+     * AdbConsumerBootstrap boundary 鈥?NOT AdbEngine.pair directly) and
      * connectAuto reaches READY.
      */
     @Test
@@ -175,7 +177,7 @@ class AtCliConsumerTest {
     }
 
     /**
-     * B4 — POST-PAIR EXECUTION: on the same consumer, `adb shell id` =
+     * B4 鈥?POST-PAIR EXECUTION: on the same consumer, `adb shell id` =
      * uid=2000(shell). (Covered by coreFunctionalGates C2; this gate records
      * the bootstrap-paired identity is usable for execution.)
      */
@@ -218,7 +220,7 @@ class AtCliConsumerTest {
     }
 
     /**
-     * B5 — RESTART REUSE: after the consumer process restarts (each
+     * B5 鈥?RESTART REUSE: after the consumer process restarts (each
      * instrumentation run is a fresh process), ensureReady/connectAuto reaches
      * READY WITHOUT re-pairing, and `adb shell id` = uid=2000(shell).
      */
@@ -257,7 +259,7 @@ class AtCliConsumerTest {
     // ------------------------------------------------------------------
 
     /**
-     * P3 — BAD ARGS: `adb pair` / `adb pair foo` / `adb pair host:notaport X`
+     * P3 鈥?BAD ARGS: `adb pair` / `adb pair foo` / `adb pair host:notaport X`
      * must fail with usage WITHOUT triggering the underlying pairing (no crash,
      * identity files untouched).
      */
@@ -298,7 +300,7 @@ class AtCliConsumerTest {
     }
 
     /**
-     * P1 — CLI PAIR: on a fresh identity, `adb pair <host>:<port> <code>` via
+     * P1 鈥?CLI PAIR: on a fresh identity, `adb pair <host>:<port> <code>` via
      * the shell succeeds (exit 0), then `adb shell id` = uid=2000(shell).
      *
      * Requires the system pairing screen open + a staged 6-digit code. The
@@ -350,7 +352,7 @@ class AtCliConsumerTest {
     }
 
     /**
-     * P2 — BAD CODE: pairing with a wrong code is rejected (nonzero exit),
+     * P2 鈥?BAD CODE: pairing with a wrong code is rejected (nonzero exit),
      * WITHOUT crashing or destroying existing identity files / lifecycle.
      *
      * Requires the pairing service open. A wrong code is always rejected by
@@ -491,7 +493,7 @@ class AtCliConsumerTest {
         Assert.assertTrue("ADB must be READY before interactive", ready)
         val adb = AtCliConsumerHost.adbEngine()
         val open = adb.openSession(
-            ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80)
+            ATSessionLaunch(command = "", initialRows = 24, initialCols = 80)
         )
         val remote = (open as? ATOpenSessionResult.Success)?.session
             ?: run { G["C4_INTERACTIVE"] = "FAIL(open=$open)"; dump(); return }
@@ -554,7 +556,7 @@ class AtCliConsumerTest {
     }
 
     // ------------------------------------------------------------------
-    // Same-underlying-runtime evidence (§13)
+    // Same-underlying-runtime evidence (搂13)
     // ------------------------------------------------------------------
 
     @Test
@@ -577,7 +579,7 @@ class AtCliConsumerTest {
 
     private fun openLocalSession(): ATTerminalSession {
         val open = localEngine.openSession(
-            ATPersistentBackend.Launch(command = "/system/bin/sh", initialRows = 24, initialCols = 80)
+            ATSessionLaunch(command = "/system/bin/sh", initialRows = 24, initialCols = 80)
         )
         return (open as ATOpenSessionResult.Success).session
     }
@@ -640,3 +642,7 @@ class AtCliConsumerTest {
         val G = ConcurrentHashMap<String, String>()
     }
 }
+
+
+
+

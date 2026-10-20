@@ -60,7 +60,11 @@ android {
 dependencies {
     // AT Engine ONLY. DELIBERATELY ABSENT: :at-backend-local, :at-backend-adb,
     // :adb-engine, :app (physical isolation gate AT.TERM-0 §36).
+    // V4-1: TRANSITIONAL_DIRECT_DEPENDENCIES (will be removed in AT.V4-4)
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":at-engine"))
+    implementation(project(":at-backend-local"))
 
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")

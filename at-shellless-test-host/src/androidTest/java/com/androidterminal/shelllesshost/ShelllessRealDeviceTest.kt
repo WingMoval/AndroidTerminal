@@ -1,11 +1,11 @@
-// AT.TERM-0 — Shellless real-device G-gate harness (VALIDATION ONLY).
+﻿// AT.TERM-0 鈥?Shellless real-device G-gate harness (VALIDATION ONLY).
 //
 // Runs on the real device. Every session operation goes ONLY through
 // ATEngine.openSession(...) -> ShelllessPersistentBackend -> real PTY ->
 // in-process non-shell native probe. No /system/bin/sh, no ADB, no Local
 // backend. The consumer NEVER calls the backend or native directly.
 //
-// Gates (AT.TERM-0 §49): G2..G19. G0 (artifact isolation) is done via
+// Gates (AT.TERM-0 搂49): G2..G19. G0 (artifact isolation) is done via
 // Gradle/DEX/native audit on the PC, not here.
 
 package com.androidterminal.shelllesshost
@@ -18,6 +18,7 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -35,7 +36,7 @@ class ShelllessRealDeviceTest {
 
     private fun open(rows: Int = 24, cols: Int = 80): ATTerminalSession =
         (eng.openSession(
-            ATPersistentBackend.Launch(
+            ATSessionLaunch(
                 command = Sl.PROBE_COMMAND,
                 initialRows = rows, initialCols = cols,
             )
@@ -192,16 +193,16 @@ class ShelllessRealDeviceTest {
         val s = open()
         readUntil(s, "READY", 5000)
         // UTF-8 multi-byte argument must round-trip byte-exact.
-        s.write("PING 中文测试\n".toByteArray())
-        val out = readUntil(s, "PONG 中文测试", 4000)
-        assertTrue("UTF-8 PONG 中文测试, got: $out", out.contains("PONG 中文测试"))
+        s.write("PING 涓枃娴嬭瘯\n".toByteArray())
+        val out = readUntil(s, "PONG 涓枃娴嬭瘯", 4000)
+        assertTrue("UTF-8 PONG 涓枃娴嬭瘯, got: $out", out.contains("PONG 涓枃娴嬭瘯"))
         // split UTF-8 chunks: split a multi-byte char across writes.
-        val full = "PING 中\n".toByteArray()
+        val full = "PING 涓璡n".toByteArray()
         s.write(full.copyOfRange(0, 4)) // "PING"
         Thread.sleep(120)
-        s.write(full.copyOfRange(4, full.size)) // " 中\n"
-        val out2 = readUntil(s, "PONG 中", 4000)
-        assertTrue("split UTF-8 PONG 中, got: $out2", out2.contains("PONG 中"))
+        s.write(full.copyOfRange(4, full.size)) // " 涓璡n"
+        val out2 = readUntil(s, "PONG 涓?, 4000)
+        assertTrue("split UTF-8 PONG 涓? got: $out2", out2.contains("PONG 涓?))
         s.close(true)
     }
 
@@ -341,7 +342,7 @@ class ShelllessRealDeviceTest {
         assertFalse("B must NOT see A", capB.out.contains("PONG A"))
         assertTrue("C PONG C", capC.out.contains("PONG C"))
 
-        // G15: resize isolation — all opened 24x80; resize A->20x70, B->40x120
+        // G15: resize isolation 鈥?all opened 24x80; resize A->20x70, B->40x120
         // (distinct from initial so the child observes a change); each sees its own.
         sA.resize(20, 70)
         sB.resize(40, 120)
@@ -406,10 +407,12 @@ class ShelllessRealDeviceTest {
     fun g19_boundedFailurePath() {
         // Unknown launch selector must yield a bounded Failure (no shell, no crash).
         val r = eng.openSession(
-            ATPersistentBackend.Launch(command = "rm -rf /", initialRows = 24, initialCols = 80)
+            ATSessionLaunch(command = "rm -rf /", initialRows = 24, initialCols = 80)
         )
         assertTrue("unknown selector must be Failure, got $r", r is ATOpenSessionResult.Failure)
         val f = r as ATOpenSessionResult.Failure
         assertTrue("failure reason non-empty", f.reason.isNotEmpty())
     }
 }
+
+

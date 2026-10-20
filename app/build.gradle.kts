@@ -1,6 +1,6 @@
-// AndroidTerminal App — Human UI consumer of AT Engine.
+﻿// AndroidTerminal App 鈥?Human UI consumer of AT Engine.
 //
-// Canonical V1 §32: AndroidTerminal = AT Engine + Human UI + selected
+// Canonical V1 搂32: AndroidTerminal = AT Engine + Human UI + selected
 // Backends/Providers. Human UI owns Android rendering (outside AT Engine);
 // the App is a consumer of the AT Engine public boundary.
 //
@@ -52,11 +52,14 @@ android {
 
 dependencies {
     // The App consumes the AT Engine public boundary and selected backends.
+    // V4-1: TRANSITIONAL_DIRECT_DEPENDENCIES (will be removed in AT.V4-4)
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))
     // AT.HUMAN-ADB-0: the App composes the ADB lifecycle (AdbRuntime) as the
-    // authoritative ADB connection owner (Canonical V1 §7.2; AT.V3-2.3
+    // authoritative ADB connection owner (Canonical V1 搂7.2; AT.V3-2.3
     // composition). Terminal execution still goes ONLY through ATEngine ->
     // ADB Backend -> ADB Engine.
     implementation(project(":adb-engine"))
@@ -66,7 +69,7 @@ dependencies {
     // shell function bootstrap now live in :at-cli, NOT :app). The App provides
     // an AppCliExecution (ATCliExecution impl) wiring its own AppRuntime /
     // AdbRuntime / Human status projection. The App no longer OWNS the CLI
-    // mechanism — it only composes it.
+    // mechanism 鈥?it only composes it.
     implementation(project(":at-cli"))
 
     // AT.CONTRACT-0.5: debug-only automated input test (AppDebugInputTest).

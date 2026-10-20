@@ -1,4 +1,4 @@
-// AndroidTerminal V3 — App-side terminal composition helper.
+﻿// AndroidTerminal V3 鈥?App-side terminal composition helper.
 //
 // AT.CONTRACT-0.5. Consumer-side composition root for the Dev App: builds the
 // Local backend and the AT Engine, then exposes ONLY the AT Engine boundary
@@ -7,7 +7,7 @@
 // This is NOT a new architecture layer and NOT an Agent/control server. It is
 // the single composition point shared by the Human UI (MainActivity) and the
 // debug-only instrumentation (AppDebugInputTest), so both drive the SAME
-// consumer path:  AT Engine → Local Backend → Local PTY → /system/bin/sh.
+// consumer path:  AT Engine 鈫?Local Backend 鈫?Local PTY 鈫?/system/bin/sh.
 //
 // It never touches LocalPtyNative / LocalPtySession / JNI / fd / pid.
 
@@ -20,6 +20,8 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 
 /**
  * App-side terminal composition helper.
@@ -27,7 +29,7 @@ import com.at.engine.ATTerminalSession
  * One AppTerminal = one TerminalSession over a SELECTED backend kind. Local and
  * ADB share the SAME ATEngine public surface (openSession / write / resize /
  * close / events). The engine is injected (built by [AppRuntime]) so this class
- * never constructs backends directly for ADB — it just consumes AT Engine.
+ * never constructs backends directly for ADB 鈥?it just consumes AT Engine.
  *
  * @param eventListener receives session output/state events (UI shows them;
  *        debug tests assert them). Implementation shape PROVISIONAL.
@@ -45,7 +47,7 @@ class AppTerminal(
     /** Optional input-activity callback (for UI annotation of external writes). */
     private val onInputActivity: ((InputSource, ByteArray) -> Unit)? = null,
 ) {
-    private val engine: ATEngine = engine ?: ATEngine(
+    private val engine: ATEngine = engine ?: DefaultATEngine(
         oneShot = null, // Dev preview / debug is persistent-focused (not one-shot)
         persistent = LocalPersistentBackend(),
     )
@@ -84,7 +86,7 @@ class AppTerminal(
     fun open(rows: Int = 24, cols: Int = 80, command: String = defaultCommand()): Boolean {
         close()
         val r = engine.openSession(
-            ATPersistentBackend.Launch(
+            ATSessionLaunch(
                 command = command,
                 initialRows = rows,
                 initialCols = cols,
@@ -146,7 +148,7 @@ class AppTerminal(
         val ok = if (h != null) h.resize(rows, cols)
         else runCatching { session?.resize(rows, cols) }.getOrNull() ?: false
         // AT.CLI-0.2: if this Local session is mid-`adb shell` interactive,
-        // relay the new size to the inner Remote PTY (§20/§19). App/CLI
+        // relay the new size to the inner Remote PTY (搂20/搂19). App/CLI
         // composition only; the AT Engine never learns of the nesting.
         if (sessionId != 0) {
             runCatching { com.androidterminal.app.AppRuntime.relayInteractiveResize(sessionId, rows, cols) }
@@ -168,3 +170,6 @@ class AppTerminal(
         session = null
     }
 }
+
+
+

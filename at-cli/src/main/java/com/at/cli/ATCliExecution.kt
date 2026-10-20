@@ -1,4 +1,4 @@
-// AT.CLI-CONSUMER-0 — Host-provided execution SPI for the reusable CLI bridge.
+﻿// AT.CLI-CONSUMER-0 鈥?Host-provided execution SPI for the reusable CLI bridge.
 //
 // The :at-cli bridge server is a REUSABLE consumer capability. It must NOT
 // depend on any AndroidTerminal :app concrete class. Instead, the embedding
@@ -10,7 +10,7 @@
 //   - :app provides AppCliExecution (wires AppRuntime.adbEngine + AdbRuntime
 //     ensureReady + Human status projection).
 //   - :at-cli-consumer-host provides its own ATCliExecution (wires its own
-//     ATEngine + AdbRuntime — NO :app dependency).
+//     ATEngine + AdbRuntime 鈥?NO :app dependency).
 //
 // The bridge NEVER creates a second AdbRuntime / AT Engine / identity. It only
 // calls into whatever composition the host already owns.
@@ -22,17 +22,18 @@ package com.at.cli
 
 import com.adb.engine.AdbConsumerBootstrap
 import com.at.engine.ATEngine
+import com.at.engine.impl.DefaultATEngine
 
 /**
  * Host-provided execution capability the CLI bridge routes into.
  *
- * A single host instance is shared by all CLI connections in that process —
+ * A single host instance is shared by all CLI connections in that process 鈥?
  * the bridge is a thin frontend over the host's existing execution subsystem.
  */
 interface ATCliExecution {
 
     /**
-     * The host's ATEngine (ADB backend) that CLI `adb shell` commands execute
+     * The host's DefaultATEngine(ADB backend) that CLI `adb shell` commands execute
      * through. One-shot uses [ATEngine.execute]; interactive uses
      * [ATEngine.openSession].
      *
@@ -45,15 +46,15 @@ interface ATCliExecution {
      * Ensure the host's ADB lifecycle is READY before executing a CLI command.
      *
      * This is the Runtime-owned ensureReady sequence (readiness / Wireless
-     * Debugging / discovery / connect). The host owns this — the bridge does
+     * Debugging / discovery / connect). The host owns this 鈥?the bridge does
      * NOT run its own polling loop.
      *
      * [onStatusLine] is invoked with intermediate human-readable status lines
      * (e.g. "checking connection...", "connected", "user action required:
      * enable Wireless Debugging"). The host decides how to surface them:
-     *   - :app → Host/SYSTEM terminal event to the bound Local session
+     *   - :app 鈫?Host/SYSTEM terminal event to the bound Local session
      *     (live projection) or T_STATUS fallback.
-     *   :at-cli-consumer-host → T_STATUS fallback (no Human UI).
+     *   :at-cli-consumer-host 鈫?T_STATUS fallback (no Human UI).
      *
      * Return true if the runtime reached READY (command may proceed), false
      * otherwise (bridge returns a non-zero exit; no command executed).
@@ -85,9 +86,11 @@ interface ATCliExecution {
      * The bridge routes the CLI `adb pair <host>:<port> <code>` command here
      * (via a dedicated T_PAIR frame). The host supplies a bootstrap bound to
      * its OWN app-private identity dir. The bridge does NOT call AdbEngine.pair
-     * directly — the bootstrap is the single pairing boundary shared with the
+     * directly 鈥?the bootstrap is the single pairing boundary shared with the
      * product UI and the consumer host.
      */
     fun consumerBootstrap(): AdbConsumerBootstrap =
         AdbConsumerBootstrap(adbIdentityDir())
 }
+
+

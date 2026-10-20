@@ -1,7 +1,7 @@
-// Test Host — ADB Backend headless vertical slice (AT.V3-2, Gates A/B/C).
+﻿// Test Host 鈥?ADB Backend headless vertical slice (AT.V3-2, Gates A/B/C).
 //
-// Independent consumer (no UI). Consumes AT Engine → ADB Backend → ADB Engine
-// → wireless adbd. Uses explicit endpoint + trusted identity (keyDir seeded
+// Independent consumer (no UI). Consumes AT Engine 鈫?ADB Backend 鈫?ADB Engine
+// 鈫?wireless adbd. Uses explicit endpoint + trusted identity (keyDir seeded
 // with the PC adbkey that the device already trusts).
 //
 // This is the HEADLESS verification; the ADBTerminal Dev UI APK is verified
@@ -22,6 +22,7 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,7 +67,7 @@ class AdbBackendHeadlessTest {
 
     private fun openSession(backend: AdbPersistentBackend): Pair<ATTerminalSession, Capture> {
         val cap = Capture()
-        val r = backend.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80))
+        val r = backend.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80))
         assertTrue("open should succeed, got $r", r is ATOpenSessionResult.Success)
         val s = (r as ATOpenSessionResult.Success).session
         s.setListener { ev -> cap(ev) }
@@ -76,7 +77,7 @@ class AdbBackendHeadlessTest {
     private fun write(s: ATTerminalSession, text: String) { s.write((text + "\n").toByteArray()) }
 
     // ------------------------------------------------------------------
-    // Gate A — one-shot
+    // Gate A 鈥?one-shot
     // ------------------------------------------------------------------
 
     @Test
@@ -124,7 +125,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Gate B — persistent remote PTY
+    // Gate B 鈥?persistent remote PTY
     // ------------------------------------------------------------------
 
     @Test
@@ -227,7 +228,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Reader cleanup (AT.V3-2.1 §11 / §24)
+    // Reader cleanup (AT.V3-2.1 搂11 / 搂24)
     // ------------------------------------------------------------------
 
     @Test
@@ -292,7 +293,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Gate C — concurrent multi-session (AT.V3-2.1)
+    // Gate C 鈥?concurrent multi-session (AT.V3-2.1)
     // ------------------------------------------------------------------
 
     @Test
@@ -492,7 +493,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Stability (AT.V3-2.1 §34)
+    // Stability (AT.V3-2.1 搂34)
     // ------------------------------------------------------------------
 
     @Test
@@ -538,3 +539,4 @@ class AdbBackendHeadlessTest {
         android.util.Log.i("ATV31", "s2: 3 concurrent rounds (varied close order) OK")
     }
 }
+

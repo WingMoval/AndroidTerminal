@@ -1,9 +1,9 @@
-// AndroidTerminal V3 — Common AT Consumer Path Validation (AT.HUMAN-ADB-0).
+﻿// AndroidTerminal V3 鈥?Common AT Consumer Path Validation (AT.HUMAN-ADB-0).
 //
 // Proves that a Debug/Test consumer can be a FIRST-CLASS AT Engine consumer
 // WITHOUT any Human UI: no MainActivity / SessionPage / EditText / Button /
 // IME / uiautomator / screen coordinates. Command results come from AT session
-// output/events — never from logcat scraping.
+// output/events 鈥?never from logcat scraping.
 //
 // It obtains the SAME composition root (AppRuntime) the Human UI uses, so Human
 // and Debug share ONE AT Engine public consumer surface / backend semantics.
@@ -21,6 +21,8 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -31,7 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * Debug/Test consumer harness: a thin adapter over AppRuntime -> ATEngine.
  * No Android UI types are touched. It is the "Debug consumer" of the one
- * common AT consumer path (AT.HUMAN-ADB-0 §33-§37, §47).
+ * common AT consumer path (AT.HUMAN-ADB-0 搂33-搂37, 搂47).
  */
 @RunWith(AndroidJUnit4::class)
 class CommonConsumerPathTest {
@@ -54,7 +56,7 @@ class CommonConsumerPathTest {
 
         fun open(engine: com.at.engine.ATEngine, command: String, rows: Int = 24, cols: Int = 80): Boolean {
             val r = engine.openSession(
-                ATPersistentBackend.Launch(command = command, initialRows = rows, initialCols = cols),
+                ATSessionLaunch(command = command, initialRows = rows, initialCols = cols),
             )
             return when (r) {
                 is ATOpenSessionResult.Success -> {
@@ -108,7 +110,7 @@ class CommonConsumerPathTest {
         assertTrue("C4: Local session closes", await(2000) { c.state == ATSessionState.CLOSED })
     }
 
-    // ---- C5-C10: ADB provider via ATEngine (single AdbRuntime owner) -------
+    // ---- C5-C10: ADB provider via DefaultATEngine(single AdbRuntime owner) -------
 
     @Test
     fun c5_c10_adbSession() {
@@ -162,3 +164,7 @@ class CommonConsumerPathTest {
         c.close()
     }
 }
+
+
+
+

@@ -17,6 +17,7 @@ package com.androidterminal.app.cli
 
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
+import com.at.cli.AdbCliProtocol
 import java.io.File
 
 object CliProbe {

@@ -1,11 +1,12 @@
-// AT Engine — one-shot execution domain types (DRAFT).
+// AT Engine API — public execution/session contract (V4-1).
 //
-// AT.CONTRACT-0. Canonical V1 §5/§7.3: AT Engine owns one-shot execution
-// semantics; ADB protocol / PTY details live in backends.
+// Layer-2 public consumer contract. This module contains ONLY the verified
+// execution/session semantic types that a Consumer needs to use AT Engine.
 //
-// IMPLEMENTATION SHAPE = PROVISIONAL. These types are a contract DRAFT for
-// AT.PERSIST-0/1 validation; they are NOT a final API and MUST NOT be frozen
-// until both Local and ADB vertical slices exercise them.
+// NO Android Context / ADB internals / backend SPI types in this module.
+//
+// V4-1: Physical extraction of existing V3 verified contracts.
+// SEMANTIC_DELTA = NONE (types are moved, not redesigned).
 
 package com.at.engine
 

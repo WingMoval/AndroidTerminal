@@ -1,4 +1,4 @@
-// Test Host — AT.V3-3 Backend Parity Audit (Local vs ADB).
+﻿// Test Host 鈥?AT.V3-3 Backend Parity Audit (Local vs ADB).
 //
 // Audit-only harness: the SAME AT Engine contract checks are executed against
 // BOTH real Execution Providers (Local Backend -> Local PTY, ADB Backend ->
@@ -33,6 +33,8 @@ import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
+import com.at.engine.ATSessionLaunch
+import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -54,8 +56,8 @@ class BackendParityAuditTest {
 
     // --- AT Engine facades (composition root = test consumer) ---
 
-    private fun localEngine() = ATEngine(LocalOneShotBackend(), LocalPersistentBackend())
-    private fun adbEngine() = ATEngine(AdbOneShotBackend(conn()), AdbPersistentBackend(conn()))
+    private fun localEngine() = DefaultATEngine(LocalOneShotBackend(), LocalPersistentBackend())
+    private fun adbEngine() = DefaultATEngine(AdbOneShotBackend(conn()), AdbPersistentBackend(conn()))
 
     private fun await(timeoutMs: Long, predicate: () -> Boolean): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -99,7 +101,7 @@ class BackendParityAuditTest {
 
     private fun openWithListener(spec: PSpec): Triple<ATTerminalSession, Cap, ATEngine> {
         val engine = spec.engine()
-        val r = engine.openSession(ATPersistentBackend.Launch(command = "", initialRows = 24, initialCols = 80))
+        val r = engine.openSession(ATSessionLaunch(command = "", initialRows = 24, initialCols = 80))
         assertTrue("${spec.label}: open should succeed, got $r", r is ATOpenSessionResult.Success)
         val s = (r as ATOpenSessionResult.Success).session
         val cap = Cap()
@@ -110,7 +112,7 @@ class BackendParityAuditTest {
     private fun write(s: ATTerminalSession, text: String) { s.write((text + "\n").toByteArray()) }
 
     // ==================================================================
-    // One-shot parity — O1..O5 (both providers)
+    // One-shot parity 鈥?O1..O5 (both providers)
     // ==================================================================
 
     private fun o1(label: String, e: ATEngine) {
@@ -243,7 +245,7 @@ class BackendParityAuditTest {
 
     // 1 MiB via a single pipe stream (large WRTE chunks). The line-based 1 MiB
     // (16384 lines) is bounded by the device's wireless debugging session
-    // lifetime (~2-4 min) at ~19ms/line credit round trip (~5-6 min needed) —
+    // lifetime (~2-4 min) at ~19ms/line credit round trip (~5-6 min needed) 鈥?
     // an environmental limit recorded in evidence. This chunked variant
     // delivers 1 MiB in ~16 large WRTE and proves the credit flow at 1 MiB
     // scale with full completeness checks.
@@ -268,7 +270,7 @@ class BackendParityAuditTest {
     @Test(timeout = 300_000)
     fun l5_adbLargeOutputViaPersistentPath64k() {
         val engine = adbEngine()
-        val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r = engine.openSession(ATSessionLaunch(command = ""))
         assertTrue("open", r is ATOpenSessionResult.Success)
         val s = (r as ATOpenSessionResult.Success).session
         val cap = Cap()
@@ -288,7 +290,7 @@ class BackendParityAuditTest {
     private fun genDone(n: Int) = gen(n) + "; echo LARGE_DONE=\$((1+1))"
 
     // ==================================================================
-    // Persistent parity — p1..p7 (both providers)
+    // Persistent parity 鈥?p1..p7 (both providers)
     // ==================================================================
 
     private fun p1_openActiveWrite(spec: PSpec) {
@@ -371,7 +373,7 @@ class BackendParityAuditTest {
     private fun p7_closeReopen(spec: PSpec) {
         val engine = spec.engine()
         val cap = Cap()
-        val r1 = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r1 = engine.openSession(ATSessionLaunch(command = ""))
         val s1 = (r1 as ATOpenSessionResult.Success).session
         s1.setListener(cap)
         write(s1, "echo CL1=\$((5+5))")
@@ -380,7 +382,7 @@ class BackendParityAuditTest {
         assertEquals("${spec.label} P7 CLOSED", ATSessionState.CLOSED, s1.state)
 
         val cap2 = Cap()
-        val r2 = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r2 = engine.openSession(ATSessionLaunch(command = ""))
         assertTrue("${spec.label} P7 reopen succeeds", r2 is ATOpenSessionResult.Success)
         val s2 = (r2 as ATOpenSessionResult.Success).session
         s2.setListener(cap2)
@@ -397,7 +399,7 @@ class BackendParityAuditTest {
         // ADB: AdbPersistentBackend applies launch size at open.
         run {
             val engine = adbEngine()
-            val r = engine.openSession(ATPersistentBackend.Launch(command = "", initialRows = 33, initialCols = 99))
+            val r = engine.openSession(ATSessionLaunch(command = "", initialRows = 33, initialCols = 99))
             val s = (r as ATOpenSessionResult.Success).session
             val cap = Cap()
             s.setListener(cap)
@@ -407,10 +409,10 @@ class BackendParityAuditTest {
             s.close()
         }
         // LOCAL: record actual behavior (finding: LocalPersistentBackend does
-        // not apply launch sizes; explicit resize() works — see P5).
+        // not apply launch sizes; explicit resize() works 鈥?see P5).
         run {
             val engine = localEngine()
-            val r = engine.openSession(ATPersistentBackend.Launch(command = "", initialRows = 33, initialCols = 99))
+            val r = engine.openSession(ATSessionLaunch(command = "", initialRows = 33, initialCols = 99))
             val s = (r as ATOpenSessionResult.Success).session
             val cap = Cap()
             s.setListener(cap)
@@ -429,13 +431,13 @@ class BackendParityAuditTest {
     }
 
     // ==================================================================
-    // EOF / state and close semantics — e1/e2
+    // EOF / state and close semantics 鈥?e1/e2
     // ==================================================================
 
     private fun e1_eofState(spec: PSpec) {
         // pull mode (no listener) to observe read()==null semantics directly
         val engine = spec.engine()
-        val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r = engine.openSession(ATSessionLaunch(command = ""))
         val s = (r as ATOpenSessionResult.Success).session
         // drain prompt
         s.read(500)
@@ -487,13 +489,13 @@ class BackendParityAuditTest {
     @Test fun e2_closeSemantics() { e2_closeSemantics(localSpec()); e2_closeSemantics(adbSpec()) }
 
     // ==================================================================
-    // Multi-session parity — m1/m2/m3
+    // Multi-session parity 鈥?m1/m2/m3
     // ==================================================================
 
     private fun m1_activeEnvCwdIsolation(spec: PSpec) {
         val engine = spec.engine()
         val sessions = (0..2).map {
-            val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+            val r = engine.openSession(ATSessionLaunch(command = ""))
             assertTrue("${spec.label} M1 open $it", r is ATOpenSessionResult.Success)
             val s = (r as ATOpenSessionResult.Success).session
             val cap = Cap()
@@ -533,7 +535,7 @@ class BackendParityAuditTest {
     private fun m2_stdinCtrlCResizeIsolation(spec: PSpec) {
         val engine = spec.engine()
         val sessions = (0..2).map {
-            val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+            val r = engine.openSession(ATSessionLaunch(command = ""))
             val s = (r as ATOpenSessionResult.Success).session
             val cap = Cap()
             s.setListener(cap)
@@ -580,7 +582,7 @@ class BackendParityAuditTest {
     private fun m3_closeReopenExitIsolation(spec: PSpec) {
         val engine = spec.engine()
         val sessions = (0..2).map {
-            val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+            val r = engine.openSession(ATSessionLaunch(command = ""))
             val s = (r as ATOpenSessionResult.Success).session
             val cap = Cap()
             s.setListener(cap)
@@ -599,7 +601,7 @@ class BackendParityAuditTest {
 
         // reopen while A/C alive
         val capD = Cap()
-        val rd = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val rd = engine.openSession(ATSessionLaunch(command = ""))
         assertTrue("${spec.label} M3 reopen", rd is ATOpenSessionResult.Success)
         val d = (rd as ATOpenSessionResult.Success).session
         d.setListener(capD)
@@ -619,7 +621,7 @@ class BackendParityAuditTest {
     @Test fun m3_closeReopenExitIsolation() { m3_closeReopenExitIsolation(localSpec()); m3_closeReopenExitIsolation(adbSpec()) }
 
     // ==================================================================
-    // Cross-mode: persistent + one-shot coexistence — x1/x2
+    // Cross-mode: persistent + one-shot coexistence 鈥?x1/x2
     // ==================================================================
 
     @Test fun x1_localCrossMode() {
@@ -679,7 +681,7 @@ class BackendParityAuditTest {
     }
 
     // ==================================================================
-    // read() / listener consumption invariant — r1/r2
+    // read() / listener consumption invariant 鈥?r1/r2
     // ==================================================================
 
     private fun r1_listenerOwnsStream(spec: PSpec) {
@@ -696,7 +698,7 @@ class BackendParityAuditTest {
 
     private fun r2_pullMode(spec: PSpec) {
         val engine = spec.engine()
-        val r = engine.openSession(ATPersistentBackend.Launch(command = ""))
+        val r = engine.openSession(ATSessionLaunch(command = ""))
         val s = (r as ATOpenSessionResult.Success).session
         // drain any startup prompt bytes; then a read with no data must
         // return an EMPTY array (timeout), never null and never an error.
@@ -722,7 +724,7 @@ class BackendParityAuditTest {
     @Test fun r2_pullMode() { r2_pullMode(localSpec()); r2_pullMode(adbSpec()) }
 
     // ==================================================================
-    // Byte-stream input contract — b1
+    // Byte-stream input contract 鈥?b1
     // ==================================================================
 
     private fun b1_byteStream(spec: PSpec) {
@@ -741,7 +743,7 @@ class BackendParityAuditTest {
     @Test fun b1_byteStream() { b1_byteStream(localSpec()); b1_byteStream(adbSpec()) }
 
     // ==================================================================
-    // Principal / capability difference evidence — c1
+    // Principal / capability difference evidence 鈥?c1
     // ==================================================================
 
     @Test fun c1_principalDifference() {
@@ -755,7 +757,7 @@ class BackendParityAuditTest {
     }
 
     // ==================================================================
-    // AT.V3-2.2 — one-shot mid-stream abnormal close (failure path)
+    // AT.V3-2.2 鈥?one-shot mid-stream abnormal close (failure path)
     // ==================================================================
 
     // Device closes its stdout/stderr while the command is still running
@@ -780,3 +782,6 @@ class BackendParityAuditTest {
         assertTrue("f1 reuse stdout", again.stdout.contains("AFTER_F1"))
     }
 }
+
+
+

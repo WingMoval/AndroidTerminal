@@ -1,4 +1,4 @@
-// :at-cli-consumer-host — Independent CLI Consumer Test Host (AT.CLI-CONSUMER-0).
+﻿// :at-cli-consumer-host 鈥?Independent CLI Consumer Test Host (AT.CLI-CONSUMER-0).
 //
 // TEST / VALIDATION ONLY. Proves a NON-AndroidTerminal consumer can obtain the
 // full "Local Terminal -> shell-visible adb -> uid=2000(shell)" environment
@@ -15,7 +15,7 @@
 //
 // It is NOT a production APK and NOT an AG project.
 //
-// Physical isolation gate (AT.CLI-CONSUMER-0 §25): the Gradle dependency graph,
+// Physical isolation gate (AT.CLI-CONSUMER-0 搂25): the Gradle dependency graph,
 // APK dex contents, and native libs of THIS module's APK MUST NOT reference
 // :app (com.androidterminal.app.*) or the AndroidTerminal identity path.
 
@@ -50,8 +50,11 @@ android {
 
 dependencies {
     // Reusable CLI consumer capability + AT composition.
-    // DELIBERATELY ABSENT: :app (consumer isolation gate §25).
+    // DELIBERATELY ABSENT: :app (consumer isolation gate 搂25).
     implementation(project(":at-cli"))
+    // V4-1: TRANSITIONAL_DIRECT_DEPENDENCIES (will be removed in AT.V4-4)
+    implementation(project(":at-engine-api"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))
@@ -61,3 +64,4 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.5.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
+

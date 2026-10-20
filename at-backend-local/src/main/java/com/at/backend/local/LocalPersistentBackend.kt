@@ -1,6 +1,6 @@
-// Local Backend — persistent terminal backend (real).
+﻿// Local Backend 鈥?persistent terminal backend (real).
 //
-// AT.PERSIST-0 — migrates the V2 ATsh.T1 verified Local PTY semantics into the
+// AT.PERSIST-0 鈥?migrates the V2 ATsh.T1 verified Local PTY semantics into the
 // AT Engine backend contract. Implements:
 //   ATPersistentBackend.openSession(launch)
 //     -> LocalPtySession.start()   (real /system/bin/sh -i on a real PTY)
@@ -17,18 +17,19 @@ package com.at.backend.local
 import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
+import com.at.engine.ATSessionLaunch
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
 
 /**
  * Local persistent backend.
  *
- * Opens a real Local PTY shell (/system/bin/sh -i) — the V2 T1 verified
+ * Opens a real Local PTY shell (/system/bin/sh -i) 鈥?the V2 T1 verified
  * primitive migrated into :at-backend-local.
  */
 class LocalPersistentBackend : ATPersistentBackend {
 
-    override fun openSession(launch: ATPersistentBackend.Launch): ATOpenSessionResult {
+    override fun openSession(launch: ATSessionLaunch): ATOpenSessionResult {
         val pty = LocalPtySession.start()
             ?: return ATOpenSessionResult.Failure("local pty start failed")
         val session = LocalTerminalSession(pty)
@@ -42,13 +43,13 @@ class LocalPersistentBackend : ATPersistentBackend {
  * Wraps [LocalPtySession] (the provider primitive) and implements the AT
  * session contract: byte transport + lifecycle/state + events.
  *
- * C1 (read/listener model): the session supports ONE active consumption mode —
+ * C1 (read/listener model): the session supports ONE active consumption mode 鈥?
  * either pull ([read]) or push ([setListener]). Setting a listener starts a
  * background reader that owns the fd and dispatches events; while a listener is
  * active, [read] is not a valid concurrent consumer. Default is pull.
  *
  * C2 (read==null): [read] returns null when the session has ended. The precise
- * cause is expressed by [state] (EXITED / FAILED / CLOSED / EOF) — read-null
+ * cause is expressed by [state] (EXITED / FAILED / CLOSED / EOF) 鈥?read-null
  * never conflates process exit, failure, caller close, or EOF.
  */
 class LocalTerminalSession internal constructor(
@@ -75,7 +76,7 @@ class LocalTerminalSession internal constructor(
 
     override fun read(timeoutMs: Int): ByteArray? {
         // Pull mode: caller-driven reads. Not valid while a listener reader is
-        // active (C1) — only one consumer of the fd at a time.
+        // active (C1) 鈥?only one consumer of the fd at a time.
         val l = listener
         if (l != null) {
             // Listener owns the reader; pull is not a concurrent consumer.

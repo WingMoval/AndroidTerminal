@@ -1,12 +1,12 @@
-// AT Engine — persistent terminal / session domain types (DRAFT).
+// AT Engine API — public session contract (V4-1).
 //
-// AT.CONTRACT-0. Canonical V1 §5/§11/§12: Persistent Terminal is a first-class
-// AT Engine capability. This file defines the minimum session lifecycle and
-// byte-stream semantics shared by Local (ATsh.T1) and ADB (ADB.I0) evidence.
+// Layer-2 public consumer contract. This module contains ONLY the verified
+// session semantic types that a Consumer needs to use AT Engine.
 //
-// IMPLEMENTATION SHAPE = PROVISIONAL. NOT frozen. No Emulator / Screen State
-// API is invented here (those are DEFERRED and must not pollute the v0 session
-// contract).
+// NO Android Context / ADB internals / backend SPI types in this module.
+//
+// V4-1: Physical extraction of existing V3 verified contracts.
+// SEMANTIC_DELTA = NONE (types are moved, not redesigned).
 
 package com.at.engine
 
@@ -114,3 +114,21 @@ sealed class ATOpenSessionResult {
     data class Success(val session: ATTerminalSession) : ATOpenSessionResult()
     data class Failure(val reason: String) : ATOpenSessionResult()
 }
+
+/**
+ * Launch description for a persistent session (V4-1: extracted from
+ * ATPersistentBackend.Launch to eliminate SPI leak in public API).
+ *
+ * SEMANTIC_DELTA = NONE (same fields, same defaults, same semantics).
+ * OLD = ATPersistentBackend.Launch
+ * NEW = ATSessionLaunch
+ */
+data class ATSessionLaunch(
+    /** Program/command to launch (default "/system/bin/sh" for both). */
+    val command: String,
+    /** Terminal size at open; 0/0 = backend default. */
+    val initialRows: Int = 0,
+    val initialCols: Int = 0,
+    /** Optional environment overrides (DEFERRED for most providers). */
+    val env: Map<String, String> = emptyMap(),
+)
