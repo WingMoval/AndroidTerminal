@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-bootstrap
+> **Version**: 4.0.0-v4-2
 > **Date**: 2026-10-21
-> **Status**: V4-0 baseline established / physical architecture frozen
+> **Status**: V4-2 complete / Android composition root established
 
 ---
 
@@ -292,8 +292,8 @@ Android Composition Layer (assembly root):
 |---|---|
 | `:at-engine-api` module creation | COMPLETED（V4-1） |
 | `:at-engine-spi` module creation | COMPLETED（V4-1） |
-| `:at-composition-android` module creation | OPEN（V4-2） |
-| Backend SPI implementation migration | OPEN（V4-3） |
+| `:at-composition-android` module creation | COMPLETED（V4-2） |
+| Backend SPI implementation migration | ABSORBED（V4-1 + V4-2） |
 | CLI / Product App migration | OPEN（V4-4） |
 | Consumer Conformance / architecture enforcement | OPEN（V4-5） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
@@ -304,7 +304,11 @@ Android Composition Layer (assembly root):
 
 **AT.V4-1**：COMPLETED — 公共 API / SPI 骨架（创建 `:at-engine-api` + `:at-engine-spi` module，移动 public types）。
 
-**AT.V4-2**：OPEN — 创建 `:at-composition-android`（composition root）。
+**AT.V4-2**：COMPLETED — Android Composition Root（创建 `:at-composition-android`，provider wiring closure）。
+
+**AT.V4-3**：ABSORBED — Backend SPI implementation migration 已在 V4-1 + V4-2 完成。
+
+**AT.V4-4**：OPEN — CLI / Product App migration（迁移 `:app` / `:at-cli` / `:at-cli-consumer-host` 到使用 composition root）。
 
 **NEXT_OPEN_AUTHORIZED = NO**（等待 Controller Review）。
 

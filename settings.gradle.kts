@@ -36,6 +36,7 @@ include(":at-engine-spi")  // V4-1: Backend SPI (Layer-3/4 implementation contra
 include(":at-engine")      // V4-1: Engine implementation (Layer-3)
 include(":at-backend-local")
 include(":at-backend-adb")
+include(":at-composition-android")  // V4-2: Android assembly root
 include(":app")
 include(":test-host")
 // AT.V3-2.3: ADB-only Test Host (TEST / VALIDATION ONLY) — proves physical

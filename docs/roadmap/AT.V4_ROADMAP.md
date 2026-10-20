@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-21
-> **Status**: V4-0 COMPLETE / V4-1 OPEN
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE
 
 ---
 
@@ -34,7 +34,7 @@
 
 ### AT.V4-1：公共 API / SPI 骨架
 
-**Status**: OPEN
+**Status**: COMPLETE
 
 **第一目标**：**PHYSICAL EXTRACTION OF EXISTING VERIFIED CONTRACTS**（只移动 V3 已存在的 verified contracts，不设计新 public semantic API）。
 
@@ -72,9 +72,9 @@
 
 ---
 
-### AT.V4-2：Engine Implementation + Android Composition
+### AT.V4-2：Android Composition Root
 
-**Status**: OPEN
+**Status**: COMPLETE
 
 **Scope**:
 - 创建 `:at-composition-android` module（Android composition root）
@@ -104,28 +104,13 @@
 
 ### AT.V4-3：Local / ADB Backend 迁移 + Injection
 
-**Status**: OPEN
+**Status**: ABSORBED_BY_V4_1_AND_V4_2
 
-**Scope**:
-- 验证 `LocalOneShotBackend` / `LocalPersistentBackend` 实现 `:at-engine-spi` 的 `ATOneShotBackend` / `ATPersistentBackend` interfaces
-- 验证 `AdbOneShotBackend` / `AdbPersistentBackend` 实现 `:at-engine-spi` 的 `ATOneShotBackend` / `ATPersistentBackend` interfaces
-- **Concrete backend implementations 留在原 module**：
-  - `LocalOneShotBackend` / `LocalPersistentBackend` / `LocalPtySession` → **remain `:at-backend-local`**
-  - `AdbOneShotBackend` / `AdbPersistentBackend` → **remain `:at-backend-adb`**
-- 验证：`:at-engine` 不依赖 concrete backend
-- 验证：`:at-composition-android` 可以注入 backend instances 到 `:at-engine`
+**Note**: V4-3 的 scope 已在 V4-1 + V4-2 中完成：
+- V4-1: Backend SPI extraction（`:at-engine-spi` 创建，backend modules 依赖 SPI）
+- V4-2: Android composition root（`:at-composition-android` 创建，backend injection）
 
-**Deliverables**:
-- 更新后的 `:at-backend-local` / `:at-backend-adb`（依赖 `:at-engine-spi`，实现 interfaces）
-- 更新后的 `:at-engine`（不依赖 concrete backend）
-- 更新后的 `:at-composition-android`（注入 backend instances）
-
-**Gate**:
-- Backend implementations 实现 `:at-engine-spi` 的 interfaces
-- **Concrete backend implementations 留在 `:at-backend-local` / `:at-backend-adb`**（不迁入 `:at-engine-spi`）
-- `:at-engine` 不依赖 concrete backend
-- `:at-composition-android` 可以注入 backend instances
-- One-shot / persistent 命令可以正常执行（Local / ADB）
+**RECOMMENDED_NEXT** = AT.V4-4
 
 ---
 
