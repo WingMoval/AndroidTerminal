@@ -5,6 +5,10 @@
 > DEVICE_TEST = NO / NEW_FEATURE = NO / NEW_TAG = NO / PUSH = NO。
 > 不修改 AndroidAgent（DO NOT MODIFY / DESIGN / TEST）。
 > 审计基线：`c9cee21`（AUTHORITATIVE_SOURCE_BASELINE，production tree 已验证等价当前 tree）。
+>
+> **状态**：`AT.CONSUMER-CAPABILITY-AUDIT-0 = CLOSED`（SUBSTANTIVE RESULT PRESERVED）。
+> **规范化**：`AT.CONSUMER-CAPABILITY-AUDIT-0.1 = PASS`（docs-only，3 项口径修正 N1/N2/N3，
+> 见 §5.1 / §17 / §18 / §16 / §20 的内联标注）。`AG_RECONCILIATION_INPUT = AUTHORITATIVE / READY`。
 
 ---
 
@@ -146,7 +150,7 @@ MODEL_VISIBLE）明确划给 consumer 产品层，**非 AT responsibility**。
 
 ## 5. Composition Object Cardinality（§13/§14/§15 — HARD QUESTIONS）
 
-### 5.1 ATEngine object cardinality（reference = `:at-cli-consumer-host`）
+### 5.1 ATEngine cardinality — role vs instance（N2 规范化，reference = `:at-cli-consumer-host`）
 
 源码证据（`AtCliConsumerHost.kt`）：
 
@@ -158,24 +162,49 @@ object AtCliConsumerHost {                       // 1 个 composition root（pro
 }
 ```
 
-| 项 | 值 | 证据 |
+**关键区分（N2）**：上面是 **factory-style**（`fun localEngine(): ATEngine = ATEngine(...)`）。
+每次调用 getter 都会**new 一个新的 `ATEngine` facade object**。因此真正稳定、可冻结的是
+**engine ROLES**（逻辑角色），**不是** heap 上的 `ATEngine` instance count。
+
+| 项 | 值 | 证据 / 说明 |
 |---|---|---|
-| CONSUMER_COMPOSITION_ROOT_COUNT | **1**（process-scoped） | `object AtCliConsumerHost` |
-| ATENGINE_OBJECT_COUNT | **2**（localEngine + adbEngine） | 两个独立 `ATEngine` 构造 |
-| LOCAL_ATENGINE_COUNT | **1** | `localEngine()` → `ATEngine(null, LocalPersistentBackend)` |
-| ADB_ATENGINE_COUNT | **1** | `adbEngine()` → `ATEngine(AdbOneShotBackend, AdbPersistentBackend)` |
-| LOCAL_AND_ADB_SHARE_SAME_ATENGINE_OBJECT | **NO** | 两个不同的 `ATEngine` 实例 |
-| LOCAL_AND_ADB_SHARE_SAME_COMPOSITION_ROOT | **YES** | 都由 `AtCliConsumerHost` 构造 |
+| CONSUMER_COMPOSITION_ROOT | **1** logical owner per host process | `object AtCliConsumerHost`（process-scoped） |
+| ATENGINE_ROLE_COUNT_REFERENCE_COMPOSITION | **2** | local-engine role + adb-engine role（逻辑角色） |
+| LOCAL_ENGINE_ROLE | **1** | `localEngine()` 角色 → `ATEngine(null, LocalPersistentBackend)` |
+| ADB_ENGINE_ROLE | **1** | `adbEngine()` 角色 → `ATEngine(AdbOneShotBackend, AdbPersistentBackend)` |
+| LOCAL_AND_ADB_SAME_ENGINE_ROLE | **NO** | local 与 adb 是两个不同的逻辑角色（不同 backend 组合） |
+| LOCAL_AND_ADB_SAME_COMPOSITION_ROOT | **YES** | 两个角色都由 `AtCliConsumerHost` 构造 |
+| **ATENGINE_INSTANCE_COUNT** | **NOT_A_LIFECYCLE_INVARIANT** | factory/getter 可反复 new 新 facade object；instance 数不是不变量 |
+| **ATENGINE_INSTANCE_CARDINALITY_GUARANTEE** | **NONE** | 进程内 `ATEngine` 对象数量无保证（可 0/1/2/N，取决于调用） |
 
-**关键澄清**：「one consumer composition」**不等于**「one ATEngine instance」。一个 consumer
-合法地拥有 `localEngine` + `adbEngine` 两个 ATEngine object。`ATEngine` 只是一个**薄 facade**
-（注入 oneShot/persistent backend），构造成本低、无 lifecycle 状态。把「一个 composition」
-误等价为「一个 ATEngine 实例」是错误。同理，「SECOND_AT_ENGINE = NO」的准确含义是：**没有第二套
-独立的 AT execution 子系统 / 没有绕过 host composition 的第二个 engine 所有权**，而**不是**
-「进程里只能 new 一个 ATEngine object」。
+**为什么 instance count 不是 invariant**：`ATEngine` 是 **thin facade**（`class ATEngine` 只持有
+`oneShot: ATOneShotBackend?` + `persistent: ATPersistentBackend?` 两个 backend 字段，**无 lifecycle
+state / 无连接 / 无资源**）。backend-injected、无状态，调用 factory 产生新 facade 对象没有副作用。
+所以「一个 consumer 进程永远只能有两个 ATEngine instance」**不成立**，也不应被读出来。
 
-`:app`（`AppRuntime`）结构完全相同：`localEngine()` + `adbEngine()` 两个 ATEngine，1 个
-composition root（`object AppRuntime`）。
+**真正需要冻结的 cardinality invariants**（§10）：
+
+```
+CONSUMER_COMPOSITION_ROOT       = 1 logical owner per host process
+ADBRUNTIME_LIFECYCLE_OWNER      = 1 process-scoped singleton（object AdbRuntime）
+RECOVERY_OWNER                  = 1（AdbRecoveryCoordinator，AdbRuntime 持有，单 ReentrantLock）
+TRANSPORT_OBSERVER_OWNER        = 1（read-only，bound to AdbRuntime lifecycle）
+IDENTITY_OWNER                  = 1 per consumer app-private identity location（语义 owner，不要求一个 File object）
+ATEngine object count           = 不属于 invariant（NOT_A_LIFECYCLE_INVARIANT）
+```
+
+**`SECOND_AT_ENGINE = NO` 的准确历史含义**（§11，统一解释，不重写历史 evidence）：
+
+```
+SECOND_AT_ENGINE = NO  应理解为：
+  ✓ NO second independent AT execution subsystem（没有第二套独立 AT 执行子系统）
+  ✓ NO second ownership island（没有绕过 host composition 的第二个 engine 所有权孤岛）
+  ✗ 不是「process may only contain one ATEngine object」
+  ✗ 不是「must contain exactly two ATEngine objects」
+```
+
+`:app`（`AppRuntime`）结构完全相同：`localEngine()` + `adbEngine()` 两个**角色**，1 个
+composition root（`object AppRuntime`），同样 instance count 非 invariant。
 
 ### 5.2 AdbRuntime cardinality
 
@@ -554,7 +583,7 @@ AT Freeze 冻结的是 **capability**，**不是永久 packaging ABI**。当前�
 - 因此 raw AAR vendoring 时，consumer 必须**显式 vendor 完整 AAR 集合**：
 
 ```
-SELF_CONTAINED_AAR_SET = {
+REQUIRED_RAW_AAR_SET = {          （N3 规范化：原 SELF_CONTAINED_AAR_SET 改名）
   at-engine-debug.aar,        （pure JVM）
   at-backend-local-debug.aar, （+ libat_local_backend.so）
   at-backend-adb-debug.aar,   （pure JVM）
@@ -562,6 +591,17 @@ SELF_CONTAINED_AAR_SET = {
   at-cli-debug.aar            （+ libatcli_env.so）
 }
 ```
+
+> **命名语义（N3）**：`REQUIRED_RAW_AAR_SET` 表示「raw AAR vendoring 时**需要**的完整 5-AAR
+> 集合」，**不是**「AT 已正式建立并验证的 self-contained binary bundle」。配套语义标志：
+>
+> ```
+> RAW_AAR_SET_CONTENT_KNOWN        = YES   （5 件内容已知，见上）
+> RAW_AAR_CONSUMPTION_VERIFIED     = NO    （raw AAR 消费未正式验证）
+> FORMAL_SELF_CONTAINED_AAR_BUNDLE = NOT_ESTABLISHED（无正式 bundle / 无 POM / 无 publication）
+> AAR_TRANSITIVITY_METADATA        = ABSENT（AAR 不携带 transitive module dep metadata）
+> BASE_APK_MUST_CONTAIN_ATCLIMAIN  = YES   （CLI 要求 host base.apk 含 com.at.cli.AtCliMain class）
+> ```
 
   5 个 AAR 的 native .so 在 APK merge 时按 ABI 合并（同 arm64-v8a 不冲突）。manifest merge
   由 AGP 处理。JNI symbol / class package 匹配（`Java_com_at_cli_*` / `Java_com_at_backend_local_*`
@@ -611,7 +651,12 @@ unsupported      : Local PTY（无 :at-backend-local）；shell-visible adb CLI�
 identity         : MANDATORY（app-private, self-generated, 经 AdbEngine.pair 创建）
 ```
 
-### FULL_TERMINAL_CONSUMER（reference = :at-cli-consumer-host）
+### FULL_TERMINAL_ENVIRONMENT_PROFILE（reference = :at-cli-consumer-host）
+
+> **命名规范化（N1/§7）**：原 `FULL_TERMINAL_CONSUMER` 改名为 **`FULL_TERMINAL_ENVIRONMENT_PROFILE`**。
+> `FULL_TERMINAL` 描述的是**完整 terminal-environment capability profile**（Local + ADB + CLI 的
+> 完整环境形态），**不是** §18 `FULL_CURRENT_AT_V3_CONSUMER_INTEGRATION` 的 normative
+> completeness proof。两者不同，不得混用。
 
 ```
 required modules : :at-engine + :at-backend-local + :at-backend-adb + :adb-engine + :at-cli
@@ -623,9 +668,42 @@ unsupported      : （无 AT-side unsupported；Product UI / Model tool 是 cons
 identity         : MANDATORY（app-private, self-generated）
 ```
 
-**说明**：Local 与 ADB 是**正交** capability，consumer 按需组合。FULL_TERMINAL_CONSUMER 是
-reference consumer（`:at-cli-consumer-host`）的完整形态。Profile 划分与真实 design 一致
-（consumer host 确实同时 wire Local + ADB + CLI）。
+**reference host 角色（§23 最终定义）**：
+
+```
+AT_CLI_CONSUMER_HOST_ROLE =
+    REFERENCE_EMBEDDING_HOST        （证明 CLI embedding recipe 可行）
+  + REFERENCE_TERMINAL_ENVIRONMENT  （当前最完整的 AT terminal-environment reference）
+```
+
+它验证：Local persistent real PTY / ADB one-shot / ADB persistent Remote PTY / shell-visible
+adb CLI / Bootstrap / identity / AdbRuntime lifecycle / CLI bridge / Local → adb → remote shell
+path。
+
+**它不是 `FINAL_CONSUMER_CONFORMANCE_TEST_HOST`**（除非未来专门创建对应任务）。它是
+**embedding reference**，**不是** normative conformance suite。
+
+#### REFERENCE_HOST_CURRENT_WIRING（§6 显式 reference host matrix — 严格用层 1-5）
+
+| CAPABILITY | AT AVAILABLE（层1-2） | REFERENCE HOST WIRED（层4） | REFERENCE HOST CALLABLE（层5） |
+|---|---|---|---|
+| Local one-shot | YES | **NO**（`localEngine().oneShot = null`，未 wire `LocalOneShotBackend`） | **NO** |
+| Local persistent PTY | YES | YES | YES |
+| ADB one-shot | YES | YES | YES |
+| ADB persistent Remote PTY | YES | YES | YES |
+| AT CLI（shell-visible adb） | YES | YES | YES |
+| Bootstrap | YES | YES | YES |
+| Identity（per-consumer） | YES | YES | YES |
+| AdbRuntime lifecycle | YES | YES | YES |
+
+**关键**：`AT AVAILABLE = YES` **不等于** `REFERENCE HOST WIRED = YES`。Local one-shot 在 AT
+**可用**（层 1-2），但当前 reference host **没有 wire** `LocalOneShotBackend`（`oneShot = null`，
+层 4 = NO）。**不得**把不存在的 Local one-shot wiring 写成 PASS，也**不得**因 reference host 没
+wire 就反推「Local one-shot 不是 Full Integration requirement」（§21）。
+
+**说明**：Local 与 ADB 是**正交** capability，consumer 按需组合。FULL_TERMINAL_ENVIRONMENT_PROFILE
+是 reference consumer（`:at-cli-consumer-host`）的完整 terminal-environment 形态。Profile 划分与
+真实 design 一致（consumer host 确实同时 wire Local persistent + ADB + CLI）。
 
 ---
 
@@ -664,6 +742,24 @@ SCREENSTATE_PART_OF_CURRENT_INTEGRATION      = NO（NOT_IMPLEMENTED / DEFERRED�
 completeness。AT integration = 层 1-5（capability 可被 consumer 正确嵌入 + 调用）；层 6-7
 （product expose / model visible）是 consumer 产品层。
 
+**reference host 与 normative definition 的关系（N1/§22，最终形式）**：
+
+`FULL_CURRENT_AT_V3_CONSUMER_INTEGRATION` 是 **NORMATIVE CAPABILITY COMPLETENESS DEFINITION**
+（consumer 自己在层 3-5 完整消费当前 AT 提供的 current capability set 的标准）。它**保留**全部
+8 条，**尤其保留** `Local one-shot CALLABLE_BY_HOST`——因为 Local one-shot 是 AT 已提供的
+current capability（层 1-2 = AVAILABLE）。**不得**为了让 reference host 对得上定义而删除
+Local one-shot requirement（本轮修的是 reference implementation wording，不是 definition）。
+
+```
+REFERENCE_HOST_FULL_CURRENT_CONFORMANCE = NOT_EVALUATED_AS_FULL_CURRENT_CONFORMANCE
+```
+
+即：`:at-cli-consumer-host` 是 **embedding reference**（REFERENCE_TERMINAL_ENVIRONMENT），
+**不是** normative conformance suite。它当前 `localEngine().oneShot = null`（Local one-shot
+未 wire），所以**不能**被读成「reference host 已逐项满足 Full Current Integration」。
+definition 与 reference implementation 是两回事：definition 要求 8 条（含 Local one-shot），
+reference host 实现了其中 7 条（Local one-shot 除外）。**不得再暗示 reference host = YES conformance。**
+
 ---
 
 ## 19. Known Gaps（CURRENT GAP — 不含未来 Emulator 的产品功能）
@@ -689,24 +785,29 @@ raw byte-stream PTY（Local/Remote）**已验证存在**，但它**不是** scre
 ## 20. AG Reconciliation Input（§45 — 纯 AT-side checklist）
 
 **EXPECTED CURRENT AT CONSUMER CAPABILITY**（AT 侧标准答案；下一轮 AG 自己填
-PACKAGED / WIRED / CALLABLE / PRODUCT-EXPOSED / MODEL-VISIBLE 列）：
+PACKAGED / WIRED / CALLABLE / PRODUCT-EXPOSED / MODEL-VISIBLE 列）。
 
-| CAPABILITY | EXPECTED CONSUMER STATE（AT 侧） | AG 填：PACKAGED | AG 填：WIRED | AG 填：CALLABLE | AG 填：PRODUCT-EXPOSED | AG 填：MODEL-VISIBLE |
-|---|---|---|---|---|---|---|
-| Local one-shot | AVAILABLE（ATEngine.execute → LocalOneShotBackend） | ? | ? | ? | ? | ? |
-| Local persistent PTY | AVAILABLE（ATEngine.openSession → real PTY） | ? | ? | ? | ? | ? |
-| ADB one-shot | AVAILABLE（ATEngine.execute → AdbOneShotBackend） | ? | ? | ? | ? | ? |
-| ADB persistent (Remote PTY) | AVAILABLE（ATEngine.openSession → shell,v2,pty:） | ? | ? | ? | ? | ? |
-| AT CLI（shell-visible adb） | AVAILABLE（:at-cli bridge + LocalCliBootstrap；需 host wiring） | ? | ? | ? | ? | ? |
-| Bootstrap（pairing/discovery/state） | AVAILABLE（AdbConsumerBootstrap facade） | ? | ? | ? | ? | ? |
-| Identity（per-consumer） | AVAILABLE（app-private, self-generated；consumer 必须拥有） | ? | ? | ? | ? | ? |
-| Lifecycle（AdbRuntime UNIQUE owner） | AVAILABLE（AdbRuntime.initialize/ensureReady/connectAuto；consumer 必须正确交 owner） | ? | ? | ? | ? | ? |
-| Recovery（operation-driven bounded） | AVAILABLE（AdbRuntime.onOperationResult；consumer 不需主动管） | ? | ? | ? | ? | ? |
-| Local PTY raw I/O / resize / Ctrl-C | AVAILABLE（real PTY semantics） | ? | ? | ? | ? | ? |
-| ADB stdin / Ctrl-C / resize / multi-session | AVAILABLE（shell-v2 remote PTY） | ? | ? | ? | ? | ? |
-| connection reuse | AVAILABLE（AdbRuntime 持 1 连接，backend 复用） | ? | ? | ? | ? | ? |
-| transport-loss semantics | AVAILABLE（TRANSPORT_LOST/RECOVERING/RECOVERY_FAILED） | ? | ? | ? | ? | ? |
-| `adb pair <host>:<port> <code>` | AVAILABLE（T_PAIR → bootstrap.pair） | ? | ? | ? | ? | ? |
+> **两个独立信息维度（§21）**：**AT AVAILABLE**（层 1-2，AT 是否提供）与
+> **REFERENCE HOST CURRENT WIRING**（reference consumer 当前是否 wire，层 4）**正交**。
+> 不得因 reference host 某项 WIRED=NO 就反推该项「不是 Full Integration requirement」，
+> 也**不得**因 AT AVAILABLE=YES 就假设 reference host 已 wire。
+
+| CAPABILITY | AT AVAILABLE（层1-2） | REFERENCE HOST WIRED（层4, :at-cli-consumer-host） | AG 填：PACKAGED | AG 填：WIRED | AG 填：CALLABLE | AG 填：PRODUCT-EXPOSED | AG 填：MODEL-VISIBLE |
+|---|---|---|---|---|---|---|---|
+| Local one-shot | AVAILABLE（ATEngine.execute → LocalOneShotBackend） | **NO**（`localEngine().oneShot = null`） | ? | ? | ? | ? | ? |
+| Local persistent PTY | AVAILABLE（ATEngine.openSession → real PTY） | YES | ? | ? | ? | ? | ? |
+| ADB one-shot | AVAILABLE（ATEngine.execute → AdbOneShotBackend） | YES | ? | ? | ? | ? | ? |
+| ADB persistent (Remote PTY) | AVAILABLE（ATEngine.openSession → shell,v2,pty:） | YES | ? | ? | ? | ? | ? |
+| AT CLI（shell-visible adb） | AVAILABLE（:at-cli bridge + LocalCliBootstrap；需 host wiring） | YES | ? | ? | ? | ? | ? |
+| Bootstrap（pairing/discovery/state） | AVAILABLE（AdbConsumerBootstrap facade） | YES | ? | ? | ? | ? | ? |
+| Identity（per-consumer） | AVAILABLE（app-private, self-generated；consumer 必须拥有） | YES | ? | ? | ? | ? | ? |
+| Lifecycle（AdbRuntime UNIQUE owner） | AVAILABLE（AdbRuntime.initialize/ensureReady/connectAuto；consumer 必须正确交 owner） | YES | ? | ? | ? | ? | ? |
+| Recovery（operation-driven bounded） | AVAILABLE（AdbRuntime.onOperationResult；consumer 不需主动管） | YES（AdbRuntime 内置） | ? | ? | ? | ? | ? |
+| Local PTY raw I/O / resize / Ctrl-C | AVAILABLE（real PTY semantics） | YES（Local persistent 承载） | ? | ? | ? | ? | ? |
+| ADB stdin / Ctrl-C / resize / multi-session | AVAILABLE（shell-v2 remote PTY） | YES（ADB persistent 承载） | ? | ? | ? | ? | ? |
+| connection reuse | AVAILABLE（AdbRuntime 持 1 连接，backend 复用） | YES | ? | ? | ? | ? | ? |
+| transport-loss semantics | AVAILABLE（TRANSPORT_LOST/RECOVERING/RECOVERY_FAILED） | YES（AdbRuntime 内置） | ? | ? | ? | ? | ? |
+| `adb pair <host>:<port> <code>` | AVAILABLE（T_PAIR → bootstrap.pair） | YES | ? | ? | ? | ? | ? |
 | `adb pair <code>` shorthand | **NOT AVAILABLE**（DEFERRED） | — | — | — | — | — |
 | Terminal Emulator | **NOT AVAILABLE**（DEFERRED） | — | — | — | — | — |
 | ScreenState | **NOT AVAILABLE**（DEFERRED） | — | — | — | — | — |
