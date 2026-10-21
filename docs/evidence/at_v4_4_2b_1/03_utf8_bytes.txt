@@ -1,0 +1,30 @@
+UTF-8 BYTE-LEVEL MECHANICAL PROOF
+Date: 2026-10-21
+
+TARGET_CODEPOINT = U+4E2D (中)
+TARGET_UTF8_BYTES = E4 B8 AD
+
+FULL ROUNDTRIP:
+  Source: "PING \u4E2D\u6587\u6D4B\u8BD5\n"
+  Runtime: "PING 中文测试\n"
+  UTF-8 bytes: 50 49 4E 47 20 E4 B8 AD E6 96 87 E6 B5 8B E8 AF 95 0A
+  Total: 16 bytes
+  Expected PONG: "PONG 中文测试"
+
+SPLIT CASE:
+  Source: "PING \u4E2D\n"
+  Runtime: "PING 中\n"
+  UTF-8 bytes: 50 49 4E 47 20 E4 B8 AD 0A
+  Total: 9 bytes
+
+  Chunk 1 (offset 0-5): 50 49 4E 47 20 E4  (6 bytes)
+  Chunk 2 (offset 6-8): B8 AD 0A            (3 bytes)
+
+  SPLIT_OFFSET = 6
+  SPLIT_INSIDE_CODEPOINT = YES
+  (E4 is the first byte of U+4E2D; B8 AD are the remaining bytes)
+
+DEVICE RESULT:
+  G7_DEVICE_RESULT = PASS (1/1)
+  FULL_ROUNDTRIP = PASS
+  SPLIT_ROUNDTRIP = PASS

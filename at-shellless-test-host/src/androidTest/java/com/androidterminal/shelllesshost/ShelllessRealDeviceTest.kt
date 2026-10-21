@@ -192,17 +192,25 @@ class ShelllessRealDeviceTest {
     fun g7_utf8BytePreservation() {
         val s = open()
         readUntil(s, "READY", 5000)
-        // UTF-8 multi-byte argument must round-trip byte-exact.
-        s.write("PING ASCII_TEST\n".toByteArray())
-        val out = readUntil(s, "PONG ASCII_TEST", 4000)
-        assertTrue("UTF-8 PONG ASCII_TEST, got: $out", out.contains("PONG ASCII_TEST"))
-        // split chunks: split across writes.
-        val full = "PING S\n".toByteArray()
-        s.write(full.copyOfRange(0, 4)) // "PING"
+        // G7: MULTIBYTE UTF-8 byte preservation.
+        // \u4E2D = U+4E2D (UTF-8: E4 B8 AD).
+        // Full roundtrip: "PING \u4E2D\u6587\u6D4B\u8BD5\n" must arrive byte-exact.
+        val fullText = "PING \u4E2D\u6587\u6D4B\u8BD5\n"
+        s.write(fullText.toByteArray(Charsets.UTF_8))
+        val out = readUntil(s, "PONG \u4E2D\u6587\u6D4B\u8BD5", 4000)
+        assertTrue("full UTF-8 roundtrip, got: $out", out.contains("PONG \u4E2D\u6587\u6D4B\u8BD5"))
+        // Byte-level split INSIDE U+4E2D (E4 B8 AD):
+        //   "PING " = 5 bytes (50 49 4E 47 20)
+        //   U+4E2D  = 3 bytes (E4 B8 AD)
+        //   "\n"   = 1 byte  (0A)
+        //   Total: 9 bytes. Split at offset 6 (inside U+4E2D).
+        val full = "PING \u4E2D\n".toByteArray(Charsets.UTF_8)
+        // full = [50 49 4E 47 20 E4 B8 AD 0A] = 9 bytes
+        s.write(full.copyOfRange(0, 6)) // "PING " + E4 (first byte of U+4E2D)
         Thread.sleep(120)
-        s.write(full.copyOfRange(4, full.size)) // " S\n"
-        val out2 = readUntil(s, "PONG S", 4000)
-        assertTrue("split PONG S got: $out2", out2.contains("PONG S"))
+        s.write(full.copyOfRange(6, full.size)) // B8 AD 0A (rest of U+4E2D + newline)
+        val out2 = readUntil(s, "PONG \u4E2D", 4000)
+        assertTrue("split UTF-8 (inside U+4E2D) PONG, got: $out2", out2.contains("PONG \u4E2D"))
         s.close(true)
     }
 

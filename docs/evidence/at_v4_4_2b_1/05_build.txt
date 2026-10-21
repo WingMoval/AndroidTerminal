@@ -1,0 +1,15 @@
+AT.V4-4.2B.1 BUILD + DEVICE EVIDENCE
+Date: 2026-10-21
+
+BUILD:
+:at-shellless-test-host:assembleDebug : PASS
+:at-shellless-test-host:assembleDebugAndroidTest : PASS
+
+DEVICE (HONOR ALI-AN00 APLMUT4312005935, Android 15):
+G7 targeted test: g7_utf8BytePreservation
+Result: 1/1 PASS
+
+FULL_ROUNDTRIP = PASS (PING 中文测试 → PONG 中文测试)
+SPLIT_ROUNDTRIP = PASS (byte-level split inside U+4E2D at offset 6)
+
+SHELLLESS_FULL_DEVICE_RESULT = NOT_RUN (optional, not required for Hard PASS)

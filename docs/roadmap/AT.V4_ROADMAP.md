@@ -347,6 +347,33 @@
 - PRODUCTION_CHANGED = NO
 - SEMANTIC_DELTA = NONE
 
+**RECOMMENDED_NEXT** = AT.V4-4.2B.1（UTF-8 Semantic Restoration）
+
+---
+
+### AT.V4-4.2B.1：UTF-8 Semantic Restoration
+
+**Status**: COMPLETE
+
+**Scope**:
+- B3 ASCII workaround 修正为 Unicode escape（`\u4E2D` 等）
+- Byte-level split inside U+4E2D（E4 B8 AD）
+- 恢复 multibyte UTF-8 validation semantic
+- 不修改 production code / Gradle / Manifest
+
+**Actual**:
+- Unicode escape used（source ASCII-safe）
+- Runtime multibyte UTF-8 restored（中文测试）
+- Byte-level split inside U+4E2D at offset 6
+- G7 targeted device 1/1 PASS
+- 0 production change
+
+**Gate**:
+- SHELLLESS_MAIN_BUILD = PASS
+- SHELLLESS_ANDROIDTEST_BUILD = PASS
+- G7_DEVICE_RESULT = PASS
+- PRODUCTION_CHANGED = NO
+
 **RECOMMENDED_NEXT** = V4-4.2 RETRY（Device Closure）
 
 ---

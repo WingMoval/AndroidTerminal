@@ -166,6 +166,20 @@ git diff --name-only 26a028c..HEAD:
 - AdbTransportLossAuditTest device behavior (pending V4-4.2)
 - DebugBridge V3→V4 device parity (pending V4-4.2)
 
+## 15a. Correction Note (AT.V4-4.2B.1)
+
+AT.V4-4.2B initially used ASCII workaround for B3. Build blocker was removed,
+but multibyte UTF-8 validation semantic was not fully preserved.
+
+AT.V4-4.2B.1 restores that semantic using Unicode escapes (`\u4E2D` etc.)
++ byte-level split inside U+4E2D (E4 B8 AD). G7 device test: 1/1 PASS.
+
+The `ASSERTION_SEMANTIC_CHANGE = 0` statement in section 10 is
+**SUPERSEDED_BY_AT_V4_4_2B_1** — the assertion semantic was changed from
+CJK to ASCII in 4.2B and restored to CJK (via escapes) in 4.2B.1.
+
+---
+
 ## 16. Handoff to V4-4.2 Retry
 
 V4-4.2 RETRY scope (frozen):

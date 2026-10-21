@@ -300,6 +300,8 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **V4-4.2B**：Validation Infrastructure Repair（COMPLETE）。B1/B2/B3 全部 REPAIRED；5 validation carriers main+androidTest 10/10 PASS；core regression 8/8 PASS；B1 targeted device 7/7 PASS。
 
+**V4-4.2B.1**：UTF-8 Semantic Restoration（COMPLETE）。B3 CJK→ASCII workaround 修正为 Unicode escape（`\u4E2D` 等）+ byte-level split inside U+4E2D；G7 device 1/1 PASS；multibyte UTF-8 validation semantic restored。
+
 **V4-4.2**：OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B4 first-use pairing / B5-B7 test host install / B8 observability evidence 待设备重连后执行）。
 
 ---
@@ -322,6 +324,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
 | AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |
 | AT.V4-4.2B | COMPLETE（Validation Infrastructure Repair；B1 @Before initialize / B2 FQN fix / B3 CJK→ASCII（Kotlin CJK compiler issue）；10/10 build PASS；core 8/8 PASS；B1 device 7/7 PASS；0 production change） |
+| AT.V4-4.2B.1 | COMPLETE（UTF-8 Semantic Restoration；B3 ASCII→Unicode escape + byte-level split inside U+4E2D；G7 device 1/1 PASS；multibyte UTF-8 semantic restored；0 production change） |
 
 ---
 
@@ -374,6 +377,8 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization。
 
 **AT.V4-4.2B**：COMPLETE — Validation Infrastructure Repair（B1: AppDebugInputTest @Before 加 AppRuntime.initialize(ctx)；B2: AdbTransportLossAuditTest FQN 修正；B3: ShelllessRealDeviceTest g7 CJK→ASCII（Kotlin 1.9.24 CJK compiler issue，pre-existing V3 debt）；3 test files changed / 0 production / 0 gradle / 0 manifest；build matrix 10/10 PASS；core regression 8/8 PASS；B1 targeted device 7/7 PASS）。
+
+**AT.V4-4.2B.1**：COMPLETE — UTF-8 Semantic Restoration（B3 ASCII workaround 修正：Unicode escape `\u4E2D\u6587\u6D4B\u8BD5` + byte-level split inside U+4E2D（E4 B8 AD）offset 6；G7 device 1/1 PASS；multibyte UTF-8 validation semantic fully restored；1 test file changed / 0 production）。
 
 **RECOMMENDED_NEXT** = AT.V4-4.2 RETRY — Device Closure（需设备重连 + test host APK install + ConsumerHost first-use pairing）。
 
