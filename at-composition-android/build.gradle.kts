@@ -36,9 +36,18 @@ android {
 }
 
 dependencies {
-    // V4-2: Composition root dependencies
+    // V4-2: Composition root dependencies.
+    // V4-4.1A: SPI visibility demoted api -> implementation.
+    // The composition PUBLIC surface (ATAndroidComposition) only exposes
+    // :at-engine-api types (ATEngine) + composition-owned types — it never
+    // names ATOneShotBackend / ATPersistentBackend or any :at-engine-spi type
+    // in a public signature. Consumers therefore do not need :at-engine-spi
+    // on their compile classpath.
+    // :at-engine-api stays `api` because ATAndroidComposition's public
+    // properties (localEngine / adbEngine) ARE ATEngine (an :at-engine-api
+    // type) — consumers compile against it.
     api(project(":at-engine-api"))
-    api(project(":at-engine-spi"))
+    implementation(project(":at-engine-spi"))
     implementation(project(":at-engine"))
     implementation(project(":at-backend-local"))
     implementation(project(":at-backend-adb"))

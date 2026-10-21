@@ -18,7 +18,6 @@ import com.at.composition.android.ATAdbReadinessState
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.at.engine.ATOpenSessionResult
-import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession

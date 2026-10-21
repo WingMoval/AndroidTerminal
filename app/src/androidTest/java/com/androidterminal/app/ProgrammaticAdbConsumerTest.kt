@@ -1,4 +1,4 @@
-// AndroidTerminal V3 â€?Programmatic ADB Consumer validation (AT.HUMAN-ADB-0).
+// AndroidTerminal V3 ï¿½?Programmatic ADB Consumer validation (AT.HUMAN-ADB-0).
 //
 // Drives the FULL Human ADB scenario through the RESERVED programmatic path:
 //   AppRuntime (composition root) -> ATEngine -> AdbPersistentBackend -> adbd
@@ -6,7 +6,7 @@
 // NO UI / NO IME / NO uiautomator / NO screen coordinates. Command results come
 // from ATTerminalSession output/events. This is the "Debug consumer" of the one
 // common AT consumer path, exercising the same ATEngine + backend semantics the
-// Human UI uses â€?proving the programmatic path is a first-class consumer.
+// Human UI uses ï¿½?proving the programmatic path is a first-class consumer.
 //
 // Covers Â§24-Â§33: principal, cwd, env, Ctrl-C, resize, multi-session, isolation,
 // inactive buffering, close isolation, Local+ADB coexistence.
@@ -18,7 +18,6 @@ import com.at.composition.android.ATAdbReadinessState
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.at.engine.ATOpenSessionResult
-import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
@@ -34,7 +33,7 @@ class ProgrammaticAdbConsumerTest {
 
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    /** Thin adapter over ATEngine â€?the programmatic consumer. No Android UI. */
+    /** Thin adapter over ATEngine ï¿½?the programmatic consumer. No Android UI. */
     private class Consumer {
         val events = ConcurrentLinkedQueue<ATSessionEvent>()
         private val output = StringBuilder()

@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-21
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.2 OPEN（Device Closure）
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 OPEN（Device Closure）
 
 ---
 
@@ -193,6 +193,37 @@
 **Deliverables**:
 - `docs/implementation/AT.V4-4.1_Consumer_Semantic_Type_Closure.md`
 - 更新后的 `AT.V4_MASTER_SSOT.md` / `AT.V4_ROADMAP.md` / `AT.V4-MIGRATION-AUDIT-0_V3_to_V4_Full_Migration_Audit.md`（count 修正）
+
+**RECOMMENDED_NEXT** = AT.V4-4.1A（Final Consumer Dependency Closure）
+
+---
+
+### AT.V4-4.1A：Final Consumer Dependency Closure
+
+**Status**: COMPLETE
+
+**Scope**（actual）:
+- `:app` 删除直接 `implementation(:at-backend-local)` / `implementation(:at-backend-adb)`
+  （HISTORICAL 遗留：V3 无 composition 时 app 直接构造 backend；V4 后零 source 需求）
+- `:at-composition-android` 的 `api(:at-engine-spi)` → `implementation(:at-engine-spi)`
+  （public surface 零 SPI 类型：`ATAndroidComposition` 只暴露 `ATEngine` + composition 类型）
+- `:at-engine-api` 保持 `api`（`ATAndroidComposition.localEngine/adbEngine` 是 public `ATEngine` 属性，consumer 需 compile 可见）
+- 删除 3 个 androidTest dead import（`com.at.engine.ATPersistentBackend`，V3 遗留失效路径）
+- APK native packaging 验证：`libat_local_backend.so` / `libadbd_engine.so` / `libatcli_env.so` / `libatapp_env.so` 全部经 composition transitive 进入 APK
+- Gradle dependency graph 证据：`:app` debugCompileClasspath 顶级仅 `:at-engine-api` / `:at-composition-android` / `:at-cli`
+
+**Gate**:
+- Build: PASS（全量 assembleDebug + 9 module test）
+- Android test compile: PASS
+- Consumer forbidden import: 0（spi / backend.* / adb.engine / engine.impl）
+- Consumer forbidden direct dep: 0
+- Composition public SPI/backend/adb leak: 0
+- APK 4 个 native .so: 全部 YES
+- Device: NOT_EVALUATED（留给 V4-4.2）
+
+**Deliverables**:
+- `docs/implementation/AT.V4-4.1A_Final_Consumer_Dependency_Closure.md`
+- 更新后的 `AT.V4_MASTER_SSOT.md` / `AT.V4_ROADMAP.md`
 
 **RECOMMENDED_NEXT** = AT.V4-4.2（Device Closure）
 

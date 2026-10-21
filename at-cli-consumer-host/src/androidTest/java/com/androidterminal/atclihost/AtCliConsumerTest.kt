@@ -30,7 +30,6 @@ import com.at.composition.android.ATAdbPairingDiscovery
 import com.at.composition.android.ATAdbPairingResult
 import com.at.composition.android.ATAdbReadinessState
 import com.at.engine.ATOpenSessionResult
-import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATTerminalSession
 import com.at.engine.ATEngine

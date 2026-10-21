@@ -51,18 +51,17 @@ android {
 }
 
 dependencies {
-    // The App consumes the AT Engine public boundary and selected backends.
-    // V4-4.1: Consumer semantic type closure (CLOSED).
-    // Allowed: :at-engine-api + :at-composition-android + :at-cli (+ backends).
-    // NO :adb-engine: the App's ADB lifecycle (AdbRuntime) is owned INSIDE the
-    // composition (assembly root); the App observes/drives it via the
-    // composition control facade (ATAndroidAdbControl, PROJECTION_ONLY) which
-    // returns composition-owned semantic types (ATAdbReadinessState /
-    // ATAdbBootstrapState / ATAdbPairingResult) or primitives.
+    // The App consumes the AT Engine public boundary + composition + CLI.
+    // V4-4.1A: FINAL consumer dependency closure.
+    // Allowed: :at-engine-api + :at-composition-android + :at-cli ONLY.
+    // NO :at-backend-local / :at-backend-adb / :adb-engine / :at-engine-spi /
+    // :at-engine: the concrete backends are constructed INSIDE the composition
+    // (assembly root) and enter the App runtime classpath transitively via
+    // implementation(:at-backend-*) in :at-composition-android (runtime
+    // visibility is enough — the App never names a backend type at compile
+    // time). Native .so packaging follows the same transitive runtime path.
     implementation(project(":at-engine-api"))
     implementation(project(":at-composition-android"))
-    implementation(project(":at-backend-local"))
-    implementation(project(":at-backend-adb"))
 
     // AT.CLI-CONSUMER-0: the App consumes the REUSABLE shell-visible ADB CLI
     // consumer capability (the `adb` CLI main + same-UID UDS bridge + Local
