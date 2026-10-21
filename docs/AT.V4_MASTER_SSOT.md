@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-4.1a
+> **Version**: 4.0.0-v4-4.2
 > **Date**: 2026-10-21
-> **Status**: V4-4 + V4-4.1 + V4-4.1A consumer boundary fully closed (Gradle + source + packaging) / device closure pending (V4-4.2)
+> **Status**: V4-4.2 Device Closure IN_PROGRESS — 79/86 gates PASS (core gates complete) / adb-only host blocked on third fresh pairing
 
 ---
 

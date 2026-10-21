@@ -1,0 +1,11 @@
+DEVICE STATE
+
+com.androidterminal.app : NOT_INSTALLED
+com.androidterminal.testhost : INSTALLED
+com.androidterminal.adbonlytesthost : NOT_INSTALLED
+com.androidterminal.shelllesshost : NOT_INSTALLED
+com.androidterminal.atclihost : INSTALLED
+
+Product identity: [NO_IDENTITY]
+ConsumerHost identity: [NO_IDENTITY]
+Wireless Debugging (adb_wifi_enabled): 0

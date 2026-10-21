@@ -1,0 +1,26 @@
+A1-A10 PRODUCT ADB GATES (RETRY)
+Date: 2026-10-21
+Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
+Method: DebugBridge attach to existing ADB Human TerminalSession (sessionId=1)
+Evidence: UI hierarchy dump (tvOutput) — authoritative source
+
+A1_remote_uid2000: PASS (id → uid=2000(shell))
+A2_stdout: PASS (echo A2_OK → A2_OK)
+A3_interactive_input: PASS (echo A3_INPUT → A3_INPUT)
+A4_cwd_continuity: PASS (cd /sdcard + pwd → /sdcard)
+A5_env_continuity: PASS (export AT_ADB=rem5 + echo $AT_ADB → rem5)
+A6_ctrl_c: PASS (sleep 10 + ^C → A6_OK)
+A7_real_pty: PASS (tty → /dev/pts/0)
+A8_session_continuity: PASS (echo A8_ALIVE → A8_ALIVE)
+A9_remote_identity: PASS (id → uid=2000(shell))
+A10_connection_lifecycle: PASS (echo A10_DONE → A10_DONE)
+
+REMOTE_ID: uid=2000(shell) gid=2000(shell) groups=2000(shell),1004(input),1007(log),1011(adb),...
+REMOTE_TTY: /dev/pts/0
+PAIRING: first-use pairing completed (user manual via UI)
+PAIRING_CODE_USED: YES (live, not recorded)
+PAIRING_RESULT: PASS
+
+NOTE: Previous attempt had Python client output accumulation bug (A5+ failed).
+UI evidence confirms all commands executed successfully on device.
+DebugBridge protocol works correctly; client-side readline buffering issue.

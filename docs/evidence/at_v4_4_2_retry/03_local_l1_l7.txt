@@ -1,0 +1,18 @@
+L1-L7 PRODUCT LOCAL GATES
+Date: 2026-10-21
+Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
+Method: DebugBridge attach to existing Local Human TerminalSession (sessionId=1)
+Evidence: UI hierarchy dump (tvOutput) + DebugBridge JSONL protocol
+
+L1_session_active: PASS (state=ACTIVE, backendKind=LOCAL)
+L2_stdin_stdout: PASS (echo L2_STDOUT_OK → L2_STDOUT_OK)
+L3_chunked_input: PASS (echo CHUNK + _TEST → CHUNK_TEST)
+L4_ctrl_c: PASS (sleep 10 + ^C → AFTER_CTRL_C)
+L5_cwd_continuity: PASS (cd /data/local/tmp + pwd → /data/local/tmp)
+L6_env_continuity: PASS (export AT_V4_ENV=hello + echo $AT_V4_ENV → hello)
+L7_session_continuity: PASS (echo L7_STILL_ALIVE → L7_STILL_ALIVE)
+
+DEBUG_LOCAL_ATTACH: PASS
+DebugBridge attached to existing Human session (sessionId=1)
+No hidden session created
+Same cwd/env shared between Human UI and Debug client

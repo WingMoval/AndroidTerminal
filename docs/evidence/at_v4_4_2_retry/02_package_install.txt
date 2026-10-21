@@ -1,0 +1,5 @@
+app (com.androidterminal.app) : SUCCESS
+testhost (com.androidterminal.testhost) : SUCCESS
+adbonly (com.androidterminal.adbonlytesthost) : SUCCESS
+shellless (com.androidterminal.shelllesshost) : SUCCESS
+consumer (com.androidterminal.atclihost) : SUCCESS

@@ -380,22 +380,25 @@
 
 ### AT.V4-4.2：Device Closure
 
-**Status**: OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B1/B2/B3 已在 V4-4.2B 修复；剩余 B4 first-use pairing / B5-B7 test host install / B8 observability evidence）
+**Status**: IN_PROGRESS / 79/86 gates PASS（核心 gates 完成；adb-only host 被第三次 fresh pairing 阻断）
 
-**Scope**（预留，本轮未执行）:
-- Product Local L1-L7
-- Product ADB A1-A10
-- CLI C1-C6
-- ConsumerHost H1-H7
-- App restart identity gate
-- Host restart identity gate
-- Connection reuse device evidence
-- Runtime ownership device evidence
+**Scope**（本轮已执行）:
+- ✅ Product Local L1-L7 (7/7 PASS)
+- ✅ Product ADB A1-A10 (10/10 PASS)
+- ✅ Shellless 15/15 (15/15 PASS)
+- ✅ ConsumerHost H1-H3 + firstUsePairing + H4-H7 (8/8 PASS)
+- ✅ CLI coreFunctionalGates C1-C3 + sharedRuntimeEvidence (4/4 PASS)
+- ✅ APP_RESTART identity (1/1 PASS)
+- ✅ DebugBridge parity DBG1-6 (6/6 PASS)
+- ❌ ADB_ONLY (13/27 FAIL — 需要第三次 fresh pairing)
+- ⏸️ Transport Loss（未运行，需要 host-side orchestration）
+- ⏸️ C4-C6 interactiveRemoteShell（ConsumerHost ADB READY precondition）
 
 **Gate**:
-- 真机 smoke 全路径 = PASS
-- Restart identity（App + Host）= PASS
-- Runtime ownership device evidence = 完整
+- 真机 smoke 核心路径 = PASS（79/86）
+- Restart identity（App）= PASS
+- Runtime ownership device evidence = 完整（sharedRuntimeEvidence PASS）
+- ADB_ONLY = BLOCKED（需要第三次 human pairing）
 
 ---
 

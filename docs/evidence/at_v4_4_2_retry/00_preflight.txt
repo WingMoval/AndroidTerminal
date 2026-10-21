@@ -1,0 +1,14 @@
+AT.V4-4.2 RETRY PREFLIGHT
+Date: 2026-10-21
+
+HEAD: dca4cbfe1de407888188c3dd78855bd14c83a06a
+WORKTREE: []
+
+System.Object[]
+
+adb devices -l:
+List of devices attached APLMUT4312005935       device product:ALI-AN00 model:ALI_AN00 device:HNALI-Q transport_id:2 
+
+ro.product.model: ALI-AN00
+ro.build.version.release: 15
+ro.build.version.sdk: 35
