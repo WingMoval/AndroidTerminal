@@ -1,0 +1,22 @@
+﻿AT.V4-4.2A.1F ENCODING SCAN (BEFORE)
+Date: 2026-10-21
+Files scanned: 7
+Files with issues: 1
+U_FFFD_COUNT: 0
+MOJIBAKE_OCCURRENCE_COUNT: 23
+
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=51 COL=59 TOKEN=鈫 CONTEXT=[ne.DefaultATEngine` 鈫?  `com.at.engine.impl.DefaultATEngine`]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=55 COL=30 TOKEN=鈥 CONTEXT=[**: `Expecting '"'` 鈥?CJK UTF-8 string literals corrupted]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=57 COL=24 TOKEN=鈫 CONTEXT=[epo creation (UTF-8 鈫?GBK/CP936 鈫?UTF-8 double-encoding). Th]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=58 COL=44 TOKEN=鈥 CONTEXT=[V3 baseline 75d5832 鈥?V3 was ALSO non-buildable.]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=92 COL=14 TOKEN=鈥 CONTEXT=[  initialize 鈥?only AppDebugInputTest is broken.]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=118 COL=66 TOKEN=鈥 CONTEXT=[s explicit `engine` 鈥?the `engine=null` fallback is TEST-ONL]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=122 COL=42 TOKEN=鈫 CONTEXT=[aunch(MainActivity) 鈫?initialize via Activity]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=125 COL=32 TOKEN=鈫 CONTEXT=[utTest uses NEITHER 鈫?broken.]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=136 COL=78 TOKEN=鈫 CONTEXT=[* | discoverPairing 鈫?user 6-digit 鈫?AdbConsumerBootstrap.pa]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=137 COL=106 TOKEN=鈫 CONTEXT=[nnectAuto (creates) 鈫?discoverPairing 鈫?AdbEngine.pair 鈫?con]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=151 COL=88 TOKEN=鈥 CONTEXT=[s trust state) | NO 鈥?do not run if already trusted |]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=152 COL=117 TOKEN=鈥 CONTEXT=[ates identity) | NO 鈥?BLOCKED (no code staged); would mutate]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=153 COL=85 TOKEN=鈥 CONTEXT=[resh identity) | NO 鈥?requires pairing dialog + code |]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=154 COL=112 TOKEN=鈥 CONTEXT=[CURE_SETTINGS) | NO 鈥?mutates WD state |]
+FILE=docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md LINE=155 COL=86 TOKEN=鈥 CONTEXT=[CURE_SETTINGS) | NO 鈥?mutates WD state |]

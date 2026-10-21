@@ -1,0 +1,24 @@
+file,line_before,bad_text,replacement,reason,semantic_change
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,51,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,55,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,57,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,57,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,58,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,92,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,118,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,122,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,125,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,136,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,136,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,136,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,136,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,136,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,137,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,137,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,137,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,137,U+922B?,→,mojibake restoration (arrow),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,151,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,152,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,153,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,154,U+9225?,—,mojibake restoration (dash),NO
+AT.V4-4.2A_Device_Validation_Readiness_Audit.md,155,U+9225?,—,mojibake restoration (dash),NO

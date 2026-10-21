@@ -234,3 +234,14 @@ NO production code changes.
 After fix: all 5 modules × androidTest should compile PASS.
 
 NEXT_OPEN_AUTHORIZED = NO (awaiting Controller authorization for V4-4.2B).
+
+
+---
+
+## 21. Encoding Finalization Note (AT.V4-4.2A.1F)
+
+- Formal artifact set scanned (7 files)
+- Mojibake found and restored: 23 occurrences in AT.V4-4.2A_Device_Validation_Readiness_Audit.md
+- U+FFFD: 0
+- CSV parse: 0 errors
+- All counts unchanged

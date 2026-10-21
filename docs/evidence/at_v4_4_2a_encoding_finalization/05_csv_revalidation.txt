@@ -1,0 +1,7 @@
+﻿CSV REVALIDATION (AFTER FIX)
+Test_Harness_Matrix: rows=251 cols=32 bad=0
+Device_Gate_Coverage_Matrix: rows=36 cols=13 bad=0
+Blocker_Matrix: rows=8 cols=16 bad=0
+CSV_PARSE_ERROR_COUNT: 0
+CSV_BAD_ROW_COUNT: 0
+CSV_HASH_CHANGED: NO (no CSV modifications)

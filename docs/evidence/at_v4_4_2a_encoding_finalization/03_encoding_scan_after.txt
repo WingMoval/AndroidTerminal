@@ -1,0 +1,11 @@
+﻿AT.V4-4.2A.1F ENCODING SCAN (AFTER)
+Date: 2026-10-21
+UTF8_STRICT_DECODE_FAIL_COUNT: 0
+ROUND_TRIP_FAIL_COUNT: 0
+U_FFFD_COUNT: 0
+KNOWN_MOJIBAKE_OCCURRENCE_COUNT: 0
+
+CSV REVALIDATION:
+docs/audit/AT.V4-4.2A_Test_Harness_Matrix.csv : rows=8032 cols=32 bad=0
+docs/audit/AT.V4-4.2A_Device_Gate_Coverage_Matrix.csv : rows=468 cols=13 bad=0
+docs/audit/AT.V4-4.2A_Blocker_Matrix.csv : rows=128 cols=16 bad=0

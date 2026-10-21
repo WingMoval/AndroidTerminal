@@ -296,6 +296,30 @@
 - Updated: `AT.V4-4.2A_Blocker_Matrix.csv`（8 blockers）
 - `docs/evidence/at_v4_4_2a_normalization/`（normalization evidence）
 
+**RECOMMENDED_NEXT** = AT.V4-4.2A.1F（Audit Encoding Finalization）
+
+---
+
+### AT.V4-4.2A.1F：Audit Encoding Finalization
+
+**Status**: COMPLETE
+
+**Scope**:
+- Formal audit artifact UTF-8 strict decode validation（7 files）
+- Mojibake detection + restoration（23 occurrences: U+922B→→, U+9225→—）
+- U+FFFD scan（0）
+- CSV strict parser revalidation（0 errors, 0 bad rows）
+- Frozen count verification（251/36/8 unchanged）
+- Zero semantic changes
+
+**Gate**:
+- UTF8_STRICT_DECODE_FAIL_COUNT = 0
+- U_FFFD_COUNT = 0
+- KNOWN_MOJIBAKE_OCCURRENCE_COUNT = 0
+- CSV_PARSE_ERROR_COUNT = 0
+- FROZEN_COUNT_MISMATCH_COUNT = 0
+- SEMANTIC_CHANGE_COUNT = 0
+
 **RECOMMENDED_NEXT** = AT.V4-4.2B（Validation Infrastructure Repair）
 
 ---

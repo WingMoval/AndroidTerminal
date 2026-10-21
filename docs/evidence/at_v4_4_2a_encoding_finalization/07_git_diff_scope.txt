@@ -1,0 +1,22 @@
+AT.V4-4.2A.1F GIT DIFF SCOPE
+Range: 45e831a..0ad39b6
+
+Files changed:
+docs/AT.V4_MASTER_SSOT.md
+docs/audit/AT.V4-4.2A.1F_Audit_Encoding_Finalization.md
+docs/audit/AT.V4-4.2A.1_Evidence_Normalization.md
+docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md
+docs/evidence/at_v4_4_2a_encoding_finalization/00_preflight.txt
+docs/evidence/at_v4_4_2a_encoding_finalization/01_encoding_scan_before.txt
+docs/evidence/at_v4_4_2a_encoding_finalization/02_replacement_manifest.csv
+docs/evidence/at_v4_4_2a_encoding_finalization/03_encoding_scan_after.txt
+docs/evidence/at_v4_4_2a_encoding_finalization/05_csv_revalidation.txt
+docs/evidence/at_v4_4_2a_encoding_finalization/06_frozen_counts_check.txt
+docs/roadmap/AT.V4_ROADMAP.md
+
+PRODUCTION_CHANGED: NO
+TEST_SOURCE_CHANGED: NO
+GRADLE_CHANGED: NO
+MANIFEST_CHANGED: NO
+
+All changes are docs/ and docs/evidence/ only.

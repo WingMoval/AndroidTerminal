@@ -296,6 +296,8 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **V4-4.2A.1**：Validation Audit Evidence Normalization（COMPLETE）。
 
+**V4-4.2A.1F**：Audit Encoding Finalization（COMPLETE）。
+
 **V4-4.2**：OPEN / BLOCKED_BY_VALIDATION_READINESS（等待 V4-4.2B 修复后 retry）。
 
 **V4-4.2B**：OPEN / WAITING_CONTROLLER_AUTHORIZATION（Validation Infrastructure Repair）。
@@ -318,6 +320,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.2 | OPEN / BLOCKED_BY_VALIDATION_READINESS（device closure 被 test/harness blocker 阻断；详见 V4-4.2A audit） |
 | AT.V4-4.2A | COMPLETE（Device Validation Readiness Audit；全量 blocker 识别；UNKNOWN=0；RECOMMENDED_NEXT=V4-4.2B） |
 | AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
+| AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |
 
 ---
 
