@@ -51,13 +51,14 @@ android {
 dependencies {
     // Reusable CLI consumer capability + AT composition.
     // DELIBERATELY ABSENT: :app (consumer isolation gate 搂25).
+    // V4-4: Consumer boundary closure
+    // Allowed: :at-engine-api + :at-composition-android + :at-cli
     implementation(project(":at-cli"))
-    // V4-1: TRANSITIONAL_DIRECT_DEPENDENCIES (will be removed in AT.V4-4)
     implementation(project(":at-engine-api"))
-    implementation(project(":at-engine-spi"))
-    implementation(project(":at-engine"))
-    implementation(project(":at-backend-local"))
-    implementation(project(":at-backend-adb"))
+    implementation(project(":at-composition-android"))
+    
+    // TRANSITIONAL: :adb-engine needed for AdbRuntimeState/AdbConsumerBootstrap types
+    // (will be removed when these are projected in :at-composition-android)
     implementation(project(":adb-engine"))
 
     androidTestImplementation("androidx.test:runner:1.5.2")

@@ -13,15 +13,12 @@
 
 package com.androidterminal.app
 
-import com.at.backend.local.LocalPersistentBackend
 import com.at.engine.ATEngine
 import com.at.engine.ATOpenSessionResult
-import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
 import com.at.engine.ATSessionLaunch
-import com.at.engine.impl.DefaultATEngine
 
 /**
  * App-side terminal composition helper.
@@ -47,10 +44,8 @@ class AppTerminal(
     /** Optional input-activity callback (for UI annotation of external writes). */
     private val onInputActivity: ((InputSource, ByteArray) -> Unit)? = null,
 ) {
-    private val engine: ATEngine = engine ?: DefaultATEngine(
-        oneShot = null, // Dev preview / debug is persistent-focused (not one-shot)
-        persistent = LocalPersistentBackend(),
-    )
+    // V4-4: Delegate to AppRuntime (which uses ATAndroidComposition).
+    private val engine: ATEngine = engine ?: AppRuntime.localEngine()
 
     /** Current session, if any. */
     var session: ATTerminalSession? = null

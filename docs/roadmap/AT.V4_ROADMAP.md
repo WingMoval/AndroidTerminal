@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-21
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING
 
 ---
 
@@ -114,27 +114,33 @@
 
 ---
 
-### AT.V4-4：CLI / Product App 迁移
+### AT.V4-4：Consumer Boundary Closure
 
-**Status**: OPEN
+**Status**: IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING
 
-**Scope**:
-- `:at-cli` 改依赖 `:at-engine-api` + `:at-composition-android`（删除 `:at-engine` / `:at-backend-local` / `:at-backend-adb` / `:adb-engine` 直接依赖）
-- `:app` 改依赖 `:at-engine-api` + `:at-composition-android` + `:at-cli`（删除 `:at-engine` / `:at-backend-local` / `:at-backend-adb` / `:adb-engine` 直接依赖）
-- `:at-cli-consumer-host` 改依赖 `:at-engine-api` + `:at-composition-android` + `:at-cli`（删除 internal module 直接依赖）
-- 简化 `ATCliExecution` SPI（`engine(): ATEngine`，不再要求 `adbEngine()` / `ensureReady()` / `adbIdentityDir()` / `consumerBootstrap()`）
-- 验证：`:at-cli` / `:app` / `:at-cli-consumer-host` 可以正常构建
-- 验证：CLI `adb shell` / `adb pair` 可以正常工作
+**Scope** (actual):
+- 创建 `ATAndroidAdbControl`（consumer semantic facade，PROJECTION_ONLY）
+- `ATAndroidComposition` 增加 `adbControl` 字段
+- 简化 `ATCliExecution` SPI（删除 `adbIdentityDir()` / `consumerBootstrap()`，增加 `pairingState()` / `pair()` / `pairDiscovered()`）
+- `:at-cli` 不再依赖 `:adb-engine`（AdbPairingResultV2 处理移到 host 侧）
+- `:app` 迁移到使用 `ATAndroidComposition`（删除 backend constructor / DefaultATEngine）
+- `:at-cli-consumer-host` 迁移到使用 `ATAndroidComposition`
+- `:app` / `:at-cli-consumer-host` 保留 TRANSITIONAL `:adb-engine` 依赖（for AdbRuntimeState/AdbBootstrapState types）
+- 验证：build + unit tests PASS
+- 验证：static import audit PASS（no forbidden imports）
+- Device smoke: BLOCKED_BY_ENVIRONMENT
 
 **Deliverables**:
-- 更新后的 `:at-cli` / `:app` / `:at-cli-consumer-host`（依赖 `:at-engine-api` + `:at-composition-android`）
-- 简化后的 `ATCliExecution` SPI
-- 更新后的 `:at-composition-android`（支持 CLI wiring）
+- `ATAndroidAdbControl`（:at-composition-android）
+- 简化后的 `ATCliExecution` SPI（:at-cli）
+- 迁移后的 `:app` / `:at-cli-consumer-host`（使用 composition）
+- 更新后的 Gradle 依赖
 
 **Gate**:
-- `:at-cli` / `:app` / `:at-cli-consumer-host` 可以正常构建
-- CLI `adb shell` / `adb pair` 可以正常工作
-- `:app` / `:at-cli-consumer-host` 不直接依赖 `:at-engine` / `:at-backend-*` / `:adb-engine`
+- Build: PASS
+- Unit tests: PASS
+- Static import audit: PASS
+- Device smoke: PENDING（device not connected）
 
 ---
 

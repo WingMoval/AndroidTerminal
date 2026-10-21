@@ -241,31 +241,17 @@ class AdbCliBridgeServer(
                 return
             }
             android.util.Log.i(TAG, "onPair: host=$host port=$port (code redacted)")
-            val r = try {
-                execution.consumerBootstrap().pair(host, port, code)
+            val resultText = try {
+                execution.pair(host, port, code)
             } catch (e: Exception) {
-                android.util.Log.w(TAG, "onPair: bootstrap.pair threw: ${e.message}")
-                com.adb.engine.AdbPairingResultV2(
-                    success = false,
-                    outcome = com.adb.engine.AdbPairingResultV2.Outcome.FAILED,
-                    error = e.message ?: "pairing failed",
-                )
+                android.util.Log.w(TAG, "onPair: pair threw: ${e.message}")
+                "pairing failed: ${e.message ?: "unknown error"}\n"
             }
             // Human-readable result (code is NEVER included).
-            val outText = when (r.outcome) {
-                com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
-                    "pairing succeeded (guid=${r.deviceGuid})\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
-                    "pairing rejected${if (r.error.isNotBlank()) ": ${r.error}" else ""}\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
-                    "pairing service not found\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
-                    "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
-                    "pairing failed${if (r.error.isNotBlank()) ": ${r.error}" else ""}\n"
-            }
-            sendFrame(fd, AdbCliProtocol.T_OUT, outText.toByteArray(Charsets.UTF_8))
-            sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(if (r.success) 0 else 1))
+            sendFrame(fd, AdbCliProtocol.T_OUT, resultText.toByteArray(Charsets.UTF_8))
+            // Exit code: 0 if "succeeded" in result, 1 otherwise.
+            val success = resultText.contains("pairing succeeded")
+            sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(if (success) 0 else 1))
         }
 
         /** Forward CLI stdin / resize to the session. */

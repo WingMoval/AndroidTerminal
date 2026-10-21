@@ -3,11 +3,12 @@
 // The reusable CLI bridge (in :at-cli) is host-agnostic: it routes CLI
 // one-shot / interactive into a host-provided [ATCliExecution]. This is the
 // ANDROIDTERMINAL PRODUCT host's adapter: it wires the bridge into the
-// product's own AppRuntime / AdbRuntime / Human status projection.
+// product's own composition (ATAndroidComposition).
+//
+// V4-4: Migrated to use ATAndroidComposition.adbControl.
 //
 // The bridge NEVER creates a second AdbRuntime / AT Engine / identity. It only
-// calls into the product's existing composition (the "one execution core path"
-// owner for :app).
+// calls into the product's existing composition.
 //
 // The Human-facing status projection (AdbCliStatusHub, the read-only
 // AdbRuntime lifecycle observer that fans out `[adb] ...` to the bound Local
@@ -29,8 +30,6 @@
 
 package com.androidterminal.app
 
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeState
 import com.at.cli.ATCliExecution
 import com.at.engine.ATEngine
 
@@ -56,7 +55,7 @@ class AppCliExecution : ATCliExecution {
         // FAST PATH: already READY. Backfill "connected" only on the session's
         // FIRST use (the lifecycle transition fired before the session
         // subscribed, so it won't re-emit). Matches pre-extraction behavior.
-        if (AdbRuntime.readinessState().isReady) {
+        if (AppRuntime.adbState().isReady) {
             if (firstSubscribe) emitStatus(sid, onStatusLine, "connected")
             return true
         }
@@ -64,11 +63,10 @@ class AppCliExecution : ATCliExecution {
         // AT.CONSUMER-BOOTSTRAP-0: HONEST first-use signal. If the consumer has
         // NO usable identity (no key material), the Runtime's generic "connection
         // failed" is misleading — the real reason is "you need to pair first".
-        // Classify via the reusable bootstrap BEFORE running the cold sequence,
-        // and surface a clear pairing-required message (UX: the user must know to
-        // open Settings -> Wireless Debugging -> Pair).
-        val bootstrap = consumerBootstrap()
-        if (!bootstrap.hasIdentity()) {
+        // Classify via the composition's adbControl BEFORE running the cold
+        // sequence, and surface a clear pairing-required message.
+        val control = AppRuntime.adbControl
+        if (!control.hasIdentity()) {
             emitStatus(sid, onStatusLine, "pairing required: no ADB identity found")
             emitStatus(
                 sid, onStatusLine,
@@ -82,21 +80,21 @@ class AppCliExecution : ATCliExecution {
         // INTERMEDIATE status lines LIVE (Host projection for the bound session
         // + T_STATUS fallback via onStatusLine). "connected" is owned by the
         // READY lifecycle transition — NOT re-emitted here (no duplicate).
-        val finalState = AdbRuntime.ensureReady(AppRuntime.adbIdentityDir()) { line ->
+        val ready = control.ensureReady { line ->
             if (line != "connected") emitStatus(sid, onStatusLine, line)
         }
         // Conservative post-failure classification (C4): identity EXISTS but the
         // connect failed. Do NOT assert "must pair" (a Boolean failure is not
         // auth evidence), but offer pairing as a remediation so the user has a
         // clear next step instead of a bare "connection failed".
-        if (finalState != AdbRuntimeState.READY) {
+        if (!ready) {
             emitStatus(
                 sid, onStatusLine,
                 "not connected (identity present). If pairing is needed: " +
                     "adb pair <host>:<port> <code>"
             )
         }
-        return finalState == AdbRuntimeState.READY
+        return ready
     }
 
     /**
@@ -117,5 +115,42 @@ class AppCliExecution : ATCliExecution {
         }
     }
 
-    override fun adbIdentityDir(): String = AppRuntime.adbIdentityDir()
+    override fun pairingState(): String =
+        when {
+            AppRuntime.adbControl.hasIdentity() && AppRuntime.adbState().isReady -> "READY"
+            !AppRuntime.adbControl.hasIdentity() -> "PAIRING_REQUIRED"
+            else -> "CONNECT_FAILED"
+        }
+
+    override fun pair(host: String, port: Int, code: String): String {
+        val result = AppRuntime.adbControl.pair(host, port, code)
+        return when (result.outcome) {
+            com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
+                "pairing succeeded (guid=${result.deviceGuid})\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
+                "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
+                "pairing service not found\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
+                "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
+                "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+        }
+    }
+
+    override fun pairDiscovered(code: String): String {
+        val result = AppRuntime.adbControl.pairDiscovered(code)
+        return when (result.outcome) {
+            com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
+                "pairing succeeded (guid=${result.deviceGuid})\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
+                "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
+                "pairing service not found\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
+                "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
+            com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
+                "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+        }
+    }
 }

@@ -1,11 +1,13 @@
-﻿// AndroidTerminal V3 鈥?App-layer composition root (AT.HUMAN-ADB-0).
+﻿// AndroidTerminal V3 — App-layer composition root (AT.HUMAN-ADB-0).
 //
 // The single process-scoped composition point that wires the ADB lifecycle and
 // builds the AT Engine with a selected backend. It is the "one execution core
 // path" owner for :app:
 //
-//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  鈫?THIS
-//   - terminal execution owner = ATEngine -> selected backend       鈫?built here
+//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  → THIS
+//   - terminal execution owner = ATEngine -> selected backend       → built here
+//
+// V4-4: Migrated to use ATAndroidComposition.
 //
 // Both the Human UI (MainActivity) and the Debug/Test consumer (instrumentation
 // harness) obtain their ATEngine from THIS object, so Human and Debug share the
@@ -13,7 +15,7 @@
 // AdbRuntime / ADB connection owner per process.
 //
 // The App owns its own persistent ADB identity in private storage
-// (filesDir/adb_identity) 鈥?never a copied PC adbkey, never packaged.
+// (filesDir/adb_identity) — never a copied PC adbkey, never packaged.
 //
 // SessionBackendKind is App/UI composition only (provider identity), NOT an
 // AT domain contract.
@@ -21,19 +23,16 @@
 package com.androidterminal.app
 
 import android.content.Context
-import com.adb.engine.AdbConnectionRequest
 import com.adb.engine.AdbConsumerBootstrap
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeDiagnostic
 import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.cli.AdbCliStatusHub
 import com.androidterminal.app.cli.CliFrontendProvisioner
-import com.at.backend.adb.AdbOneShotBackend
-import com.at.backend.adb.AdbPersistentBackend
-import com.at.backend.local.LocalPersistentBackend
 import com.at.cli.AdbCliBridgeServer
+import com.at.composition.android.ATAndroid
+import com.at.composition.android.ATAndroidComposition
 import com.at.engine.ATEngine
-import com.at.engine.impl.DefaultATEngine
 import java.io.File
 
 /** App/UI backend kind (provider identity; NOT an AT domain contract). */
@@ -45,12 +44,18 @@ enum class SessionBackendKind {
 /**
  * App-layer composition root (process-scoped).
  *
- * - [initialize] wires AdbRuntime once and fixes the app's ADB identity path.
- * - [localEngine] / [adbEngine] build an [ATEngine] with the selected backend.
+ * V4-4: Uses ATAndroid.create(context) to obtain the composition.
+ *
+ * - [initialize] wires the ATAndroidComposition + provisions CLI frontend.
+ * - [localEngine] / [adbEngine] delegate to the composition.
  * - [connectAuto] / [adbState] drive the single AdbRuntime lifecycle owner.
+ *
+ * AppRuntime is PRODUCT RUNTIME / GLUE, NOT an execution composition root.
+ * It does NOT understand backend constructors or propagate identityDir.
  */
 object AppRuntime {
 
+    private var composition: ATAndroidComposition? = null
     private var adbKeyDir: String? = null
     private var filesDirRef: File? = null
     private var appContextRef: Context? = null
@@ -58,25 +63,24 @@ object AppRuntime {
     private var statusHub: AdbCliStatusHub? = null
     private var sessionRegistryRef: AppSessionRegistry? = null
 
-    /** Wire the ADB runtime + fix the app identity dir. Idempotent. */
+    /** Wire the ATAndroidComposition + provision CLI frontend. Idempotent. */
     fun initialize(context: Context) {
         val app = context.applicationContext
-        if (!AdbRuntime.isInitialized()) {
-            AdbRuntime.initialize(app)
-        }
-        if (adbKeyDir == null) {
+        if (composition == null) {
             appContextRef = app
             filesDirRef = app.filesDir
+            // Track the identity dir for test compatibility.
             val dir = File(app.filesDir, "adb_identity")
             dir.mkdirs()
             adbKeyDir = dir.absolutePath
+            // Create the composition (identity profile = "adb_identity" for the product).
+            composition = ATAndroid.create(context = app)
         }
         // AT.CLI-CONSUMER-0: the product consumes the REUSABLE shell-hosted
         // `adb` CLI consumer capability (now in :at-cli). Provision the CLI
         // frontend (asset extract + PATH, product-side) and start the bridge
-        // wired to the product's own AppCliExecution (AppRuntime / AdbRuntime /
-        // Human status projection). Product surface: present in BOTH debug and
-        // release (NOT gated by BuildConfig.DEBUG).
+        // wired to the product's own AppCliExecution. Product surface: present in
+        // BOTH debug and release (NOT gated by BuildConfig.DEBUG).
         runCatching {
             CliFrontendProvisioner.provision(app)
             if (cliBridge == null) {
@@ -91,9 +95,17 @@ object AppRuntime {
         }
     }
 
+    /** The composition (null if not initialized). */
+    fun composition(): ATAndroidComposition? = composition
+
     /** The app's own persistent ADB identity directory (private storage). */
     fun adbIdentityDir(): String = adbKeyDir
         ?: error("AppRuntime.initialize(context) not called")
+
+    /** The ADB control facade (delegates to AdbRuntime + AdbConsumerBootstrap). */
+    val adbControl
+        get() = composition?.adbControl
+            ?: error("AppRuntime.initialize(context) not called")
 
     /**
      * AT.CLI-0.1: the installed base.apk absolute path (injected into the Local
@@ -113,7 +125,7 @@ object AppRuntime {
     fun cliBridgeSocketPath(): String = cliBridge?.socketPath.orEmpty()
 
     /** Current ADB lifecycle state (single owner = AdbRuntime). */
-    fun adbState(): AdbRuntimeState = AdbRuntime.readinessState()
+    fun adbState(): AdbRuntimeState = adbControl.readinessState()
 
     /** Drive the single AdbRuntime auto-connect (READY gate). */
     fun connectAuto(): AdbRuntimeDiagnostic = AdbRuntime.connectAuto(adbIdentityDir())
@@ -122,32 +134,26 @@ object AppRuntime {
      * The product's reusable ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0).
      *
      * ONE shared instance bound to the product's own app-private identity dir.
-     * PairActivity (and any product surface) uses this for first-use pairing 鈥?
+     * PairActivity (and any product surface) uses this for first-use pairing —
      * it does NOT call AdbEngine.pair directly. The bootstrap is the single
      * pairing boundary shared with the CLI `adb pair` and the consumer host.
+     *
+     * V4-4: For test compatibility. New code should use [adbControl].
      */
     fun consumerBootstrap(): AdbConsumerBootstrap = AdbConsumerBootstrap(adbIdentityDir())
 
-    /** ATEngine with the Local backend (Local PTY -> /system/bin/sh). */
-    fun localEngine(): ATEngine = DefaultATEngine(oneShot = null, persistent = LocalPersistentBackend())
+    /** ATEngine with the Local backend (delegates to composition). */
+    fun localEngine(): ATEngine = composition?.localEngine
+        ?: error("AppRuntime.initialize(context) not called")
 
     /**
-     * ATEngine with the ADB backend (reuses the AdbRuntime connection).
-     * Placeholder endpoint: the AUTO lifecycle (connectAuto) has already
-     * established the connection; the backend short-circuits on ONLINE.
+     * ATEngine with the ADB backend (delegates to composition).
      *
-     * AT.CLI-0: also wires the one-shot backend so the shell-hosted `adb` CLI
-     * (and any App consumer) can run `adb shell <cmd>` one-shot executions
-     * through the SAME AdbRuntime / ADB Engine. App-layer composition only 鈥?
-     * no AT/ADB Engine change.
+     * V4-4: The composition constructs the ADB engine with a placeholder
+     * connection. The actual connection is established by AdbRuntime.connectAuto().
      */
-    fun adbEngine(): ATEngine {
-        val placeholder = AdbConnectionRequest("127.0.0.1", 0, adbIdentityDir())
-        return DefaultATEngine(
-            oneShot = AdbOneShotBackend(placeholder),
-            persistent = AdbPersistentBackend(placeholder),
-        )
-    }
+    fun adbEngine(): ATEngine = composition?.adbEngine
+        ?: error("AppRuntime.initialize(context) not called")
 
     /**
      * AT.CLI-0: the product CLI bridge server (Unix Domain Socket, app-internal).
@@ -160,7 +166,7 @@ object AppRuntime {
      * AT.CLI-0.2: app-layer resize relay (搂20). When the Human resizes a Local
      * session, forward the new size to the inner Remote PTY if that session is
      * currently hosting an active `adb shell` interactive. No-op otherwise.
-     * App/CLI composition 鈥?the AT Engine is never told about "nested adb shell".
+     * App/CLI composition — the AT Engine is never told about "nested adb shell".
      */
     fun relayInteractiveResize(sessionId: Int, rows: Int, cols: Int) {
         runCatching { cliBridge?.relayInteractiveResize(sessionId, rows, cols) }
@@ -172,7 +178,7 @@ object AppRuntime {
      * AT.CLI-0.1A: bind the session registry to the ADB lifecycle status hub and
      * start its read-only AdbRuntime listener. Idempotent. The hub observes the
      * single AdbRuntime and fans out `[adb] ...` status to Local sessions that
-     * have used adb. Host orchestration only 鈥?NOT a lifecycle/recovery owner.
+     * have used adb. Host orchestration only — NOT a lifecycle/recovery owner.
      */
     fun initStatusHub(registry: AppSessionRegistry) {
         // Always (re)create the hub with the LATEST registry: if the Activity
@@ -205,13 +211,11 @@ object AppRuntime {
 
     /**
      * AT.CLI-0.1B: emit a command-time ADB status line to a specific Local
-     * session (the one running `adb shell <cmd>`). HOST/SYSTEM terminal event 鈥?
-     * does NOT go through the short-lived AdbCliMain process. The Human sees it
+     * session (the one running `adb shell <cmd>`). HOST/SYSTEM terminal event —
+     * does not go through the short-lived AdbCliMain process. The Human sees it
      * immediately as ensureReady progresses (live projection, not end-of-command
      * buffered replay).
      */
     fun emitAdbCommandStatus(sessionId: Int, status: String) =
         statusHub?.emitCommandStatus(sessionId, status)
 }
-
-

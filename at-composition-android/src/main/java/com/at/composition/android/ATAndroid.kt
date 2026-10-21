@@ -55,14 +55,16 @@ object ATAndroid {
      *   2. Creates the app-private identity directory
      *   3. Constructs the Local ATEngine (LocalOneShotBackend + LocalPersistentBackend)
      *   4. Constructs the ADB ATEngine (AdbOneShotBackend + AdbPersistentBackend)
+     *   5. Constructs the ADB control facade (ATAndroidAdbControl)
      *
      * The Local engine is ALWAYS available, even if ADB initialization fails.
      * The ADB engine is constructed but may not be READY (requires connectAuto).
      *
      * @param context Android Context (uses applicationContext)
-     * @return ATAndroidComposition with localEngine + adbEngine
+     * @param config optional configuration (identityProfile)
+     * @return ATAndroidComposition with localEngine + adbEngine + adbControl
      */
-    fun create(context: Context): ATAndroidComposition {
+    fun create(context: Context, config: ATAndroidConfig = ATAndroidConfig()): ATAndroidComposition {
         val app = context.applicationContext
 
         // 1. Initialize AdbRuntime (idempotent, process-scoped singleton)
@@ -71,7 +73,10 @@ object ATAndroid {
         }
 
         // 2. Create the app-private identity directory
-        val identityDir = File(app.filesDir, "adb_identity")
+        // The identity path is: filesDir/<identityProfile>
+        // App: filesDir/adb_identity
+        // ConsumerHost: filesDir/at-cli-identity
+        val identityDir = File(app.filesDir, config.identityProfile)
         identityDir.mkdirs()
         val identityPath = identityDir.absolutePath
 
@@ -94,6 +99,7 @@ object ATAndroid {
         return ATAndroidComposition(
             localEngine = localEngine,
             adbEngine = adbEngine,
+            adbControl = ATAndroidAdbControl(identityPath),
         )
     }
 }
@@ -101,7 +107,11 @@ object ATAndroid {
 /**
  * Android composition handle.
  *
- * Exposes ONLY the [ATEngine] interface (Layer-2 public contract).
+ * Exposes:
+ *   - localEngine: ATEngine (Layer-2 public contract)
+ *   - adbEngine: ATEngine (Layer-2 public contract)
+ *   - adbControl: ATAndroidAdbControl (consumer semantic facade)
+ *
  * Does NOT expose:
  *   - DefaultATEngine
  *   - Backend concrete classes
@@ -128,7 +138,15 @@ class ATAndroidComposition internal constructor(
      * ADB ATEngine (AdbOneShotBackend + AdbPersistentBackend).
      *
      * The engine is constructed but may not be READY.
-     * Callers must use AdbRuntime.connectAuto() to establish the connection.
+     * Use [adbControl].ensureReady() to establish the connection.
      */
     val adbEngine: ATEngine,
+
+    /**
+     * ADB control facade (consumer semantic facade).
+     *
+     * PROJECTION_ONLY — does NOT own the ADB lifecycle, recovery, or pairing.
+     * Delegates to AdbRuntime + AdbConsumerBootstrap + AdbEngine.pair.
+     */
+    val adbControl: ATAndroidAdbControl,
 )

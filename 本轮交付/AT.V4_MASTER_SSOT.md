@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-2
+> **Version**: 4.0.0-v4-4
 > **Date**: 2026-10-21
-> **Status**: V4-2 complete / Android composition root established
+> **Status**: V4-4 implementation complete / device closure pending
 
 ---
 
@@ -294,7 +294,7 @@ Android Composition Layer (assembly root):
 | `:at-engine-spi` module creation | COMPLETED（V4-1） |
 | `:at-composition-android` module creation | COMPLETED（V4-2） |
 | Backend SPI implementation migration | ABSORBED（V4-1 + V4-2） |
-| CLI / Product App migration | OPEN（V4-4） |
+| CLI / Product App migration | IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING（V4-4） |
 | Consumer Conformance / architecture enforcement | OPEN（V4-5） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
 
@@ -308,9 +308,11 @@ Android Composition Layer (assembly root):
 
 **AT.V4-3**：ABSORBED — Backend SPI implementation migration 已在 V4-1 + V4-2 完成。
 
-**AT.V4-4**：OPEN — CLI / Product App migration（迁移 `:app` / `:at-cli` / `:at-cli-consumer-host` 到使用 composition root）。
+**AT.V4-4**：IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING — Consumer boundary closure（代码迁移完成，等待设备验证）。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller Review）。
+**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4 device closure）。
+
+**NEXT_OPEN_AUTHORIZED = NO**（等待 V4-4 device closure）。
 
 ---
 
