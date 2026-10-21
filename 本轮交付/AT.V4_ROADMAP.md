@@ -144,6 +144,43 @@
 
 ---
 
+### AT.V4-MIGRATION-AUDIT-0：V3 → V4 全量迁移完整性审计
+
+**Status**: COMPLETE
+
+**Scope**（docs/evidence only，无 production/gradle/test 修改）:
+- 基于 git tree（V3 `75d5832` / V4 `84936f8`）逐层审计：module / production / native / resource / test / docs
+- 34 项 capability（handoff 26 项 + 补充审计项）逐项验证 V4 实现
+- 专项审计：bootstrap/identity 分类规则 / recovery lifecycle / CLI full path / Human UI / DebugBridge / test host / evidence-freeze
+
+**Verdict**:
+- V3_FULL_MIGRATION_PARITY = PASS_AT_IMPLEMENTATION_LEVEL
+- MISSING = 0 / UNCLASSIFIED = 0 / UNAUTHORIZED_DROP = 0 / OWNERSHIP_REGRESSION = 0
+- DEVICE_PARITY = NOT_EVALUATED
+
+**Deliverables**:
+- `docs/audit/AT.V4-MIGRATION-AUDIT-0_V3_to_V4_Full_Migration_Audit.md`
+- `docs/audit/AT.V4-MIGRATION-AUDIT-0_V3_V4_Source_Mapping.csv`
+- `docs/audit/AT.V4-MIGRATION-AUDIT-0_Capability_Matrix.csv`
+
+**RECOMMENDED_NEXT** = AT.V4-4.1（Consumer Semantic Type Closure + Device Closure）
+
+---
+
+### AT.V4-4.1：Consumer Semantic Type Closure + Device Closure
+
+**Status**: OPEN（审计后推荐，待 Controller 授权）
+
+**Scope**:
+- 闭合 `:app` / `:at-cli-consumer-host` 的 transitional `:adb-engine` 依赖（semantic projection：AdbRuntimeState / AdbBootstrapState / AdbPairingResultV2 / AdbPairingDiscovery / AdbDiscoveredService 收口到 `:at-composition-android` 或 `:at-engine-api`）
+- PairActivity / AtCliConsumerTest 收口到 composition 语义（移除 consumer bootstrap concrete type 直接持有）
+- `ATCliExecution` 结构化 pairing 结果（替代 String）
+- Device smoke：Product Local L1-L7 / Product ADB A1-A10 / CLI C1-C6 / ConsumerHost H1-H7
+- Restart identity gate（App + Host）
+- Runtime ownership device evidence
+
+---
+
 ### AT.V4-5：Consumer Conformance + Architecture Enforcement
 
 **Status**: OPEN

@@ -310,9 +310,17 @@ Android Composition Layer (assembly root):
 
 **AT.V4-4**：IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING — Consumer boundary closure（代码迁移完成，等待设备验证）。
 
-**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4 device closure）。
+**AT.V4-MIGRATION-AUDIT-0**：COMPLETE — V3→V4 全量迁移完整性审计。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 V4-4 device closure）。
+**V3_FULL_MIGRATION_AUDIT** = PASS（PASS_AT_IMPLEMENTATION_LEVEL）
+- MISSING_PRODUCTION_CAPABILITY = 0 / UNCLASSIFIED = 0 / UNAUTHORIZED_DROP = 0 / OWNERSHIP_REGRESSION = 0
+- DEVICE_PARITY = NOT_EVALUATED（V4-4.1 / V4-6）
+
+**AT.V4-4.1**：OPEN — Consumer Semantic Type Closure + Device Closure（审计后推荐下一任务）。
+
+**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4.1 device closure）。
+
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.1）。
 
 ---
 
