@@ -1,0 +1,58 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.androidterminal.app.AdbCliInteractiveTest" tests="16" failures="4" errors="0" skipped="0" time="586.027" timestamp="2026-10-21T14:03:20" hostname="localhost">
+  <properties>
+    <property name="device" value="ALI-AN00 - 15" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="i10_naturalExit" classname="com.androidterminal.app.AdbCliInteractiveTest" time="77.982" />
+  <testcase name="i11_outerTtyRestored" classname="com.androidterminal.app.AdbCliInteractiveTest" time="96.59">
+    <failure>java.lang.AssertionError: I11: local echo works after interactive (out=[echo BEFORE_STTY
+BEFORE_STTY
+:/ $ adb shell
+connected
+HNALI-Q:/ $ ])
+at org.junit.Assert.fail(Assert.java:89)
+at org.junit.Assert.assertTrue(Assert.java:42)
+at com.androidterminal.app.AdbCliInteractiveTest.i11_outerTtyRestored(AdbCliInteractiveTest.kt:539)
+</failure>
+  </testcase>
+  <testcase name="i12_secondReopen" classname="com.androidterminal.app.AdbCliInteractiveTest" time="8.038" />
+  <testcase name="i13_connectionReuse" classname="com.androidterminal.app.AdbCliInteractiveTest" time="15.416" />
+  <testcase name="i14_transportLossTermination" classname="com.androidterminal.app.AdbCliInteractiveTest" time="96.036">
+    <failure>java.lang.AssertionError: I14: transport loss handled (local usable or invocation terminated) (out=[adb shell
+connected
+HNALI-Q:/ $ ])
+at org.junit.Assert.fail(Assert.java:89)
+at org.junit.Assert.assertTrue(Assert.java:42)
+at com.androidterminal.app.AdbCliInteractiveTest.i14_transportLossTermination(AdbCliInteractiveTest.kt:640)
+</failure>
+  </testcase>
+  <testcase name="i15_multiSessionIsolation" classname="com.androidterminal.app.AdbCliInteractiveTest" time="96.501">
+    <failure>java.lang.AssertionError: I15: isolated session reached remote (out=[adb shell
+connected
+HNALI-Q:/ $ ])
+at org.junit.Assert.fail(Assert.java:89)
+at org.junit.Assert.assertTrue(Assert.java:42)
+at com.androidterminal.app.AdbCliInteractiveTest.i15_multiSessionIsolation(AdbCliInteractiveTest.kt:713)
+</failure>
+  </testcase>
+  <testcase name="i16_coldLiveStatusBeforeRemotePrompt" classname="com.androidterminal.app.AdbCliInteractiveTest" time="18.089" />
+  <testcase name="i1_noArgOpensInteractive" classname="com.androidterminal.app.AdbCliInteractiveTest" time="7.983" />
+  <testcase name="i2_remotePrincipal" classname="com.androidterminal.app.AdbCliInteractiveTest" time="7.991" />
+  <testcase name="i3_realPtyTty" classname="com.androidterminal.app.AdbCliInteractiveTest" time="8.005" />
+  <testcase name="i4_cwdContinuity" classname="com.androidterminal.app.AdbCliInteractiveTest" time="8.001" />
+  <testcase name="i5_envContinuity" classname="com.androidterminal.app.AdbCliInteractiveTest" time="8.146" />
+  <testcase name="i6_foregroundStdin" classname="com.androidterminal.app.AdbCliInteractiveTest" time="9.515" />
+  <testcase name="i7_ctrlCRemoteForeground" classname="com.androidterminal.app.AdbCliInteractiveTest" time="11.086" />
+  <testcase name="i8_resizeReflected" classname="com.androidterminal.app.AdbCliInteractiveTest" time="96.48">
+    <failure>java.lang.AssertionError: I8: remote stty size reflects 41 after resize (out=[adb shell
+connected
+HNALI-Q:/ $ ])
+at org.junit.Assert.fail(Assert.java:89)
+at org.junit.Assert.assertTrue(Assert.java:42)
+at com.androidterminal.app.AdbCliInteractiveTest.i8_resizeReflected(AdbCliInteractiveTest.kt:362)
+</failure>
+  </testcase>
+  <testcase name="i9_utf8" classname="com.androidterminal.app.AdbCliInteractiveTest" time="8.111" />
+</testsuite>

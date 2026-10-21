@@ -2,7 +2,7 @@
 
 > **Version**: 4.0.0-v4-4.2
 > **Date**: 2026-10-21
-> **Status**: V4-4.2 Device Closure IN_PROGRESS — 79/86 gates PASS (core gates complete) / adb-only host blocked on third fresh pairing
+> **Status**: V4-4.2 Device Closure — IDENTITY RECONCILED (single-identity parity PASS) / closure gates PARTIAL (C4-C6, A5, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP PASS-with-evidence; Transport-Loss + resize/multi-session primary validators still open as harness/observability gaps; debt1_* = EXCLUDED_VALIDATION_HARNESS)
 
 ---
 

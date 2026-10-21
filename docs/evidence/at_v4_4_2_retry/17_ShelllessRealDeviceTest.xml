@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" tests="15" failures="0" errors="0" skipped="0" time="15.608" timestamp="2026-10-21T09:48:45" hostname="localhost">
+  <properties>
+    <property name="device" value="ALI-AN00 - 15" />
+    <property name="flavor" value="" />
+    <property name="project" value=":at-shellless-test-host" />
+  </properties>
+  <testcase name="g17_sequentialLifecycle" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="3.657" />
+  <testcase name="g7_utf8BytePreservation" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.309" />
+  <testcase name="g19_boundedFailurePath" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.002" />
+  <testcase name="g2_g3_childNotShell_realPtyIsatty" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.183" />
+  <testcase name="g12_pullMode" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.285" />
+  <testcase name="g13_pushMode" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.105" />
+  <testcase name="g9_controlByteSigint" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.182" />
+  <testcase name="g18_naturalExitReopen" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.308" />
+  <testcase name="g5_writeChildReadRoundtrip" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.189" />
+  <testcase name="g11_explicitClose" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.157" />
+  <testcase name="g6_chunkedInput" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.41" />
+  <testcase name="g14_g15_g16_multiSessionIsolation" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="8.374" />
+  <testcase name="g2_procCapture" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.182" />
+  <testcase name="g8_resizeChildObserved" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.237" />
+  <testcase name="g10_naturalExit" classname="com.androidterminal.shelllesshost.ShelllessRealDeviceTest" time="0.079" />
+</testsuite>

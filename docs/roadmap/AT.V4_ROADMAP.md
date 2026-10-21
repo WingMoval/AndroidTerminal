@@ -380,25 +380,34 @@
 
 ### AT.V4-4.2：Device Closure
 
-**Status**: IN_PROGRESS / 79/86 gates PASS（核心 gates 完成；adb-only host 被第三次 fresh pairing 阻断）
+**Status**: IN_PROGRESS — IDENTITY RECONCILED / closure gates PARTIAL
 
-**Scope**（本轮已执行）:
-- ✅ Product Local L1-L7 (7/7 PASS)
-- ✅ Product ADB A1-A10 (10/10 PASS)
-- ✅ Shellless 15/15 (15/15 PASS)
-- ✅ ConsumerHost H1-H3 + firstUsePairing + H4-H7 (8/8 PASS)
-- ✅ CLI coreFunctionalGates C1-C3 + sharedRuntimeEvidence (4/4 PASS)
-- ✅ APP_RESTART identity (1/1 PASS)
-- ✅ DebugBridge parity DBG1-6 (6/6 PASS)
-- ❌ ADB_ONLY (13/27 FAIL — 需要第三次 fresh pairing)
-- ⏸️ Transport Loss（未运行，需要 host-side orchestration）
-- ⏸️ C4-C6 interactiveRemoteShell（ConsumerHost ADB READY precondition）
+**Identity reconciliation (controller-accepted):**
+- `AT_CANONICAL_ADB_IDENTITY_COUNT = 1`（Product `files/adb_identity`, fingerprint `cc7a9884...`）
+- `AT_FIRST_USE_PAIRING_COUNT = 1`, `AT_NORMAL_REPAIRING_COUNT = 0`
+- `V4_PRODUCT_IDENTITY_REGRESSION = NO`
+- `V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS`
+- `debt1_e4` / `debt1_cont` = `VALIDATION_ONLY_FRESH_IDENTITY_SCENARIOS` → `EXCLUDED_VALIDATION_HARNESS`（`MULTI_PAIRING_REQUIREMENT = VALIDATION_HARNESS_OVERREACH`）
+
+**Scope**（本轮已执行 + 证据）:
+- ✅ Product Local L1-L7 (7/7 PASS, UI evidence)
+- ✅ Product ADB A1-A10 (10/10 PASS, UI + DebugBridge evidence)
+- ✅ Shellless 15/15 (15/15 PASS, XML persisted: `17_ShelllessRealDeviceTest.xml`)
+- ✅ CLI C1-C3 (coreFunctionalGates PASS) + **C4-C6** (i2/i4/i6 PASS, `16_AdbCliInteractiveTest_app.xml`)
+- ✅ **A5 (Ctrl-C)** i7 PASS, **A10 (natural exit)** i10 PASS, **CONNECTION_REUSE** i13 PASS (同一 adb_identity, XML persisted)
+- ✅ APP_RESTART identity (fingerprint before==after, no re-pair)
+- ✅ RUNTIME_OWNERSHIP (sharedRuntimeEvidence PASS)
+- ✅ DebugBridge parity DBG1-6 (hello/list/attach/write-read/detach/pong)
+- ⚠️ HOST_RESTART — ConsumerHost restart-reuse PASS this round (Gradle) 但 XML 被后续运行覆盖，未持久化 → evidence-persistence gap
+- ❌ Transport Loss (I14) — FAIL (output-capture harness gap, 连接已建立但 post-loss marker 未捕获)
+- ❌ A6 (resize i8) / A7-A8 (multi-session i15) — secondary FAIL (harness capture); primary `ProgrammaticAdbConsumerTest` 本轮未重跑
+- ⊘ ADB_ONLY debt1_* — EXCLUDED_VALIDATION_HARNESS (raw 14/27 FAIL 不变, 非 Product blocker)
 
 **Gate**:
-- 真机 smoke 核心路径 = PASS（79/86）
-- Restart identity（App）= PASS
-- Runtime ownership device evidence = 完整（sharedRuntimeEvidence PASS）
-- ADB_ONLY = BLOCKED（需要第三次 human pairing）
+- 单一 identity 语义 = 完整验证 (parity PASS)
+- C4-C6 / A5 / A10 / CONNECTION_REUSE / RUNTIME_OWNERSHIP = PASS-with-evidence
+- **未达 "no REQUIRED item remains open"**：Transport-Loss + resize/multi-session primary validators 仍 open（harness/observability + evidence-persistence 缺口，非 identity/architecture 回归）
+- **V4-4.2 NOT marked COMPLETE**（见 `15_final_gate_reconciliation.md`）
 
 ---
 
