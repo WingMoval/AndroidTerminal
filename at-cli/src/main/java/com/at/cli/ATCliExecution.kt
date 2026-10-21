@@ -86,41 +86,36 @@ interface ATCliExecution {
     fun ensureReady(sessionId: Int, onStatusLine: (String) -> Unit): Boolean
 
     /**
-     * Readiness projection for first-use classification.
+     * Readiness projection for first-use classification (structured, V4-4.1).
      *
-     * Returns a string classification:
-     *   - "READY" — ADB is ready, command may proceed
-     *   - "PAIRING_REQUIRED" — no identity, user must pair first
-     *   - "CONNECT_FAILED" — identity exists but connection failed
-     *   - "NOT_READY" — runtime not initialized
-     *
-     * This replaces the old hasIdentity() check with a richer classification.
+     * The host maps its composition bootstrap state into [ATCliPairingState].
+     * The honest classification semantics are preserved (NO IDENTITY ->
+     * PAIRING_REQUIRED; EXISTING IDENTITY + connect failure -> CONNECT_FAILED).
      */
-    fun pairingState(): String = "NOT_READY"
+    fun pairingState(): ATCliPairingState = ATCliPairingState.NOT_READY
 
     /**
-     * Pair against an explicit endpoint using the 6-digit code.
+     * Pair against an explicit endpoint using the 6-digit code (V4-4.1:
+     * structured result).
      *
      * This is called by the CLI `adb pair <host>:<port> <code>` command.
-     * The host implements this by delegating to its composition's adbControl.
+     * The host implements this by delegating to its composition's adbControl
+     * and mapping the result into [ATCliPairingResult].
      *
-     * @param host the pairing service host
-     * @param port the pairing service port
-     * @param code the 6-digit pairing code
-     * @return a human-readable result message
+     * @return a structured CLI pairing result (the bridge renders the text)
      */
-    fun pair(host: String, port: Int, code: String): String =
-        "pairing not supported by this host"
+    fun pair(host: String, port: Int, code: String): ATCliPairingResult =
+        ATCliPairingResult.FAILED_RESULT
 
     /**
-     * Pair against an auto-discovered endpoint using the 6-digit code.
+     * Pair against an auto-discovered endpoint using the 6-digit code
+     * (V4-4.1: structured result).
      *
      * This is called by the CLI `adb pair` command (without explicit endpoint).
      * The host implements this by delegating to its composition's adbControl.
      *
-     * @param code the 6-digit pairing code
-     * @return a human-readable result message
+     * @return a structured CLI pairing result (the bridge renders the text)
      */
-    fun pairDiscovered(code: String): String =
-        "pairing not supported by this host"
+    fun pairDiscovered(code: String): ATCliPairingResult =
+        ATCliPairingResult.FAILED_RESULT
 }

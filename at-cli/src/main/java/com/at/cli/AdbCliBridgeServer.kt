@@ -241,17 +241,33 @@ class AdbCliBridgeServer(
                 return
             }
             android.util.Log.i(TAG, "onPair: host=$host port=$port (code redacted)")
-            val resultText = try {
+            val result = try {
                 execution.pair(host, port, code)
             } catch (e: Exception) {
                 android.util.Log.w(TAG, "onPair: pair threw: ${e.message}")
-                "pairing failed: ${e.message ?: "unknown error"}\n"
+                ATCliPairingResult(
+                    success = false,
+                    outcome = ATCliPairingResult.Outcome.FAILED,
+                    error = e.message ?: "pairing failed",
+                )
             }
-            // Human-readable result (code is NEVER included).
-            sendFrame(fd, AdbCliProtocol.T_OUT, resultText.toByteArray(Charsets.UTF_8))
-            // Exit code: 0 if "succeeded" in result, 1 otherwise.
-            val success = resultText.contains("pairing succeeded")
-            sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(if (success) 0 else 1))
+            // Single presentation formatter (V4-4.1): the structured semantic
+            // result is rendered to CLI text HERE at the CLI boundary. The wire
+            // protocol (T_OUT text + T_EXIT code) is UNCHANGED.
+            val outText = when (result.outcome) {
+                ATCliPairingResult.Outcome.SUCCESS ->
+                    "pairing succeeded (guid=${result.deviceGuid})\n"
+                ATCliPairingResult.Outcome.REJECTED ->
+                    "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+                ATCliPairingResult.Outcome.SERVICE_NOT_FOUND ->
+                    "pairing service not found\n"
+                ATCliPairingResult.Outcome.MULTIPLE_ENDPOINTS ->
+                    "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
+                ATCliPairingResult.Outcome.FAILED ->
+                    "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
+            }
+            sendFrame(fd, AdbCliProtocol.T_OUT, outText.toByteArray(Charsets.UTF_8))
+            sendFrame(fd, AdbCliProtocol.T_EXIT, AdbCliProtocol.le32Bytes(if (result.success) 0 else 1))
         }
 
         /** Forward CLI stdin / resize to the session. */

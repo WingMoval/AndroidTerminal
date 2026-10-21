@@ -31,6 +31,9 @@
 package com.androidterminal.app
 
 import com.at.cli.ATCliExecution
+import com.at.cli.ATCliPairingResult
+import com.at.cli.ATCliPairingState
+import com.at.composition.android.ATAdbPairingResult
 import com.at.engine.ATEngine
 
 /**
@@ -115,42 +118,31 @@ class AppCliExecution : ATCliExecution {
         }
     }
 
-    override fun pairingState(): String =
+    override fun pairingState(): ATCliPairingState =
         when {
-            AppRuntime.adbControl.hasIdentity() && AppRuntime.adbState().isReady -> "READY"
-            !AppRuntime.adbControl.hasIdentity() -> "PAIRING_REQUIRED"
-            else -> "CONNECT_FAILED"
+            AppRuntime.adbControl.hasIdentity() && AppRuntime.adbState().isReady -> ATCliPairingState.READY
+            !AppRuntime.adbControl.hasIdentity() -> ATCliPairingState.PAIRING_REQUIRED
+            else -> ATCliPairingState.CONNECT_FAILED
         }
 
-    override fun pair(host: String, port: Int, code: String): String {
-        val result = AppRuntime.adbControl.pair(host, port, code)
-        return when (result.outcome) {
-            com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
-                "pairing succeeded (guid=${result.deviceGuid})\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
-                "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
-                "pairing service not found\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
-                "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
-                "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-        }
-    }
+    override fun pair(host: String, port: Int, code: String): ATCliPairingResult =
+        toCliResult(AppRuntime.adbControl.pair(host, port, code))
 
-    override fun pairDiscovered(code: String): String {
-        val result = AppRuntime.adbControl.pairDiscovered(code)
-        return when (result.outcome) {
-            com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
-                "pairing succeeded (guid=${result.deviceGuid})\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
-                "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
-                "pairing service not found\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
-                "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
-            com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
-                "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-        }
-    }
+    override fun pairDiscovered(code: String): ATCliPairingResult =
+        toCliResult(AppRuntime.adbControl.pairDiscovered(code))
+
+    /** Host mapping: composition semantic result -> CLI semantic result. */
+    private fun toCliResult(r: ATAdbPairingResult): ATCliPairingResult =
+        ATCliPairingResult(
+            success = r.success,
+            outcome = when (r.outcome) {
+                ATAdbPairingResult.Outcome.SUCCESS -> ATCliPairingResult.Outcome.SUCCESS
+                ATAdbPairingResult.Outcome.REJECTED -> ATCliPairingResult.Outcome.REJECTED
+                ATAdbPairingResult.Outcome.SERVICE_NOT_FOUND -> ATCliPairingResult.Outcome.SERVICE_NOT_FOUND
+                ATAdbPairingResult.Outcome.MULTIPLE_ENDPOINTS -> ATCliPairingResult.Outcome.MULTIPLE_ENDPOINTS
+                ATAdbPairingResult.Outcome.FAILED -> ATCliPairingResult.Outcome.FAILED
+            },
+            deviceGuid = r.deviceGuid,
+            error = r.error,
+        )
 }

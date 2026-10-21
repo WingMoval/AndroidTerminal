@@ -4,10 +4,15 @@
 // builds the AT Engine with a selected backend. It is the "one execution core
 // path" owner for :app:
 //
-//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  → THIS
+//   - ADB lifecycle ownership  = AdbRuntime (ADB-domain singleton)  → via composition
 //   - terminal execution owner = ATEngine -> selected backend       → built here
 //
-// V4-4: Migrated to use ATAndroidComposition.
+// V4-4.1: CONSUMER SEMANTIC TYPE CLOSURE.
+//
+// AppRuntime no longer depends on :adb-engine at all. Every ADB semantic it
+// exposes goes through the composition control facade (ATAndroidAdbControl),
+// which returns composition-owned semantic types (ATAdbReadinessState /
+// ATAdbBootstrapState / ATAdbPairingResult) or primitives.
 //
 // Both the Human UI (MainActivity) and the Debug/Test consumer (instrumentation
 // harness) obtain their ATEngine from THIS object, so Human and Debug share the
@@ -23,17 +28,12 @@
 package com.androidterminal.app
 
 import android.content.Context
-import com.adb.engine.AdbConsumerBootstrap
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeDiagnostic
-import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.cli.AdbCliStatusHub
 import com.androidterminal.app.cli.CliFrontendProvisioner
 import com.at.cli.AdbCliBridgeServer
 import com.at.composition.android.ATAndroid
 import com.at.composition.android.ATAndroidComposition
 import com.at.engine.ATEngine
-import java.io.File
 
 /** App/UI backend kind (provider identity; NOT an AT domain contract). */
 enum class SessionBackendKind {
@@ -44,20 +44,19 @@ enum class SessionBackendKind {
 /**
  * App-layer composition root (process-scoped).
  *
- * V4-4: Uses ATAndroid.create(context) to obtain the composition.
+ * V4-4.1: Uses ATAndroid.create(context) to obtain the composition. AppRuntime
+ * is PRODUCT RUNTIME / GLUE — it does NOT understand backend constructors,
+ * does NOT propagate identityDir, and does NOT name any :adb-engine type.
  *
  * - [initialize] wires the ATAndroidComposition + provisions CLI frontend.
  * - [localEngine] / [adbEngine] delegate to the composition.
- * - [connectAuto] / [adbState] drive the single AdbRuntime lifecycle owner.
- *
- * AppRuntime is PRODUCT RUNTIME / GLUE, NOT an execution composition root.
- * It does NOT understand backend constructors or propagate identityDir.
+ * - [adbControl] exposes the composition control facade (semantic surface).
+ * - [adbState] drives/observes the single AdbRuntime lifecycle (via facade).
  */
 object AppRuntime {
 
     private var composition: ATAndroidComposition? = null
-    private var adbKeyDir: String? = null
-    private var filesDirRef: File? = null
+    private var filesDirRef: java.io.File? = null
     private var appContextRef: Context? = null
     private var cliBridge: AdbCliBridgeServer? = null
     private var statusHub: AdbCliStatusHub? = null
@@ -69,11 +68,8 @@ object AppRuntime {
         if (composition == null) {
             appContextRef = app
             filesDirRef = app.filesDir
-            // Track the identity dir for test compatibility.
-            val dir = File(app.filesDir, "adb_identity")
-            dir.mkdirs()
-            adbKeyDir = dir.absolutePath
-            // Create the composition (identity profile = "adb_identity" for the product).
+            // Create the composition (identity profile = "adb_identity" for the
+            // product — the app's own private storage, self-generated).
             composition = ATAndroid.create(context = app)
         }
         // AT.CLI-CONSUMER-0: the product consumes the REUSABLE shell-hosted
@@ -98,11 +94,7 @@ object AppRuntime {
     /** The composition (null if not initialized). */
     fun composition(): ATAndroidComposition? = composition
 
-    /** The app's own persistent ADB identity directory (private storage). */
-    fun adbIdentityDir(): String = adbKeyDir
-        ?: error("AppRuntime.initialize(context) not called")
-
-    /** The ADB control facade (delegates to AdbRuntime + AdbConsumerBootstrap). */
+    /** The ADB control facade (composition semantic surface). */
     val adbControl
         get() = composition?.adbControl
             ?: error("AppRuntime.initialize(context) not called")
@@ -124,36 +116,30 @@ object AppRuntime {
      */
     fun cliBridgeSocketPath(): String = cliBridge?.socketPath.orEmpty()
 
-    /** Current ADB lifecycle state (single owner = AdbRuntime). */
-    fun adbState(): AdbRuntimeState = adbControl.readinessState()
-
-    /** Drive the single AdbRuntime auto-connect (READY gate). */
-    fun connectAuto(): AdbRuntimeDiagnostic = AdbRuntime.connectAuto(adbIdentityDir())
+    /** Current ADB lifecycle state (single owner = AdbRuntime; via facade). */
+    fun adbState() = adbControl.readinessState()
 
     /**
-     * The product's reusable ADB Consumer Bootstrap (AT.CONSUMER-BOOTSTRAP-0).
+     * The app's ADB identity directory (app-private storage, self-generated).
      *
-     * ONE shared instance bound to the product's own app-private identity dir.
-     * PairActivity (and any product surface) uses this for first-use pairing —
-     * it does NOT call AdbEngine.pair directly. The bootstrap is the single
-     * pairing boundary shared with the CLI `adb pair` and the consumer host.
-     *
-     * V4-4: For test compatibility. New code should use [adbControl].
+     * V4-4.1: exposed as [java.io.File] so product tests can verify identity
+     * self-generation / continuity WITHOUT naming any provider type.
+     * Path semantics UNCHANGED (filesDir/adb_identity).
      */
-    fun consumerBootstrap(): AdbConsumerBootstrap = AdbConsumerBootstrap(adbIdentityDir())
-
-    /** ATEngine with the Local backend (delegates to composition). */
-    fun localEngine(): ATEngine = composition?.localEngine
-        ?: error("AppRuntime.initialize(context) not called")
+    fun adbIdentityDir(): java.io.File =
+        java.io.File(
+            appContextRef?.filesDir
+                ?: error("AppRuntime.initialize(context) not called"),
+            "adb_identity",
+        )
 
     /**
-     * ATEngine with the ADB backend (delegates to composition).
+     * Drive the single AdbRuntime readiness sequence (via composition facade).
      *
-     * V4-4: The composition constructs the ADB engine with a placeholder
-     * connection. The actual connection is established by AdbRuntime.connectAuto().
+     * V4-4.1: test-only convenience (the old connectAuto() accessor);
+     * delegates to [adbControl].ensureReady (single owner = AdbRuntime).
      */
-    fun adbEngine(): ATEngine = composition?.adbEngine
-        ?: error("AppRuntime.initialize(context) not called")
+    fun connectAuto(): Boolean = adbControl.ensureReady { }
 
     /**
      * AT.CLI-0: the product CLI bridge server (Unix Domain Socket, app-internal).
@@ -171,6 +157,14 @@ object AppRuntime {
     fun relayInteractiveResize(sessionId: Int, rows: Int, cols: Int) {
         runCatching { cliBridge?.relayInteractiveResize(sessionId, rows, cols) }
     }
+
+    /** ATEngine with the Local backend (delegates to composition). */
+    fun localEngine(): ATEngine = composition?.localEngine
+        ?: error("AppRuntime.initialize(context) not called")
+
+    /** ATEngine with the ADB backend (delegates to composition). */
+    fun adbEngine(): ATEngine = composition?.adbEngine
+        ?: error("AppRuntime.initialize(context) not called")
 
     // ---- AT.CLI-0.1A: ADB lifecycle status hub ----------------------------
 

@@ -1,4 +1,4 @@
-﻿// AndroidTerminal V3 鈥?Shared Session Bridge test (AT.DEBUG-0).
+// AndroidTerminal V3 �?Shared Session Bridge test (AT.DEBUG-0).
 //
 // End-to-end: Human creates a session via MainActivity (registered in
 // AppSessionRegistry). A PC-side DebugBridge client (loopback socket via the
@@ -16,10 +16,11 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.debug.DebugBridge
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -153,7 +154,7 @@ class SharedSessionBridgeTest {
     private fun createAdbPage(): Int {
         var pageId = -1
         scenario?.onActivity { a ->
-            if (AppRuntime.adbState() != AdbRuntimeState.READY) {
+            if (AppRuntime.adbState() != ATAdbReadinessState.READY) {
                 AppRuntime.connectAuto()
             }
             val p = a.createPage(SessionBackendKind.ADB)
@@ -418,8 +419,8 @@ class SharedSessionBridgeTest {
 
     @Test
     fun b14_adbAttachNoExtraStream() {
-        if (AppRuntime.adbState() != AdbRuntimeState.READY &&
-            !await(20000) { AppRuntime.connectAuto(); AppRuntime.adbState() == AdbRuntimeState.READY }
+        if (AppRuntime.adbState() != ATAdbReadinessState.READY &&
+            !await(20000) { AppRuntime.connectAuto(); AppRuntime.adbState() == ATAdbReadinessState.READY }
         ) {
             org.junit.Assume.assumeTrue("ADB not ready (skip)", false)
         }

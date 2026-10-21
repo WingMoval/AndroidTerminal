@@ -1,4 +1,4 @@
-// AT.CLI-0.1A â€” AdbRuntime lifecycle / connection status integration test.
+// AT.CLI-0.1A â€?AdbRuntime lifecycle / connection status integration test.
 //
 // Verifies the Runtime-owned ensureReady + Auto-WD + transport-loss projection
 // + session-scoped async status, on the REAL Human Local /system/bin/sh via the
@@ -10,13 +10,13 @@
 // device; the test detects capability and classifies accordingly.
 
 package com.androidterminal.app
+
+import com.at.composition.android.ATAdbReadinessState
 import com.at.cli.AdbCliBridgeServer
 
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeState
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -49,7 +49,7 @@ class AdbCliLifecycleTest {
             runCatching {
                 val deadline = System.currentTimeMillis() + 30_000
                 while (System.currentTimeMillis() < deadline) {
-                    if (AdbRuntime.readinessState().isReady) return@runCatching
+                    if (AppRuntime.adbControl.readinessState().isReady) return@runCatching
                     com.androidterminal.app.AppRuntime.connectAuto()
                     Thread.sleep(500)
                 }
@@ -202,7 +202,7 @@ class AdbCliLifecycleTest {
     @Test
     fun l7_noReplay() {
         // The no-replay invariant is STRUCTURAL: AdbRuntime.onOperationResult /
-        // onObservedTransportLost only restore the CONNECTION â€” they never
+        // onObservedTransportLost only restore the CONNECTION â€?they never
         // re-execute the failed command (see AdbRuntime.kt:278-298 comment "no
         // transparent command replay"). A deterministic instrumentation test
         // cannot force a mid-command transport loss without a real disconnect,
@@ -210,7 +210,7 @@ class AdbCliLifecycleTest {
         // side-effect-free command whose OUTPUT (not the echoed input) carries a
         // marker, and that the command completed with the expected result.
         val body = AtomicBoolean(false)
-        // `sh -c 'echo MARK'` â€” the remote OUTPUT is "MARK"; the echoed input
+        // `sh -c 'echo MARK'` â€?the remote OUTPUT is "MARK"; the echoed input
         // line contains "MARK" too, so we assert the command SUCCEEDED (uid/exit
         // path) and produced the marker, rather than counting occurrences.
         val out = runLocalCmd("adb shell echo REPLAY_OK; echo L7_DONE", listOf("L7_DONE"), bodyEntered = body)
@@ -259,7 +259,7 @@ class AdbCliLifecycleTest {
         // If the permission IS effective, this path is the auto-WD path (L1)
         // and we skip the strict fallback assertion (capability present).
         val body = AtomicBoolean(false)
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (canWd) {
             // Capability present: turning WD off would auto-enable (L1), so we
             // do not force the unavailable path here (would flip WD state for
@@ -298,10 +298,10 @@ class AdbCliLifecycleTest {
         // Requires WRITE_SECURE_SETTINGS effective. If not effective, this is
         // classified as NOT_AVAILABLE (permission), not a fail.
         val body = AtomicBoolean(false)
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (!canWd) {
             // No auto-WD capability on this install: classify, don't fail.
-            assertTrue("L1: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€” classified", true)
+            assertTrue("L1: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€?classified", true)
             return
         }
         // Capability present: turn WD off, then ONE `adb shell id` must auto-enable.

@@ -24,16 +24,17 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbEngine
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeState
+import com.at.composition.android.ATAdbBootstrapState
+import com.at.composition.android.ATAdbDiscoveredService
+import com.at.composition.android.ATAdbPairingDiscovery
+import com.at.composition.android.ATAdbPairingResult
+import com.at.composition.android.ATAdbReadinessState
 import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATTerminalSession
 import com.at.engine.ATEngine
 import com.at.engine.ATSessionLaunch
-import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -64,7 +65,7 @@ class AtCliConsumerTest {
 
     @Test
     fun identityFreshState() {
-        val keyDir = File(AtCliConsumerHost.adbIdentityDir())
+        val keyDir = AtCliConsumerHost.adbIdentityDir()
         Assert.assertTrue("host identity dir must exist", keyDir.isDirectory)
         Assert.assertNotEquals(
             "host identity must NOT be the AndroidTerminal app dir",
@@ -92,9 +93,13 @@ class AtCliConsumerTest {
     // REUSABLE AdbConsumerBootstrap (NOT AdbEngine.pair directly).
     // ------------------------------------------------------------------
 
-    /** The host's reusable bootstrap (ONE shared impl; the acceptance boundary). */
-    private val bootstrap: com.adb.engine.AdbConsumerBootstrap
-        get() = AtCliConsumerHost.cliExecution().consumerBootstrap()
+    /**
+     * The host's ADB control surface (composition semantic facade).
+     * V4-4.1: the test exercises pairing via the composition facade —
+     * NEVER a direct provider type (the single pairing boundary stays
+     * INTERNAL to the composition).
+     */
+    private val control get() = AtCliConsumerHost.composition()!!.adbControl
 
     /**
      * B1 鈥?NEW_IDENTITY: with a fresh (no identity) consumer, bootstrapState()
@@ -109,20 +114,25 @@ class AtCliConsumerTest {
     @Test
     fun b1_newIdentityClassification() {
         // A bootstrap bound to an empty dir has no identity -> PAIRING_REQUIRED.
+        // V4-4.1: evaluated via the host's TEST-ONLY classification helper
+        // (pure function over the controlled dir — NO provider import, no
+        // second bootstrap state machine).
         val emptyDir = File(ctx.filesDir, "bootstrap_b1_empty").apply {
             deleteRecursively(); mkdirs()
         }
-        val emptyBootstrap = com.adb.engine.AdbConsumerBootstrap(emptyDir.absolutePath)
-        Assert.assertFalse("precondition: empty dir has no identity", emptyBootstrap.hasIdentity())
+        Assert.assertFalse(
+            "precondition: empty dir has no identity",
+            AtCliConsumerHost.hasIdentityForDir(emptyDir),
+        )
         // bootstrapState requires AdbRuntime initialized; the host initialized it.
-        val state = emptyBootstrap.bootstrapState()
-        G["B1_EMPTY_DIR_HAS_IDENTITY"] = emptyBootstrap.hasIdentity().toString()
+        val state = AtCliConsumerHost.bootstrapClassificationForDir(emptyDir)
+        G["B1_EMPTY_DIR_HAS_IDENTITY"] = AtCliConsumerHost.hasIdentityForDir(emptyDir).toString()
         G["B1_EMPTY_DIR_STATE"] = state.name
         // If the runtime is not READY (which it shouldn't be for a no-identity
         // bootstrap's own readiness), the classification must be PAIRING_REQUIRED
         // (evidence: no key material), NOT a guess.
-        val b1Pass = (state == com.adb.engine.AdbBootstrapState.PAIRING_REQUIRED ||
-            state == com.adb.engine.AdbBootstrapState.READY)
+        val b1Pass = (state == ATAdbBootstrapState.PAIRING_REQUIRED ||
+            state == ATAdbBootstrapState.READY)
         G["B1_NEW_IDENTITY"] = if (b1Pass) "PASS" else "FAIL(state=$state)"
         emptyDir.deleteRecursively()
         dump()
@@ -135,13 +145,13 @@ class AtCliConsumerTest {
      */
     @Test
     fun b2_discovery() {
-        val d = bootstrap.discoverPairing(10_000)
+        val d = control.discoverPairing(10_000)
         G["B2_DISCOVERY_ENDPOINTS"] = d.endpoints.size.toString()
         G["B2_DISCOVERY_SERVICE_NOT_FOUND"] = d.serviceNotFound.toString()
         G["B2_DISCOVERY_MULTIPLE"] = d.multiple.toString()
-        d.endpoints.take(1).forEach {
-            G["B2_ENDPOINT_HOST"] = it.host ?: "loopback"
-            G["B2_ENDPOINT_PORT"] = it.port.toString()
+        d.endpoints.take(1).forEach { ep: ATAdbDiscoveredService ->
+            G["B2_ENDPOINT_HOST"] = ep.host ?: "loopback"
+            G["B2_ENDPOINT_PORT"] = ep.port.toString()
         }
         // PASS if discovery returned a structured result (either found or
         // honestly serviceNotFound). The acceptance pairing (B3) needs the
@@ -163,13 +173,13 @@ class AtCliConsumerTest {
             dump()
             return
         }
-        val r = bootstrap.pairDiscovered(code.trim())
+        val r = control.pairDiscovered(code.trim())
         G["B3_PAIR_OUTCOME"] = r.outcome.name
         G["B3_PAIR_DEVICE_GUID"] = r.deviceGuid
         if (r.success) {
-            AtCliConsumerHost.connectAuto()
+            AtCliConsumerHost.ensureReady()
             G["B3_PAIR"] =
-                if (AtCliConsumerHost.adbState() == AdbRuntimeState.READY) "PASS" else "FAIL(not READY)"
+                if (AtCliConsumerHost.adbState() == ATAdbReadinessState.READY) "PASS" else "FAIL(not READY)"
         } else {
             G["B3_PAIR"] = "FAIL(${r.outcome}: ${r.error})"
         }
@@ -183,10 +193,10 @@ class AtCliConsumerTest {
      */
     @Test
     fun b4_postPairExecution() {
-        if (AtCliConsumerHost.adbState() != AdbRuntimeState.READY) {
-            AtCliConsumerHost.connectAuto()
+        if (AtCliConsumerHost.adbState() != ATAdbReadinessState.READY) {
+            AtCliConsumerHost.ensureReady()
         }
-        if (AtCliConsumerHost.adbState() != AdbRuntimeState.READY) {
+        if (AtCliConsumerHost.adbState() != ATAdbReadinessState.READY) {
             G["B4_ADB_SHELL"] = "SKIPPED(not READY; run B3 first)"
             dump()
             return
@@ -226,9 +236,9 @@ class AtCliConsumerTest {
      */
     @Test
     fun b5_restartReuse() {
-        val diag = AtCliConsumerHost.connectAuto()
-        val ready = AtCliConsumerHost.adbState() == AdbRuntimeState.READY
-        G["B5_RESTART_REUSE"] = if (ready) "PASS" else "FAIL(${diag.message})"
+        AtCliConsumerHost.ensureReady()
+        val ready = AtCliConsumerHost.adbState() == ATAdbReadinessState.READY
+        G["B5_RESTART_REUSE"] = if (ready) "PASS" else "FAIL(not READY)"
         G["B5_ADB_STATE"] = AtCliConsumerHost.adbState().name
         dump()
     }
@@ -244,11 +254,11 @@ class AtCliConsumerTest {
             dump()
             return
         }
-        val r = bootstrap.pairDiscovered(code.trim())
+        val r = control.pairDiscovered(code.trim())
         Assert.assertTrue("pairing must succeed: ${r.outcome} ${r.error}", r.success)
-        AtCliConsumerHost.connectAuto()
+        AtCliConsumerHost.ensureReady()
         G["FIRST_USE_PAIRING"] =
-            if (AtCliConsumerHost.adbState() == AdbRuntimeState.READY) "PASS" else "FAIL(not READY)"
+            if (AtCliConsumerHost.adbState() == ATAdbReadinessState.READY) "PASS" else "FAIL(not READY)"
         G["PAIRING_DEVICE_GUID"] = r.deviceGuid
         G["CONSUMER_TEST_DIRECT_ADBENGINE_PAIR"] = "NO"
         dump()
@@ -315,7 +325,7 @@ class AtCliConsumerTest {
             dump()
             return
         }
-        val d = bootstrap.discoverPairing(10_000)
+        val d = control.discoverPairing(10_000)
         if (d.serviceNotFound || d.unique == null) {
             G["P1_CLI_PAIR"] = "SKIPPED(pairing service not open / not unique: ${d.endpoints.size})"
             dump()
@@ -342,7 +352,7 @@ class AtCliConsumerTest {
             G["P1_PAIR_RC"] = if (pairOut.contains("PAIR_RC=0")) "PASS" else "FAIL(got=$pairOut)"
             G["P1_PAIR_OUT"] = pairOut.take(200)
             // Then `adb shell id` = uid=2000.
-            AtCliConsumerHost.connectAuto()
+            AtCliConsumerHost.ensureReady()
             val idOut = runCmd(session, "adb shell id")
             G["P1_CLI_PAIR"] = if (idOut.contains("uid=2000")) "PASS" else "FAIL(got=$idOut)"
         } finally {
@@ -360,7 +370,7 @@ class AtCliConsumerTest {
      */
     @Test
     fun p2_badCode() {
-        val d = bootstrap.discoverPairing(10_000)
+        val d = control.discoverPairing(10_000)
         if (d.serviceNotFound || d.unique == null) {
             G["P2_BAD_CODE"] = "SKIPPED(pairing service not open / not unique)"
             dump()
@@ -398,9 +408,9 @@ class AtCliConsumerTest {
 
     @Test
     fun identityReuseAfterRestart() {
-        val diag = AtCliConsumerHost.connectAuto()
-        val ready = AtCliConsumerHost.adbState() == AdbRuntimeState.READY
-        G["CONSUMER_IDENTITY_REUSE_AFTER_RESTART"] = if (ready) "PASS" else "FAIL(${diag.message})"
+        AtCliConsumerHost.ensureReady()
+        val ready = AtCliConsumerHost.adbState() == ATAdbReadinessState.READY
+        G["CONSUMER_IDENTITY_REUSE_AFTER_RESTART"] = if (ready) "PASS" else "FAIL(not READY)"
         G["ADB_STATE"] = AtCliConsumerHost.adbState().name
         dump()
     }
@@ -561,7 +571,7 @@ class AtCliConsumerTest {
 
     @Test
     fun sharedRuntimeEvidence() {
-        G["ADB_RUNTIME_IS_SINGLETON"] = AdbRuntime.isInitialized().toString()
+        G["ADB_RUNTIME_IS_SINGLETON"] = AtCliConsumerHost.isAdbRuntimeInitialized().toString()
         G["SECOND_AT_ENGINE"] = "NO (bridge routes into host's single ATEngine)"
         G["SECOND_ADB_RUNTIME"] = "NO (AdbRuntime is the process singleton)"
         G["CLI_SHARED_AT_RUNTIME"] =

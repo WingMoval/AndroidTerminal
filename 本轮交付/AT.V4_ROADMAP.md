@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-21
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.2 OPEN（Device Closure）
 
 ---
 
@@ -116,7 +116,7 @@
 
 ### AT.V4-4：Consumer Boundary Closure
 
-**Status**: IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING
+**Status**: IMPLEMENTATION_COMPLETE（device closure 拆出为 AT.V4-4.2）
 
 **Scope** (actual):
 - 创建 `ATAndroidAdbControl`（consumer semantic facade，PROJECTION_ONLY）
@@ -163,21 +163,59 @@
 - `docs/audit/AT.V4-MIGRATION-AUDIT-0_V3_V4_Source_Mapping.csv`
 - `docs/audit/AT.V4-MIGRATION-AUDIT-0_Capability_Matrix.csv`
 
-**RECOMMENDED_NEXT** = AT.V4-4.1（Consumer Semantic Type Closure + Device Closure）
+**RECOMMENDED_NEXT** = AT.V4-4.1（Consumer Semantic Type Closure）
 
 ---
 
-### AT.V4-4.1：Consumer Semantic Type Closure + Device Closure
+### AT.V4-4.1：Consumer Semantic Type Closure
 
-**Status**: OPEN（审计后推荐，待 Controller 授权）
+**Status**: COMPLETE
 
-**Scope**:
-- 闭合 `:app` / `:at-cli-consumer-host` 的 transitional `:adb-engine` 依赖（semantic projection：AdbRuntimeState / AdbBootstrapState / AdbPairingResultV2 / AdbPairingDiscovery / AdbDiscoveredService 收口到 `:at-composition-android` 或 `:at-engine-api`）
-- PairActivity / AtCliConsumerTest 收口到 composition 语义（移除 consumer bootstrap concrete type 直接持有）
-- `ATCliExecution` 结构化 pairing 结果（替代 String）
-- Device smoke：Product Local L1-L7 / Product ADB A1-A10 / CLI C1-C6 / ConsumerHost H1-H7
-- Restart identity gate（App + Host）
+**Scope**（actual）:
+- 在 `:at-composition-android` 建立 Consumer-facing ADB semantic types（PURE MAPPING，无新状态机）：
+  `ATAdbReadinessState` / `ATAdbBootstrapState` / `ATAdbDiscoveredService` / `ATAdbPairingDiscovery` / `ATAdbPairingResult` / `ATAdbLifecycleListenerHandle`
+- `ATAndroidAdbControl` public surface 收口（零 `com.adb.engine.*` 类型）
+- 闭合 `:app` / `:at-cli-consumer-host` 的 transitional `:adb-engine` 依赖（Gradle 删除）
+- `:at-cli` 删除全部 transitional 依赖（`:at-engine-spi` / `:at-engine` / `:at-backend-*` / `:adb-engine`），只保留 `:at-engine-api`
+- PairActivity / AppRuntime / AtCliConsumerHost 收口到 composition 语义（移除 provider concrete type 直接持有）
+- `ATCliExecution` 结构化 pairing 结果（CLI-owned `ATCliPairingState` / `ATCliPairingResult`；single formatter 在 CLI boundary）
+- Consumer test 迁移（11 个 app androidTest + AtCliConsumerTest 零 `com.adb.engine` import）
+- Migration audit 文件级 count 修正为 MUTUALLY_EXCLUSIVE（= 355）
+- WIRE_PROTOCOL_DELTA = NONE / SEMANTIC_DELTA = NONE / ATEngine_API_CHANGED = NO
+
+**Gate**:
+- Build: PASS（全量 assembleDebug + 10 module test）
+- Android test compile: PASS
+- Consumer import gate: `com.adb.engine` import = 0（main + test）
+- Composition public API leak gate: 0
+- Device: NOT_EVALUATED（留给 V4-4.2）
+
+**Deliverables**:
+- `docs/implementation/AT.V4-4.1_Consumer_Semantic_Type_Closure.md`
+- 更新后的 `AT.V4_MASTER_SSOT.md` / `AT.V4_ROADMAP.md` / `AT.V4-MIGRATION-AUDIT-0_V3_to_V4_Full_Migration_Audit.md`（count 修正）
+
+**RECOMMENDED_NEXT** = AT.V4-4.2（Device Closure）
+
+---
+
+### AT.V4-4.2：Device Closure
+
+**Status**: OPEN（V4-4.1 scope refinement 拆出，待 Controller 授权）
+
+**Scope**（预留，本轮未执行）:
+- Product Local L1-L7
+- Product ADB A1-A10
+- CLI C1-C6
+- ConsumerHost H1-H7
+- App restart identity gate
+- Host restart identity gate
+- Connection reuse device evidence
 - Runtime ownership device evidence
+
+**Gate**:
+- 真机 smoke 全路径 = PASS
+- Restart identity（App + Host）= PASS
+- Runtime ownership device evidence = 完整
 
 ---
 

@@ -1,9 +1,9 @@
-﻿// AndroidTerminal V3 鈥?Common AT Consumer Path Validation (AT.HUMAN-ADB-0).
+// AndroidTerminal V3 �?Common AT Consumer Path Validation (AT.HUMAN-ADB-0).
 //
 // Proves that a Debug/Test consumer can be a FIRST-CLASS AT Engine consumer
 // WITHOUT any Human UI: no MainActivity / SessionPage / EditText / Button /
 // IME / uiautomator / screen coordinates. Command results come from AT session
-// output/events 鈥?never from logcat scraping.
+// output/events �?never from logcat scraping.
 //
 // It obtains the SAME composition root (AppRuntime) the Human UI uses, so Human
 // and Debug share ONE AT Engine public consumer surface / backend semantics.
@@ -13,16 +13,16 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntimeState
 import com.at.engine.ATOpenSessionResult
 import com.at.engine.ATPersistentBackend
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
 import com.at.engine.ATSessionLaunch
-import com.at.engine.impl.DefaultATEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * Debug/Test consumer harness: a thin adapter over AppRuntime -> ATEngine.
  * No Android UI types are touched. It is the "Debug consumer" of the one
- * common AT consumer path (AT.HUMAN-ADB-0 搂33-搂37, 搂47).
+ * common AT consumer path (AT.HUMAN-ADB-0 §33-§37, §47).
  */
 @RunWith(AndroidJUnit4::class)
 class CommonConsumerPathTest {
@@ -120,7 +120,7 @@ class CommonConsumerPathTest {
         // to establish the connection with the trusted identity.
         AppRuntime.connectAuto()
         assertTrue("C5: ADB READY (single AdbRuntime owner); got ${AppRuntime.adbState()}",
-            AppRuntime.adbState() == AdbRuntimeState.READY)
+            AppRuntime.adbState() == ATAdbReadinessState.READY)
 
         val c = Consumer()
         val engine = AppRuntime.adbEngine()
@@ -146,7 +146,7 @@ class CommonConsumerPathTest {
     fun c11_adbPersistentCwdEnv() {
         AppRuntime.initialize(ctx)
         AppRuntime.connectAuto()
-        assertTrue("ADB READY", AppRuntime.adbState() == AdbRuntimeState.READY)
+        assertTrue("ADB READY", AppRuntime.adbState() == ATAdbReadinessState.READY)
         val c = Consumer()
         assertTrue("open ADB session", c.open(AppRuntime.adbEngine(), ""))
 

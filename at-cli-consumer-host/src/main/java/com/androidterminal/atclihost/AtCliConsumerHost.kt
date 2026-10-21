@@ -4,60 +4,52 @@
 //   - its OWN AT composition (via ATAndroid.create);
 //   - the :at-cli reusable bridge (same-UID UDS) + shell-visible `adb` function.
 //
-// V4-4: Migrated to use ATAndroidComposition.
+// V4-4.1: CONSUMER SEMANTIC TYPE CLOSURE.
+//
+// AtCliConsumerHost no longer imports ANY com.adb.engine type. All ADB
+// semantics go through the composition control facade (ATAndroidAdbControl),
+// which returns composition-owned semantic types (ATAdbReadinessState /
+// ATAdbPairingResult) or primitives.
 //
 // This host NEVER depends on :app and NEVER copies the AndroidTerminal key.
 // It proves the reusable CLI consumer capability is host-agnostic: any
 // embedding APK can obtain the full Local Terminal -> adb -> uid=2000(shell)
 // environment by composing :at-cli + its own AT composition.
 //
-// Two paths (mirrors AdbOnlyHost, adds Local + CLI):
-//   (A) lifecycle  -> ATAndroidComposition.adbControl (delegates to AdbRuntime)
-//   (B) execution  -> ATAndroidComposition.adbEngine -> ADB Backend -> ADB Engine
-//   (C) CLI bridge -> :at-cli AdbCliBridgeServer + LocalCliBootstrap
+// Identity: filesDir/at-cli-identity (this host's OWN app-private storage,
+// self-generated). Path semantics UNCHANGED from V3.
 
 package com.androidterminal.atclihost
 
 import android.content.Context
-import android.content.pm.PackageManager
-import com.adb.engine.AdbConsumerBootstrap
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeDiagnostic
-import com.adb.engine.AdbRuntimeState
 import com.at.cli.AdbCliBridgeServer
 import com.at.cli.ATCliExecution
+import com.at.cli.ATCliPairingResult
+import com.at.cli.ATCliPairingState
 import com.at.cli.LocalCliBootstrap
 import com.at.composition.android.ATAndroid
 import com.at.composition.android.ATAndroidConfig
 import com.at.composition.android.ATAndroidComposition
+import com.at.composition.android.ATAdbBootstrapState
+import com.at.composition.android.ATAdbPairingResult
+import com.at.composition.android.ATAdbReadinessState
 import com.at.engine.ATEngine
-import java.io.File
 
 /**
  * The CLI consumer composition root.
  *
- * V4-4: Uses ATAndroid.create(context) to obtain the composition.
- *
  * - [initialize] wires the ATAndroidComposition + starts the :at-cli bridge.
  * - [localEngine] / [adbEngine] delegate to the composition.
+ * - [adbState] / [ensureReady] observe/drive the single AdbRuntime via the
+ *   composition facade (the host does NOT own the lifecycle).
  * - [cliBootstrap] returns the host's shell-visible `adb` function bootstrap.
  * - [cliExecution] is the host-provided ATCliExecution the bridge routes into.
- *
- * For test compatibility, the following methods are preserved:
- *   - adbIdentityDir()
- *   - appApkPath()
- *   - cliBridgeSocketPath()
- *   - cliBridgeRunning()
- *   - adbState()
- *   - connectAuto()
  */
 object AtCliConsumerHost {
 
     private var composition: ATAndroidComposition? = null
     private var appContextRef: Context? = null
-    private var filesDirRef: File? = null
     private var cliBridge: AdbCliBridgeServer? = null
-    private var keyDir: String? = null
 
     /** The host's AtCliMain entrypoint class (shared in :at-cli). */
     const val CLI_MAIN_CLASS = "com.at.cli.AtCliMain"
@@ -67,18 +59,11 @@ object AtCliConsumerHost {
      *
      * The identity dir is THIS host's own private storage
      * (filesDir/at-cli-identity). It is never the AndroidTerminal key.
-     * On first use it is empty -> UNPAIRED / NEW_IDENTITY.
      */
     fun initialize(context: Context) {
         val app = context.applicationContext
         if (composition == null) {
             appContextRef = app
-            filesDirRef = app.filesDir
-            // Track the identity dir for test compatibility.
-            val dir = File(app.filesDir, "at-cli-identity")
-            dir.mkdirs()
-            keyDir = dir.absolutePath
-            // Create the composition with the host's identity profile.
             composition = ATAndroid.create(
                 context = app,
                 config = ATAndroidConfig(identityProfile = "at-cli-identity"),
@@ -94,10 +79,6 @@ object AtCliConsumerHost {
 
     /** The composition (null if not initialized). */
     fun composition(): ATAndroidComposition? = composition
-
-    /** The host's OWN self-generated ADB identity directory (private). */
-    fun adbIdentityDir(): String = keyDir
-        ?: error("AtCliConsumerHost.initialize(context) not called")
 
     /** The host's installed base.apk path (for the `adb` shell function). */
     fun appApkPath(): String {
@@ -122,25 +103,79 @@ object AtCliConsumerHost {
     fun adbEngine(): ATEngine = composition?.adbEngine
         ?: error("AtCliConsumerHost.initialize(context) not called")
 
+    /** Current ADB lifecycle state (composition semantic projection). */
+    fun adbState(): ATAdbReadinessState =
+        composition?.adbControl?.readinessState()
+            ?: error("AtCliConsumerHost.initialize(context) not called")
+
+    /** Drive the single AdbRuntime readiness sequence (via composition facade). */
+    fun ensureReady(onStatusLine: (String) -> Unit = { }): Boolean =
+        composition?.adbControl?.ensureReady(onStatusLine)
+            ?: error("AtCliConsumerHost.initialize(context) not called")
+
     /**
-     * The host's REUSABLE ADB Consumer Bootstrap (for test compatibility).
+     * The host's ADB identity directory (app-private storage, self-generated).
      *
-     * This is a DIRECT delegation to the bootstrap bound to the host's identity.
-     * The bridge does NOT use this — it uses the composition's adbControl.
+     * V4-4.1: exposed as [File] so Consumer tests can verify identity
+     * separation (key NOT copied from the product app) WITHOUT naming any
+     * provider type. Path semantics UNCHANGED (filesDir/at-cli-identity).
      */
-    fun consumerBootstrap(): AdbConsumerBootstrap =
-        AdbConsumerBootstrap(adbIdentityDir())
+    fun adbIdentityDir(): java.io.File =
+        java.io.File(
+            appContextRef?.filesDir
+                ?: error("AtCliConsumerHost.initialize(context) not called"),
+            "at-cli-identity",
+        )
 
-    /** Current ADB lifecycle state (delegates to AdbRuntime). */
-    fun adbState(): AdbRuntimeState = AdbRuntime.readinessState()
+    /**
+     * Test-only (V4-4.1): whether a controlled identity directory holds usable
+     * identity material (adbkey / adbkey.pub). Pure filesystem check — the
+     * SAME predicate the provider bootstrap uses, evaluated WITHOUT naming
+     * any provider type (used by the B1 honest-classification gate).
+     */
+    fun hasIdentityForDir(dir: java.io.File): Boolean =
+        java.io.File(dir, "adbkey").exists() || java.io.File(dir, "adbkey.pub").exists()
 
-    /** Drive the single AdbRuntime auto-connect (READY gate). */
-    fun connectAuto(): AdbRuntimeDiagnostic = AdbRuntime.connectAuto(adbIdentityDir())
+    /**
+     * Test-only (V4-4.1): the bootstrap CLASSIFICATION that the consumer
+     * bootstrap bound to [dir] would report, evaluated against the host's
+     * CURRENT composition readiness (via the semantic facade — NO provider
+     * type named).
+     *
+     * The conservative C4 rules (SAME as the provider bootstrapState):
+     *   READY when ready; USER_ACTION_REQUIRED_WD / ENDPOINT_NOT_FOUND
+     *   pass-through; PAIRING_REQUIRED when the dir has NO key material
+     *   (evidence-backed); otherwise CONNECT_FAILED.
+     *
+     * No second bootstrap state machine is created (the host's own bootstrap
+     * is owned by the composition; this only re-reads the same state).
+     */
+    fun bootstrapClassificationForDir(dir: java.io.File): ATAdbBootstrapState {
+        val readiness = composition?.adbControl?.readinessState()
+            ?: return ATAdbBootstrapState.NOT_READY
+        return when {
+            readiness.isReady -> ATAdbBootstrapState.READY
+            readiness == ATAdbReadinessState.USER_ACTION_REQUIRED ->
+                ATAdbBootstrapState.USER_ACTION_REQUIRED_WD
+            readiness == ATAdbReadinessState.ENDPOINT_NOT_FOUND ->
+                ATAdbBootstrapState.ENDPOINT_NOT_FOUND
+            !hasIdentityForDir(dir) -> ATAdbBootstrapState.PAIRING_REQUIRED
+            else -> ATAdbBootstrapState.CONNECT_FAILED
+        }
+    }
+
+    /**
+     * Test-only (V4-4.1): whether the process's single AdbRuntime has been
+     * initialized (via the composition facade — NO provider type named).
+     * Used by ownership gates to prove SECOND_ADB_RUNTIME = NO.
+     */
+    fun isAdbRuntimeInitialized(): Boolean =
+        composition?.adbControl?.isRuntimeInitialized() == true
 
     /**
      * The host-provided ATCliExecution the :at-cli bridge routes into.
      *
-     * V4-4: Delegates to the composition's adbEngine + adbControl.
+     * Delegates to the composition's adbEngine + adbControl (no provider types).
      */
     fun cliExecution(sessionId: Int = 0): ATCliExecution = object : ATCliExecution {
         override fun adbEngine(): ATEngine = AtCliConsumerHost.adbEngine()
@@ -152,8 +187,7 @@ object AtCliConsumerHost {
                 onStatusLine("connected")
                 return true
             }
-            // AT.CONSUMER-BOOTSTRAP-0: HONEST first-use signal. No identity ->
-            // the user must pair first (clear message, not a bare "failed").
+            // HONEST first-use signal. No identity -> the user must pair first.
             if (!comp.adbControl.hasIdentity()) {
                 onStatusLine("pairing required: no ADB identity found")
                 onStatusLine(
@@ -163,12 +197,9 @@ object AtCliConsumerHost {
                 return false
             }
             // Not READY (identity present): run the Runtime-owned ensureReady
-            // sequence, forwarding status lines. The consumer host has no Human
-            // UI projection, so every line goes to onStatusLine (-> T_STATUS
-            // fallback to the CLI client).
-            val ready = comp.adbControl.ensureReady { line ->
-                onStatusLine(line)
-            }
+            // sequence, forwarding status lines (T_STATUS fallback — this host
+            // has no Human UI projection).
+            val ready = comp.adbControl.ensureReady { line -> onStatusLine(line) }
             // Conservative post-failure hint (C4): identity exists but connect
             // failed — offer pairing as a remediation (not an assertion).
             if (!ready) {
@@ -180,48 +211,41 @@ object AtCliConsumerHost {
             return ready
         }
 
-        override fun pairingState(): String =
+        override fun pairingState(): ATCliPairingState =
             when {
                 composition?.adbControl?.hasIdentity() == true &&
-                    composition?.adbControl?.readinessState()?.isReady == true -> "READY"
-                composition?.adbControl?.hasIdentity() == false -> "PAIRING_REQUIRED"
-                else -> "CONNECT_FAILED"
+                    composition?.adbControl?.readinessState()?.isReady == true -> ATCliPairingState.READY
+                composition?.adbControl?.hasIdentity() == false -> ATCliPairingState.PAIRING_REQUIRED
+                else -> ATCliPairingState.CONNECT_FAILED
             }
 
-        override fun pair(host: String, port: Int, code: String): String {
-            val result = composition?.adbControl?.pair(host, port, code)
-                ?: error("AtCliConsumerHost.initialize(context) not called")
-            return when (result.outcome) {
-                com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
-                    "pairing succeeded (guid=${result.deviceGuid})\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
-                    "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
-                    "pairing service not found\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
-                    "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
-                    "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-            }
-        }
+        override fun pair(host: String, port: Int, code: String): ATCliPairingResult =
+            toCliResult(
+                composition?.adbControl?.pair(host, port, code)
+                    ?: error("AtCliConsumerHost.initialize(context) not called")
+            )
 
-        override fun pairDiscovered(code: String): String {
-            val result = composition?.adbControl?.pairDiscovered(code)
-                ?: error("AtCliConsumerHost.initialize(context) not called")
-            return when (result.outcome) {
-                com.adb.engine.AdbPairingResultV2.Outcome.SUCCESS ->
-                    "pairing succeeded (guid=${result.deviceGuid})\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.REJECTED ->
-                    "pairing rejected${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
-                    "pairing service not found\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
-                    "multiple pairing endpoints; use adb pair <host>:<port> <code>\n"
-                com.adb.engine.AdbPairingResultV2.Outcome.FAILED ->
-                    "pairing failed${if (result.error.isNotBlank()) ": ${result.error}" else ""}\n"
-            }
-        }
+        override fun pairDiscovered(code: String): ATCliPairingResult =
+            toCliResult(
+                composition?.adbControl?.pairDiscovered(code)
+                    ?: error("AtCliConsumerHost.initialize(context) not called")
+            )
     }
+
+    /** Host mapping: composition semantic result -> CLI semantic result. */
+    private fun toCliResult(r: ATAdbPairingResult): ATCliPairingResult =
+        ATCliPairingResult(
+            success = r.success,
+            outcome = when (r.outcome) {
+                ATAdbPairingResult.Outcome.SUCCESS -> ATCliPairingResult.Outcome.SUCCESS
+                ATAdbPairingResult.Outcome.REJECTED -> ATCliPairingResult.Outcome.REJECTED
+                ATAdbPairingResult.Outcome.SERVICE_NOT_FOUND -> ATCliPairingResult.Outcome.SERVICE_NOT_FOUND
+                ATAdbPairingResult.Outcome.MULTIPLE_ENDPOINTS -> ATCliPairingResult.Outcome.MULTIPLE_ENDPOINTS
+                ATAdbPairingResult.Outcome.FAILED -> ATCliPairingResult.Outcome.FAILED
+            },
+            deviceGuid = r.deviceGuid,
+            error = r.error,
+        )
 
     /** Stop the bridge (teardown; closes CLI-owned interactive sessions). */
     fun stopCliBridge() {

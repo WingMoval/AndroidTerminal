@@ -1,8 +1,8 @@
-// AndroidTerminal V3 â€” AT.CLI-0 Product CLI Bridge test.
+// AndroidTerminal V3 â€?AT.CLI-0 Product CLI Bridge test.
 //
 // The test runs in the APP process (same UID as the app), so it can:
 //   1) connect to the Product CLI Bridge UDS in the app's private files dir
-//      (same-UID peer â€” the exact case the bridge authenticates), and
+//      (same-UID peer â€?the exact case the bridge authenticates), and
 //   2) drive a real Local /system/bin/sh session via MainActivity to prove the
 //      shell-hosted `adb` resolves and executes (the real user path).
 //
@@ -14,12 +14,13 @@
 // a raw UDS (the test plays the role of the shell-hosted `adb` CLI client).
 
 package com.androidterminal.app
+
+import com.at.composition.android.ATAdbReadinessState
 import com.at.cli.AdbCliProtocol
 
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntime
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -341,7 +342,7 @@ class AdbCliBridgeTest {
     @Test
     fun c13_unsupportedSubcommand() {
         // `adb devices` (any non-shell subcommand) must be a clear "unsupported"
-        // with a nonzero exit â€” a pure CLI parser branch that exits BEFORE
+        // with a nonzero exit â€?a pure CLI parser branch that exits BEFORE
         // connecting to the bridge.
         //
         // Output acquisition uses the PRODUCTION observation model: the
@@ -349,7 +350,7 @@ class AdbCliBridgeTest {
         // single listener owns the PTY reader and fans out Data events to
         // observers. We register a test observer and capture the `adb devices`
         // output from onOutput events (NOT the pull read(), which is disabled
-        // while the listener reader is active â€” by design).
+        // while the listener reader is active â€?by design).
         //
         // The exit code is verified in the REAL Local /system/bin/sh by running
         // the unsupported command and immediately echoing a unique marker with
@@ -403,7 +404,7 @@ class AdbCliBridgeTest {
         }
         // Single steady-state: the AdbRuntime is the sole owner; reuse means the
         // physical connection stays online across the three one-shots.
-        assertTrue("runtime still ready after reuse", AdbRuntime.readinessState().isReady)
+        assertTrue("runtime still ready after reuse", AppRuntime.adbControl.readinessState().isReady)
     }
 
     // ---- C15: 20 sequential open/close (cleanup, no leak) --------------------

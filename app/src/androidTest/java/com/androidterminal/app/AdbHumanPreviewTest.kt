@@ -1,4 +1,4 @@
-﻿// AndroidTerminal V3 鈥?ADB Human Preview UI test (AT.HUMAN-ADB-0 搂46).
+// AndroidTerminal V3 �?ADB Human Preview UI test (AT.HUMAN-ADB-0 §46).
 //
 // Drives the REAL MainActivity and reuses the ORDINARY SessionPage (no special
 // ADB page / observation page). Verifies the Human path:
@@ -10,11 +10,12 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import android.graphics.Bitmap
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.R
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
@@ -87,7 +88,7 @@ class AdbHumanPreviewTest {
             a.createPage(SessionBackendKind.ADB)
             // If not READY, openAdbSessionAsync would connect on bg thread; for
             // deterministic test we drive connectAuto directly then open.
-            if (AppRuntime.adbState() != AdbRuntimeState.READY) {
+            if (AppRuntime.adbState() != ATAdbReadinessState.READY) {
                 AppRuntime.connectAuto()
             }
             a.openActiveSession(rows, cols)
@@ -116,7 +117,7 @@ class AdbHumanPreviewTest {
     fun h1_adbReadyVisible() {
         // ADB status must reflect the REAL AdbRuntime state (READY).
         assertTrue("ADB READY required (provisioned identity); got ${AppRuntime.adbState()}",
-            await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+            await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         scenario?.onActivity { a -> a.updateAdbStatusForTest() }
         assertTrue("ADB status visible READY, got: ${adbLabel()}", await(2000) { adbLabel().contains("READY") })
         saveScreenshot("h1_adb_ready")
@@ -124,7 +125,7 @@ class AdbHumanPreviewTest {
 
     @Test
     fun h2_adbPageIdUid2000() {
-        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         val s = createAdbPage()
         assertTrue("ADB page session opened", s != null)
         assertTrue("banner ADB SESSION visible",
@@ -138,7 +139,7 @@ class AdbHumanPreviewTest {
 
     @Test
     fun h3_multiAdbSessionIsolation() {
-        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         val s1 = createAdbPage()
         assertTrue("ADB1 opened", s1 != null)
         // ADB1: cd /data/local/tmp
@@ -152,7 +153,7 @@ class AdbHumanPreviewTest {
         val s2 = activeSession()
         assertTrue("ADB2 opened", s2 != null)
         write(s2, "pwd")
-        // ADB2 cwd defaults to remote shell home (e.g. /) 鈥?must differ from ADB1.
+        // ADB2 cwd defaults to remote shell home (e.g. /) �?must differ from ADB1.
         assertTrue("ADB2 independent cwd visible",
             await(5000) { activeOutput().contains("/") })
         saveScreenshot("h3_multi_adb_isolation")
@@ -160,7 +161,7 @@ class AdbHumanPreviewTest {
 
     @Test
     fun h4_localAdbCoexistence() {
-        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         val adb = createAdbPage()
         assertTrue("ADB page", adb != null)
         write(adb, "id")
@@ -182,7 +183,7 @@ class AdbHumanPreviewTest {
 
     @Test
     fun h5_ctrlCAndContinue() {
-        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         val s = createAdbPage()
         assertTrue("ADB page", s != null)
         write(s, "sleep 30")
@@ -198,7 +199,7 @@ class AdbHumanPreviewTest {
 
     @Test
     fun h6_resizeIsolation() {
-        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == AdbRuntimeState.READY })
+        assertTrue("ADB READY", await(30_000) { AppRuntime.adbState() == ATAdbReadinessState.READY })
         val s = createAdbPage(24, 80)
         assertTrue("ADB page", s != null)
         scenario?.onActivity { a -> a.activeSession()?.resize(40, 120) }

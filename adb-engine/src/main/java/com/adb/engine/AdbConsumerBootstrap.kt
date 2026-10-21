@@ -161,6 +161,66 @@ class AdbConsumerBootstrap(private val identityDir: String) {
         private const val TAG = "AdbConsumerBootstrap"
         /** Default discovery window (ms) — the pairing screen must be open. */
         const val DEFAULT_DISCOVERY_TIMEOUT_MS = 10_000L
+
+        /**
+         * Pure filesystem check: does the given identity dir hold usable
+         * identity material (adbkey / adbkey.pub)?
+         *
+         * V4-4.1: static helper so a test can evaluate the identity-presence
+         * predicate against a CONTROLLED directory without constructing a
+         * bootstrap bound to a real consumer identity (no second bootstrap
+         * state machine, no runtime initialization).
+         */
+        fun hasIdentityForDir(identityDir: String): Boolean =
+            File(identityDir, "adbkey").exists() || File(identityDir, "adbkey.pub").exists()
+
+        /**
+         * Pure classification: the [AdbBootstrapState] that the consumer
+         * bootstrap bound to [identityDir] would report, evaluated against the
+         * CURRENT AdbRuntime state (no runtime side effects, no re-init).
+         *
+         * V4-4.1: static helper (same conservative C4 rules as
+         * [bootstrapState]) so a test can verify the honest first-use
+         * classification against a controlled (e.g. empty) directory.
+         */
+        fun bootstrapStateForDir(identityDir: String): AdbBootstrapState {
+            if (!AdbRuntime.isInitialized()) return AdbBootstrapState.NOT_READY
+            val state = AdbRuntime.readinessState()
+            return when {
+                state.isReady -> AdbBootstrapState.READY
+                state == AdbRuntimeState.USER_ACTION_REQUIRED ->
+                    AdbBootstrapState.USER_ACTION_REQUIRED_WD
+                state == AdbRuntimeState.ENDPOINT_NOT_FOUND ->
+                    AdbBootstrapState.ENDPOINT_NOT_FOUND
+                !hasIdentityForDir(identityDir) -> AdbBootstrapState.PAIRING_REQUIRED
+                else -> AdbBootstrapState.CONNECT_FAILED
+            }
+        }
+
+        /**
+         * V4-4.1: pure delegation to the single [AdbRuntime].discoverPairing
+         * (NO second discovery owner; the Runtime remains the discovery
+         * owner). Exposed here so a test can exercise discovery through the
+         * bootstrap's semantic surface without importing AdbRuntime directly.
+         */
+        fun discoverPairingForTest(timeoutMs: Long = DEFAULT_DISCOVERY_TIMEOUT_MS): List<AdbDiscoveredService> =
+            AdbRuntime.discoverPairing(timeoutMs)
+
+        /**
+         * V4-4.1: test-only capability probe — delegates to the single
+         * [AdbRuntime].canWriteSecureSettings (READ-ONLY permission check;
+         * enables nothing). Lets a product test assert auto-WD capability
+         * without importing AdbRuntime from the consumer test scope.
+         */
+        fun canWriteSecureSettingsForTest(): Boolean =
+            AdbRuntime.canWriteSecureSettings()
+
+        /**
+         * V4-4.1: test-only probe — whether the process's single AdbRuntime
+         * has been initialized (ownership gate: SECOND_ADB_RUNTIME = NO).
+         */
+        fun isRuntimeInitializedForTest(): Boolean =
+            AdbRuntime.isInitialized()
     }
 
     /** The consumer's app-private identity directory. */

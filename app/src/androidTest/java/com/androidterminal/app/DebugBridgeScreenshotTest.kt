@@ -1,4 +1,4 @@
-ï»¿// AndroidTerminal V3 éˆ¥?DebugBridge screenshot evidence (AT.DEBUG-0).
+// AndroidTerminal V3 â€?DebugBridge screenshot evidence (AT.DEBUG-0).
 //
 // Creates a real ADB session via the Human path (MainActivity -> SessionPage),
 // attaches a loopback DebugBridge client, writes commands through the bridge,
@@ -7,11 +7,12 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import android.graphics.Bitmap
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntimeState
 import com.androidterminal.app.debug.DebugBridge
 import org.junit.After
 import org.junit.Before
@@ -65,11 +66,11 @@ class DebugBridgeScreenshotTest {
     private fun waitReady(): Boolean {
         val deadline = System.currentTimeMillis() + 30000
         while (System.currentTimeMillis() < deadline) {
-            if (AppRuntime.adbState() == AdbRuntimeState.READY) return true
+            if (AppRuntime.adbState() == ATAdbReadinessState.READY) return true
             AppRuntime.connectAuto()
             Thread.sleep(300)
         }
-        return AppRuntime.adbState() == AdbRuntimeState.READY
+        return AppRuntime.adbState() == ATAdbReadinessState.READY
     }
 
     private fun outputText(): String {
@@ -152,7 +153,7 @@ class DebugBridgeScreenshotTest {
         Thread.sleep(1200)
         shot("d5_shared_ctrlc")
 
-        // d6: multi-session target éˆ¥?create a 2nd ADB page.
+        // d6: multi-session target â€?create a 2nd ADB page.
         scenario?.onActivity { a ->
             val p2 = a.createPage(SessionBackendKind.ADB)
             a.openActiveSession(24, 80)

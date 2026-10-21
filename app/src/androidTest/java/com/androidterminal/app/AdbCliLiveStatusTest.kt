@@ -1,4 +1,4 @@
-// AT.CLI-0.1B â€” Live Command-Time ADB Status Projection test.
+// AT.CLI-0.1B â€?Live Command-Time ADB Status Projection test.
 //
 // Verifies that when a Human runs `adb shell <cmd>` in a real Local
 // /system/bin/sh session and ADB is NOT yet READY, the connection status
@@ -13,10 +13,11 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntime
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -78,7 +79,7 @@ class AdbCliLiveStatusTest {
 
         // Set up the session on the main thread (createPage + open + observer).
         // Wait for the PTY to be ready (banner + prompt) before writing the
-        // command â€” same as AdbCliLifecycleTest.runLocalCmd (1200ms).
+        // command â€?same as AdbCliLifecycleTest.runLocalCmd (1200ms).
         scenarioRef.onActivity { a ->
             a.createPage(SessionBackendKind.LOCAL)
             val opened = a.openActiveSession()
@@ -150,10 +151,10 @@ class AdbCliLiveStatusTest {
     @Test
     fun s1_coldLiveStatusBeforeExit() {
         // Requires WRITE_SECURE + WD OFF for cold path.
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (!canWd) {
             // No auto-WD: classify, don't fail.
-            assertTrue("S1: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€” classified", true)
+            assertTrue("S1: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€?classified", true)
             return
         }
         setWd(false)
@@ -189,7 +190,7 @@ class AdbCliLiveStatusTest {
     // ---- S2: status ordering -----------------------------------------------
     @Test
     fun s2_statusOrdering() {
-        // READY fast-path: checking â†’ connected â†’ uid=2000 (order in text).
+        // READY fast-path: checking â†?connected â†?uid=2000 (order in text).
         val (events, body, _) = runLocalCmdTimed("adb shell id", "uid=2000")
         val text = allText(events)
         assertTrue("S2: body entered (out=[$text])", body.get())
@@ -205,9 +206,9 @@ class AdbCliLiveStatusTest {
     fun s3_noDuplicate() {
         // Cold path: each logical status appears exactly once in the Human-visible
         // output. (Host projection + T_STATUS must not both emit the same line.)
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (!canWd) {
-            assertTrue("S3: auto-WD NOT_AVAILABLE â€” classified", true)
+            assertTrue("S3: auto-WD NOT_AVAILABLE â€?classified", true)
             return
         }
         setWd(false)
@@ -235,7 +236,7 @@ class AdbCliLiveStatusTest {
         // "connected" status may or may not appear in the observer depending on
         // the harness's Activity-recreate behavior (pageId/registry reset).
         // The KEY assertion is that the command SUCCEEDS (uid=2000 present)
-        // without crashing â€” the fast-path dedupe (no re-spam) is verified by
+        // without crashing â€?the fast-path dedupe (no re-spam) is verified by
         // S3 (connected count=1) in the cold path.
         val (events, body, _) = runLocalCmdTimed("adb shell id", "uid=2000")
         assertTrue("S4: body entered", body.get())
@@ -246,7 +247,7 @@ class AdbCliLiveStatusTest {
     // ---- S5: stdout isolation -------------------------------------------------
     @Test
     fun s5_stdoutIsolation() {
-        // `adb shell sh -c 'echo LIVE_STATUS_TEST > file'` â€” the file must
+        // `adb shell sh -c 'echo LIVE_STATUS_TEST > file'` â€?the file must
         // contain ONLY "LIVE_STATUS_TEST", NOT any [adb] status lines.
         // The status lines go to the HOST projection (observer), NOT to the
         // remote stdout (file). We verify by reading the file DIRECTLY (not
@@ -277,20 +278,20 @@ class AdbCliLiveStatusTest {
     // ---- S6: permission failure before exit ----------------------------------
     @Test
     fun s6_permissionFailureBeforeExit() {
-        // WD OFF + no WRITE_SECURE â†’ "user action required" must appear BEFORE
+        // WD OFF + no WRITE_SECURE â†?"user action required" must appear BEFORE
         // the command's non-zero exit. (If WRITE_SECURE IS available, this test
         // classifies as NOT_AVAILABLE for the failure path.)
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (canWd) {
             // WRITE_SECURE available: auto-WD succeeds, no failure path.
             // Classify: the failure path (no WRITE_SECURE) is not testable on
             // this device. The Gate E scenario requires WRITE_SECURE
             // unavailable, which we can't simulate without uninstalling the
             // permission.
-            assertTrue("S6: WRITE_SECURE available â€” failure path NOT testable on this device (classified)", true)
+            assertTrue("S6: WRITE_SECURE available â€?failure path NOT testable on this device (classified)", true)
             return
         }
-        // WRITE_SECURE unavailable: WD OFF â†’ user action required before exit.
+        // WRITE_SECURE unavailable: WD OFF â†?user action required before exit.
         setWd(false)
         try {
             val (events, body, _) = runLocalCmdTimed("adb shell id", "user action required")

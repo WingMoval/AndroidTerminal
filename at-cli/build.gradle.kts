@@ -65,19 +65,13 @@ android {
 }
 
 dependencies {
-    // The CLI bridge routes one-shot / interactive into a host-provided
-    // ATEngine (ADB backend). Local bootstrap needs the Local backend package
-    // only for the host to build its Local terminal (the CLI module itself
-    // does not create Local sessions — the host does).
-    // V4-1: CLI depends on public API + backend SPI + backends + ADB engine
-    // (TRANSITIONAL_DIRECT_DEPENDENCIES: :at-backend-local / :at-backend-adb / :adb-engine
-    //  will be removed in AT.V4-4 when :at-composition-android is created)
+    // V4-4.1: Consumer semantic type closure (CLOSED).
+    // :at-cli depends on :at-engine-api ONLY. The bridge routes one-shot /
+    // interactive into a host-provided ATEngine (the host owns the backends /
+    // composition; the CLI module itself never names a backend or provider
+    // type). The pairing surface (ATCliPairingState / ATCliPairingResult) is
+    // CLI-owned semantic typing (host-mapped) — NO :adb-engine dependency.
     implementation(project(":at-engine-api"))
-    implementation(project(":at-engine-spi"))
-    implementation(project(":at-engine"))
-    implementation(project(":at-backend-local"))
-    implementation(project(":at-backend-adb"))
-    implementation(project(":adb-engine"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.5.2")

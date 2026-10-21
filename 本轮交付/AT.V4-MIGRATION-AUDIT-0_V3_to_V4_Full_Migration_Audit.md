@@ -394,14 +394,29 @@ UNAUTHORIZED_DROP_COUNT                  = 0
 | V3_RESOURCE_ASSET_TOTAL（src/main/res + assets） | 6 |
 | V3_DOC_EVIDENCE_TOTAL（docs/） | 81 |
 
-| Classification | Count（V3 tracked items） |
-|---|---|
-| MIGRATED（含 EXACT_UNCHANGED / EXACT_RELOCATED / 修改迁移） | 347 |
-| REPLACED_BY_EQUIVALENT | 2（at-engine ATEngine.kt 拆分；AppRuntime/AtCliConsumerHost wiring 归入 composition 计为 production mapping 行，文件级仍为 MIGRATED） |
-| TEST_REFERENCE_ONLY | 2（V3 本轮交付 2 个快照文档） |
-| INTENTIONALLY_DEFERRED | 0（deferred 项是 capability 级，非 V3 tracked file 丢失） |
-| INTENTIONALLY_DROPPED_AUTHORIZED | 0 |
-| MISSING | 0 |
-| UNCLASSIFIED | 0 |
+### MUTUALLY_EXCLUSIVE_FILE_CLASSIFICATION（V3 tracked 355 items，精确相加 = 355）
 
-注：文件级 MIGRATED 347 + TEST_REFERENCE_ONLY 2 + 4 个 at-engine contract 文件（计为 REPLACED_BY_EQUIVALENT/EXACT_RELOCATED，已含在 347 的语义映射内）= 355。分类按"能力归宿"而非 1:1 文件数。
+| Classification | Count | 说明 |
+|---|---|---|
+| EXACT_UNCHANGED | 316 | V3 路径在 V4 存在且逐字节相同（`git diff 75d5832..84936f8` 无该文件条目） |
+| MIGRATED_MODIFIED | 33 | 同路径存在但内容修改（V4-1 import 归位 / V4-2/4 composition wiring / V4-4 SPI 简化；协议与语义不变） |
+| REPLACED_BY_EQUIVALENT | 2 | V3 文件被 V4 等价结构取代：`ATExecution.kt`（R082 → `:at-engine-api`）、`ATSession.kt`（R077 → `:at-engine-api`）；capability 完整保留 |
+| TEST_REFERENCE_ONLY | 2 | V3 `本轮交付/` 2 个快照文档（V4 每轮刷新规则下不再保留历史快照；非 capability） |
+| SUPERSEDED_BY_STRUCTURE | 2 | `ATBackend.kt` → `:at-engine-spi/ATBackend.kt`（V4-1 SPI 提取，语义等价）；`ATEngine.kt` → `:at-engine-api/ATEngine.kt`（interface）+ `:at-engine/impl/DefaultATEngine.kt`（impl，V4-1 拆分，SEMANTIC_DELTA=NONE） |
+| MISSING | 0 | — |
+| UNCLASSIFIED | 0 | — |
+| **TOTAL** | **355** | 316 + 33 + 2 + 2 + 2 = 355 |
+
+注（V4-4.1 修正）：上一版表格的 `MIGRATED 347` 与 `REPLACED_BY_EQUIVALENT 2` 存在
+count overlap（4 个 at-engine contract 文件在两个 bucket 中重复计数），表述非严格
+互斥。本版改为 `git diff --name-status 75d5832..84936f8` 的精确文件级分类：
+EXACT_UNCHANGED 316 + MIGRATED_MODIFIED 33 + REPLACED_BY_EQUIVALENT 2 +
+TEST_REFERENCE_ONLY 2 + SUPERSEDED_BY_STRUCTURE 2 = **355**（互斥，精确相加）。
+
+verdict 不变：
+
+- MISSING = 0
+- UNCLASSIFIED = 0
+- UNAUTHORIZED_DROP = 0
+- OWNERSHIP_REGRESSION = 0
+- **V3_FULL_MIGRATION_PARITY = PASS_AT_IMPLEMENTATION_LEVEL**

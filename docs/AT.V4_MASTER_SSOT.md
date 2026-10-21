@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-4
+> **Version**: 4.0.0-v4-4.1
 > **Date**: 2026-10-21
-> **Status**: V4-4 implementation complete / device closure pending
+> **Status**: V4-4 + V4-4.1 consumer boundary implementation closed / device closure pending (V4-4.2)
 
 ---
 
@@ -145,28 +145,44 @@ Android Composition Layer (assembly root):
   ├── implementation(:at-engine-spi)
   └── implementation(:adb-engine)
 
-:at-composition-android
-  ├── implementation(:at-engine-api)
+:at-composition-android   （assembly root — ASSEMBLY-ROOT INTERNAL DEPENDENCY）
+  ├── api(:at-engine-api)
+  ├── api(:at-engine-spi)
   ├── implementation(:at-engine)
   ├── implementation(:at-backend-local)
-  └── implementation(:at-backend-adb)
+  ├── implementation(:at-backend-adb)
+  └── implementation(:adb-engine)   ← composition 内部直接依赖（PROVIDER_WIRING_MODEL = A）
 
 :at-cli
-  ├── implementation(:at-engine-api)
-  └── implementation(:at-composition-android)  [optional frontend]
+  └── implementation(:at-engine-api)   （ONLY — V4-4.1 CLOSED）
 
 :app
   ├── implementation(:at-engine-api)
   ├── implementation(:at-composition-android)
-  └── implementation(:at-cli)  [optional]
+  ├── implementation(:at-cli)
+  ├── implementation(:at-backend-local)
+  └── implementation(:at-backend-adb)
+  （NO :adb-engine — V4-4.1 CLOSED）
 
 :at-cli-consumer-host
   ├── implementation(:at-engine-api)
   ├── implementation(:at-composition-android)
-  └── implementation(:at-cli)  [optional]
+  └── implementation(:at-cli)
+  （NO :adb-engine — V4-4.1 CLOSED）
 ```
 
 **NO CYCLES** ✓
+
+**Consumer DAG 最终态（V4-4.1）**：
+
+```
+:app                  → :at-engine-api → :at-composition-android → :at-cli
+:at-cli-consumer-host → :at-engine-api → :at-composition-android → :at-cli
+:at-cli               → :at-engine-api
+```
+
+（`:at-composition-android → :adb-engine` 是 assembly-root internal dependency，
+不是 Consumer violation。）
 
 ---
 
@@ -180,10 +196,10 @@ Android Composition Layer (assembly root):
 | `:at-backend-local` | `:at-engine-api`, `:at-engine-spi` |
 | `:at-backend-adb` | `:at-engine-api`, `:at-engine-spi`, `:adb-engine` |
 | `:adb-engine` | (none) |
-| `:at-composition-android` | `:at-engine-api`, `:at-engine`, `:at-backend-local`, `:at-backend-adb` |
-| `:at-cli` | `:at-engine-api`, `:at-composition-android` |
-| `:app` | `:at-engine-api`, `:at-composition-android`, `:at-cli` (optional) |
-| `:at-cli-consumer-host` | `:at-engine-api`, `:at-composition-android`, `:at-cli` (optional) |
+| `:at-composition-android` | `:at-engine-api`, `:at-engine-spi`, `:at-engine`, `:at-backend-local`, `:at-backend-adb`, `:adb-engine`（assembly-root internal） |
+| `:at-cli` | `:at-engine-api` ONLY（V4-4.1） |
+| `:app` | `:at-engine-api`, `:at-composition-android`, `:at-cli`, `:at-backend-local`, `:at-backend-adb`（NO `:adb-engine`） |
+| `:at-cli-consumer-host` | `:at-engine-api`, `:at-composition-android`, `:at-cli`（NO `:adb-engine`） |
 
 ---
 
@@ -248,9 +264,13 @@ Android Composition Layer (assembly root):
 
 **不是**：Local executor / ADB lifecycle owner / composition root。
 
-**TO-BE**：`:at-cli` 只依赖 `:at-engine-api` + `:at-composition-android`（最多再依赖真正必要的 frontend utility module）。
+**ACTUAL（V4-4.1 CLOSED）**：`:at-cli` 只依赖 `:at-engine-api` ONLY。
+pairing surface 使用 CLI-owned semantic types（`ATCliPairingState` /
+`ATCliPairingResult`，host 映射自 composition semantic types）；
+presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
-**不得直接依赖**：`:adb-engine` / `:at-backend-adb` / `:at-backend-local`。
+**不得直接依赖**：`:adb-engine` / `:at-backend-adb` / `:at-backend-local` /
+`:at-engine-spi` / `:at-engine`（transitional 依赖已全部移除）。
 
 ---
 
@@ -274,7 +294,7 @@ Android Composition Layer (assembly root):
 
 ## M. Current Phase
 
-**V4-0**：基线建立与物理架构冻结（COMPLETE）。
+**V4-4.1**：Consumer Semantic Type Closure（COMPLETE — 静态/build 验证；device closure 留给 V4-4.2）。
 
 ---
 
@@ -283,6 +303,13 @@ Android Composition Layer (assembly root):
 | Task | Status |
 |---|---|
 | AT.V4-0 | COMPLETE（V4 baseline established / physical architecture frozen） |
+| AT.V4-0.1 | COMPLETE（V4 historical / DAG / migration semantics normalization） |
+| AT.V4-1 | COMPLETE（`:at-engine-api` + `:at-engine-spi` extraction；`ATEngine` interface + `DefaultATEngine` impl；SEMANTIC_DELTA=NONE） |
+| AT.V4-2 | COMPLETE（`:at-composition-android` composition root；PROVIDER_WIRING_MODEL = A） |
+| AT.V4-3 | ABSORBED（V4-1 + V4-2） |
+| AT.V4-4 | IMPLEMENTATION_COMPLETE（consumer boundary 代码迁移；device closure 拆出为 V4-4.2） |
+| AT.V4-MIGRATION-AUDIT-0 | COMPLETE（V3→V4 全量迁移审计；PASS_AT_IMPLEMENTATION_LEVEL；V4-4.1 修正文件级 count 为 MUTUALLY_EXCLUSIVE） |
+| AT.V4-4.1 | COMPLETE（Consumer Semantic Type Closure；CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED；DEVICE_CLOSURE = PENDING） |
 
 ---
 
@@ -294,8 +321,9 @@ Android Composition Layer (assembly root):
 | `:at-engine-spi` module creation | COMPLETED（V4-1） |
 | `:at-composition-android` module creation | COMPLETED（V4-2） |
 | Backend SPI implementation migration | ABSORBED（V4-1 + V4-2） |
-| CLI / Product App migration | IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING（V4-4） |
-| Consumer Conformance / architecture enforcement | OPEN（V4-5） |
+| Consumer semantic type boundary（`:app` / `:at-cli-consumer-host` / `:at-cli` 的 `:adb-engine` 泄漏） | COMPLETED（V4-4.1 — CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED） |
+| Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | OPEN（**V4-4.2**） |
+| Consumer Conformance / architecture enforcement | OPEN（V4-5 — 等待 V4-4.2 device closure） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
 
 ---
@@ -308,19 +336,22 @@ Android Composition Layer (assembly root):
 
 **AT.V4-3**：ABSORBED — Backend SPI implementation migration 已在 V4-1 + V4-2 完成。
 
-**AT.V4-4**：IMPLEMENTATION_COMPLETE_DEVICE_CLOSURE_PENDING — Consumer boundary closure（代码迁移完成，等待设备验证）。
+**AT.V4-4**：IMPLEMENTATION_COMPLETE — Consumer boundary closure（代码迁移完成）。
 
 **AT.V4-MIGRATION-AUDIT-0**：COMPLETE — V3→V4 全量迁移完整性审计。
 
 **V3_FULL_MIGRATION_AUDIT** = PASS（PASS_AT_IMPLEMENTATION_LEVEL）
 - MISSING_PRODUCTION_CAPABILITY = 0 / UNCLASSIFIED = 0 / UNAUTHORIZED_DROP = 0 / OWNERSHIP_REGRESSION = 0
-- DEVICE_PARITY = NOT_EVALUATED（V4-4.1 / V4-6）
+- 文件级分类 = MUTUALLY_EXCLUSIVE（316 EXACT_UNCHANGED + 33 MIGRATED_MODIFIED + 2 REPLACED_BY_EQUIVALENT + 2 TEST_REFERENCE_ONLY + 2 SUPERSEDED_BY_STRUCTURE = 355）
+- DEVICE_PARITY = NOT_EVALUATED（V4-4.2 / V4-6）
 
-**AT.V4-4.1**：OPEN — Consumer Semantic Type Closure + Device Closure（审计后推荐下一任务）。
+**AT.V4-4.1**：COMPLETED — Consumer Semantic Type Closure（consumer 语义类型闭合；`:app` / `:at-cli-consumer-host` / `:at-cli` 的 `:adb-engine` 依赖全部删除；composition semantic projection types 建立；ATCliExecution 结构化 pairing result；WIRE_PROTOCOL_DELTA = NONE；BUILD/TEST = PASS）。
 
-**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4.1 device closure）。
+**AT.V4-4.2**：OPEN — Device Closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / App+Host restart identity / connection reuse / runtime ownership device evidence）。**推荐 NEXT。**
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.1）。
+**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4.2 device closure）。
+
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.2）。
 
 ---
 

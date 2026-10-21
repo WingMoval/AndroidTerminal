@@ -1,7 +1,7 @@
-// AT.CLI-0.1 â€” app_process `adb shell <command>` one-shot closure test.
+// AT.CLI-0.1 â€?app_process `adb shell <command>` one-shot closure test.
 //
 // Drives the REAL Human Local /system/bin/sh (untrusted_app domain) via the
-// SharedSessionHandle observer model (the production observation path â€” NOT
+// SharedSessionHandle observer model (the production observation path â€?NOT
 // LocalTerminalSession.read(), which returns null while the listener reader is
 // active by design). Verifies Gates A-J for the one-shot slice.
 //
@@ -12,6 +12,8 @@
 // One-shot scope only: no interactive `adb shell`, no Ctrl-C/resize/cwd/env.
 
 package com.androidterminal.app
+
+import com.at.composition.android.ATAdbReadinessState
 
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,7 +53,7 @@ class AdbCliOneShotTest {
             runCatching {
                 val deadline = System.currentTimeMillis() + 30_000
                 while (System.currentTimeMillis() < deadline) {
-                    if (com.adb.engine.AdbRuntime.readinessState().isReady) return@runCatching
+                    if (AppRuntime.adbControl.readinessState().isReady) return@runCatching
                     com.androidterminal.app.AppRuntime.connectAuto()
                     Thread.sleep(500)
                 }
@@ -148,7 +150,7 @@ class AdbCliOneShotTest {
     fun o3_principalTransition() {
         val body = AtomicBoolean(false)
         // Marker MUST be `uid=2000` (remote shell uid). The local `id` prints
-        // uid=10313(u0_a313) which contains "u0_a" â€” using that as a marker
+        // uid=10313(u0_a313) which contains "u0_a" â€?using that as a marker
         // false-matches the local id before the remote one-shot returns.
         val out = runLocalCmd(
             "id; adb shell id; id",

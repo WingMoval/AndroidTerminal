@@ -1,27 +1,26 @@
-// AT.CLI-0.1A — ADB lifecycle status hub (App/Host layer).
+// AT.CLI-0.1A — ADB lifecycle status hub (read-only AdbRuntime observer).
 //
 // Bridges the single AdbRuntime lifecycle (the ONE lifecycle owner) to the
-// Human-visible Local terminal sessions that have actually USED adb.
-//
-// Responsibilities (Host orchestration only — NOT a lifecycle owner):
-//   - subscribes a READ-ONLY AdbRuntimeListener (addLifecycleListener)
-//   - tracks which Local sessionIds have used adb (SUBSCRIBE/UNSUBSCRIBE)
-//   - on a lifecycle transition, emits a `[adb] ...` HOST/SYSTEM terminal event
-//     to exactly the subscribed sessions (via SharedSessionHandle.emitSystemOutput)
+// product's Human-facing sessions:
+//   - subscribes a READ-ONLY AdbRuntimeListener (via the composition
+//     control facade — the hub itself does NOT own the lifecycle)
+//   - fans out Human-visible `[adb] ...` status lines to subscribed Local
+//     sessions (Host/SYSTEM output)
 //
 // It does NOT: create a second AdbRuntime, second recovery owner, second
-// endpoint store, or any reconnect/heartbeat. It only OBSERVES the existing
-// AdbRuntime state and fans out Human-visible text.
+// transport observer owner. It only observes the existing single AdbRuntime
+// state and fans out Human-visible text.
 //
-// Multi-session rule: a session that never used adb never receives status. A
-// session that used adb receives transitions. Closed sessions are unsubscribed
-// immediately (no observer/registry leak).
+// V4-4.1: observes via AppRuntime.adbControl (composition facade) instead of
+// a direct AdbRuntime import; status mapping uses the composition-owned
+// ATAdbReadinessState semantic type. Status line semantics UNCHANGED.
 
 package com.androidterminal.app.cli
 
 import android.util.Log
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeState
+import com.at.composition.android.ATAdbLifecycleListenerHandle
+import com.at.composition.android.ATAdbReadinessState
+import com.androidterminal.app.AppRuntime
 import com.androidterminal.app.AppSessionRegistry
 
 class AdbCliStatusHub(private val registry: AppSessionRegistry) {
@@ -31,12 +30,16 @@ class AdbCliStatusHub(private val registry: AppSessionRegistry) {
     }
 
     private val subscribed = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
-    private var handle: AdbRuntime.AdbRuntimeListenerHandle? = null
+    private var handle: ATAdbLifecycleListenerHandle? = null
 
     /** Register the read-only AdbRuntime listener (idempotent). */
     fun start() {
         if (handle != null) return
-        handle = AdbRuntime.addLifecycleListener { old, new -> onTransition(old, new) }
+        // V4-4.1: observes via the composition semantic surface (the facade
+        // projects the provider state into ATAdbReadinessState internally).
+        handle = AppRuntime.adbControl.addLifecycleListener { old, new ->
+            onTransition(old, new)
+        }
         Log.i(TAG, "started (read-only AdbRuntime listener)")
     }
 
@@ -61,44 +64,25 @@ class AdbCliStatusHub(private val registry: AppSessionRegistry) {
         if (removed) Log.i(TAG, "unsubscribe session=$sessionId")
     }
 
-    fun isSubscribed(sessionId: Int): Boolean =
-        synchronized(subscribed) { sessionId in subscribed }
+    /** Whether a session is currently subscribed. */
+    fun isSubscribed(sessionId: Int): Boolean = subscribed.contains(sessionId)
 
     /**
-     * AT.CLI-0.1B: emit a COMMAND-TIME status line to a specific Local session
-     * (the session that is currently running `adb shell <cmd>`). This is the
-     * HOST/SYSTEM terminal event path — it does NOT go through the short-lived
-     * AdbCliMain process (whose PTY stdout/stderr is not reliably live during
-     * ensureReady). It rides the same observer fan-out as [onTransition], so
-     * the Human sees it immediately as the Runtime progresses.
-     *
-     * [status] should be the bare status text (e.g. "checking connection...");
-     * this method adds the `[adb] ` prefix and trailing newline.
-     *
-     * No-op if the session is closed or not in the registry.
+     * AT.CLI-0.1B: command-time ADB status line (Host/SYSTEM event) to ONE
+     * specific Local session. Does NOT go through the short-lived AdbCliMain
+     * process. The Human sees it immediately as ensureReady progresses.
      */
     fun emitCommandStatus(sessionId: Int, status: String) {
-        if (sessionId <= 0 || status.isEmpty()) return
-        val text = "[adb] $status\n"
-        Log.i(TAG, "emitCommandStatus session=$sessionId: $status")
-        // Synchronous delivery (NOT main.post): the caller is the bridge
-        // thread running ensureReady. The observer's onOutput is invoked on
-        // THIS thread. SharedSessionHandle.forEachObserver uses a
-        // synchronized copy of the observer list, so concurrent
-        // register/unregister is safe. The Human UI (MainActivity) renders
-        // onOutput on its own thread; the Local PTY reader path (fanOut)
-        // already delivers on the PTY reader thread, not main.
+        if (sessionId <= 0) return
+        val text = status + "\n"
         runCatching {
-            val h = registry.lookup(sessionId) ?: return
-            if (h.isClosed()) {
-                unsubscribe(sessionId)
-                return
-            }
+            val h = registry.lookup(sessionId)
+                ?: return
             h.emitSystemOutput(text.toByteArray(Charsets.UTF_8))
         }.onFailure { Log.w(TAG, "emitCommandStatus to $sessionId failed", it) }
     }
 
-    private fun onTransition(old: AdbRuntimeState, new: AdbRuntimeState) {
+    private fun onTransition(old: ATAdbReadinessState, new: ATAdbReadinessState) {
         val text = statusLine(old, new) ?: return
         Log.i(TAG, "transition $old -> $new: $text")
         val ids = synchronized(subscribed) { subscribed.toList() }
@@ -124,20 +108,21 @@ class AdbCliStatusHub(private val registry: AppSessionRegistry) {
     /**
      * Map a lifecycle transition to a `[adb] ...` Human status line (or null when
      * there is nothing to surface). Only state transitions produce a line — no
-     * duplication on repeated same-state.
+     * duplication on repeated same-state. (Same mapping as pre-V4-4.1, now over
+     * the composition semantic state.)
      */
-    private fun statusLine(old: AdbRuntimeState, new: AdbRuntimeState): String? = when (new) {
-        AdbRuntimeState.READY -> when (old) {
-            AdbRuntimeState.RECOVERING -> "[adb] connected\n"
-            AdbRuntimeState.TRANSPORT_LOST -> "[adb] connected\n"
+    private fun statusLine(old: ATAdbReadinessState, new: ATAdbReadinessState): String? = when (new) {
+        ATAdbReadinessState.READY -> when (old) {
+            ATAdbReadinessState.RECOVERING -> "[adb] connected\n"
+            ATAdbReadinessState.TRANSPORT_LOST -> "[adb] connected\n"
             else -> "[adb] connected\n"
         }
-        AdbRuntimeState.TRANSPORT_LOST -> "[adb] disconnected\n"
-        AdbRuntimeState.RECOVERING -> "[adb] reconnecting...\n"
-        AdbRuntimeState.RECOVERY_FAILED -> "[adb] disconnected\n"
-        AdbRuntimeState.USER_ACTION_REQUIRED ->
+        ATAdbReadinessState.TRANSPORT_LOST -> "[adb] disconnected\n"
+        ATAdbReadinessState.RECOVERING -> "[adb] reconnecting...\n"
+        ATAdbReadinessState.RECOVERY_FAILED -> "[adb] disconnected\n"
+        ATAdbReadinessState.USER_ACTION_REQUIRED ->
             "[adb] user action required: enable Wireless Debugging\n"
-        AdbRuntimeState.CONNECTING -> null // in-progress; surfaced via command-time STATUS
+        ATAdbReadinessState.CONNECTING -> null // in-progress; surfaced via command-time STATUS
         else -> null
     }
 }

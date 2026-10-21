@@ -27,9 +27,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
-import com.adb.engine.AdbEngine
-import com.adb.engine.AdbRuntime
-import com.adb.engine.AdbRuntimeState
+import com.at.composition.android.ATAdbReadinessState
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import com.at.engine.ATTerminalSession
@@ -282,16 +280,16 @@ class MainActivity : Activity() {
     /** ADB page: ensure READY (single AdbRuntime owner), then open the session. */
     private fun openAdbSessionAsync() {
         updateAdbStatus()
-        if (AppRuntime.adbState() != AdbRuntimeState.READY) {
+        if (AppRuntime.adbState() != ATAdbReadinessState.READY) {
             stateLabel.text = "State: connecting ADB..."
             Thread {
-                val diag = AppRuntime.connectAuto()
+                val ready = AppRuntime.adbControl.ensureReady { }
                 mainHandler.post {
                     updateAdbStatus()
-                    if (AppRuntime.adbState() == AdbRuntimeState.READY) {
+                    if (AppRuntime.adbState() == ATAdbReadinessState.READY) {
                         openActiveSession()
                     } else {
-                        stateLabel.text = "State: ADB not ready — ${diag.code} ${diag.message}"
+                        stateLabel.text = "State: ADB not ready — ${AppRuntime.adbState().name}"
                     }
                 }
             }.start()
@@ -303,10 +301,10 @@ class MainActivity : Activity() {
     private fun retryAdb() {
         stateLabel.text = "State: connecting ADB..."
         Thread {
-            val diag = AppRuntime.connectAuto()
+            AppRuntime.adbControl.ensureReady { }
             mainHandler.post {
                 updateAdbStatus()
-                stateLabel.text = "ADB: ${AppRuntime.adbState().name} | ${diag.code}"
+                stateLabel.text = "ADB: ${AppRuntime.adbState().name}"
             }
         }.start()
     }
@@ -314,20 +312,20 @@ class MainActivity : Activity() {
     private fun updateAdbStatus() {
         val s = AppRuntime.adbState()
         adbStateLabel.text = when (s) {
-            AdbRuntimeState.DISCONNECTED -> "ADB: DISCONNECTED"
-            AdbRuntimeState.CONNECTING -> "ADB: CONNECTING"
-            AdbRuntimeState.READY -> "ADB: READY"
-            AdbRuntimeState.CONNECT_FAILED -> "ADB: CONNECT_FAILED"
-            AdbRuntimeState.ENDPOINT_NOT_FOUND -> "ADB: CONNECT_FAILED"
-            AdbRuntimeState.USER_ACTION_REQUIRED -> "ADB: USER_ACTION_REQUIRED"
-            AdbRuntimeState.TRANSPORT_LOST -> "ADB: TRANSPORT_LOST"
-            AdbRuntimeState.RECOVERING -> "ADB: RECOVERING"
-            AdbRuntimeState.RECOVERY_FAILED -> "ADB: RECOVERY_FAILED"
+            ATAdbReadinessState.DISCONNECTED -> "ADB: DISCONNECTED"
+            ATAdbReadinessState.CONNECTING -> "ADB: CONNECTING"
+            ATAdbReadinessState.READY -> "ADB: READY"
+            ATAdbReadinessState.CONNECT_FAILED -> "ADB: CONNECT_FAILED"
+            ATAdbReadinessState.ENDPOINT_NOT_FOUND -> "ADB: CONNECT_FAILED"
+            ATAdbReadinessState.USER_ACTION_REQUIRED -> "ADB: USER_ACTION_REQUIRED"
+            ATAdbReadinessState.TRANSPORT_LOST -> "ADB: TRANSPORT_LOST"
+            ATAdbReadinessState.RECOVERING -> "ADB: RECOVERING"
+            ATAdbReadinessState.RECOVERY_FAILED -> "ADB: RECOVERY_FAILED"
         }
         // Guidance only while not READY (Wireless Debugging is the user's own
         // device setting; we never open it).
         adbHint.visibility =
-            if (s == AdbRuntimeState.READY) View.GONE else View.VISIBLE
+            if (s == ATAdbReadinessState.READY) View.GONE else View.VISIBLE
     }
 
     /** Debug-only (tests): refresh the ADB status label from AdbRuntime. */

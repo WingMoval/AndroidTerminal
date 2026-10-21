@@ -1,4 +1,4 @@
-// AT.CLI-0.2 â€” Interactive `adb shell` (no-arg) remote PTY relay test.
+// AT.CLI-0.2 â€?Interactive `adb shell` (no-arg) remote PTY relay test.
 //
 // Verifies the full real Human Local PTY path:
 //   Local /system/bin/sh -> adb() wrapper (raw mode) -> app_process AdbCliMain
@@ -17,10 +17,11 @@
 
 package com.androidterminal.app
 
+import com.at.composition.android.ATAdbReadinessState
+
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.adb.engine.AdbRuntime
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -63,7 +64,7 @@ class AdbCliInteractiveTest {
         setWd(true)
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            if (com.adb.engine.AdbRuntime.readinessState().isReady) return
+            if (AppRuntime.adbControl.readinessState().isReady) return
             Thread.sleep(500)
         }
     }
@@ -147,7 +148,7 @@ class AdbCliInteractiveTest {
                     }
                     // 3. Drive the remaining steps (only if enter succeeded).
                     // A step with an EMPTY marker means "send and settle" (no
-                    // deterministic output to wait for â€” e.g. `cat`/`sleep`
+                    // deterministic output to wait for â€?e.g. `cat`/`sleep`
                     // start, or a raw Ctrl-C byte).
                     if (entered) {
                         for ((send, marker) in steps) {
@@ -518,7 +519,7 @@ class AdbCliInteractiveTest {
                 waitFor(observed, "uid=2000")
                 h.write(InputSource.DEBUG, "exit\n".toByteArray(StandardCharsets.UTF_8))
                 Thread.sleep(2500)
-                // AFTER: a local command (echo) â€” proves the Outer TTY is
+                // AFTER: a local command (echo) â€?proves the Outer TTY is
                 // restored (canonical, echo works) after interactive exit.
                 h.write(InputSource.DEBUG, "echo LOCAL_AFTER_INTERACTIVE\n".toByteArray(StandardCharsets.UTF_8))
                 waitFor(observed, "LOCAL_AFTER_INTERACTIVE", 15_000)
@@ -559,7 +560,7 @@ class AdbCliInteractiveTest {
         // Two sequential interactive sessions (open/exit, open/exit) with AdbRuntime
         // READY. The second must NOT re-run TLS handshake / CNXN / pairing (the
         // underlying authenticated connection is reused). We verify both succeed
-        // (uid=2000 twice) â€” a re-pair would fail/timeout on this device.
+        // (uid=2000 twice) â€?a re-pair would fail/timeout on this device.
         val (e1, b1, ent1) = runInteractive("id\n", "uid=2000", emptyList())
         assertTrue("I13: first session reached remote", b1.get() && allText(e1).contains("uid=2000"))
         val (e2, b2, ent2) = runInteractive("id\n", "uid=2000", emptyList())
@@ -718,9 +719,9 @@ class AdbCliInteractiveTest {
         // WD OFF: `adb shell` (interactive) must show the cold-connect status
         // lines (checking / enabling / discovering / connecting / connected)
         // BEFORE the remote prompt. Reuses the AT.CLI-0.1B live status path.
-        val canWd = AdbRuntime.canWriteSecureSettings()
+        val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (!canWd) {
-            assertTrue("I16: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€” classified", true)
+            assertTrue("I16: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€?classified", true)
             return
         }
         setWd(false)

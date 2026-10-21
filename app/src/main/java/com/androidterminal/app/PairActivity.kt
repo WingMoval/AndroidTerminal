@@ -33,10 +33,9 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.adb.engine.AdbBootstrapState
-import com.adb.engine.AdbConsumerBootstrap
-import com.adb.engine.AdbPairingResultV2
-import com.adb.engine.AdbRuntimeState
+import com.at.composition.android.ATAdbBootstrapState
+import com.at.composition.android.ATAdbPairingResult
+import com.at.composition.android.ATAdbReadinessState
 
 class PairActivity : Activity() {
 
@@ -44,12 +43,13 @@ class PairActivity : Activity() {
     private lateinit var codeInput: EditText
     private lateinit var statusText: TextView
     private lateinit var pairButton: Button
-    private lateinit var bootstrap: AdbConsumerBootstrap
+
+    /** The composition semantic control surface (V4-4.1: no provider types). */
+    private val control get() = AppRuntime.adbControl
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppRuntime.initialize(applicationContext)
-        bootstrap = AppRuntime.consumerBootstrap()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -104,14 +104,14 @@ class PairActivity : Activity() {
 
     /** Reflect the consumer bootstrap state in the status area (read-only). */
     private fun refreshStateLabel() {
-        val state = bootstrap.bootstrapState()
+        val state = control.bootstrapState()
         statusText.text = when (state) {
-            AdbBootstrapState.READY -> "已连接（ADB READY）"
-            AdbBootstrapState.PAIRING_REQUIRED -> "ADB 尚未完成首次配对"
-            AdbBootstrapState.USER_ACTION_REQUIRED_WD -> "请先开启：设置 → 无线调试"
-            AdbBootstrapState.ENDPOINT_NOT_FOUND -> "未发现 ADB 连接端点"
-            AdbBootstrapState.CONNECT_FAILED -> "未连接（可尝试重新配对）"
-            AdbBootstrapState.NOT_READY -> "ADB 运行时未初始化"
+            ATAdbBootstrapState.READY -> "已连接（ADB READY）"
+            ATAdbBootstrapState.PAIRING_REQUIRED -> "ADB 尚未完成首次配对"
+            ATAdbBootstrapState.USER_ACTION_REQUIRED_WD -> "请先开启：设置 → 无线调试"
+            ATAdbBootstrapState.ENDPOINT_NOT_FOUND -> "未发现 ADB 连接端点"
+            ATAdbBootstrapState.CONNECT_FAILED -> "未连接（可尝试重新配对）"
+            ATAdbBootstrapState.NOT_READY -> "ADB 运行时未初始化"
         }
     }
 
@@ -124,34 +124,35 @@ class PairActivity : Activity() {
         pairButton.isEnabled = false
         statusText.text = "正在发现配对服务..."
         Thread {
-            // Pair through the REUSABLE bootstrap (single pairing boundary).
-            // pairDiscovered handles 0/1/N endpoints; the user only supplies
-            // the 6-digit code. The bootstrap (not this Activity) calls
-            // AdbEngine.pair.
-            val result = runCatching { bootstrap.pairDiscovered(code) }.getOrElse { t ->
-                AdbPairingResultV2(
+            // Pair through the composition semantic control surface (V4-4.1).
+            // The single pairing boundary (bootstrap -> AdbEngine.pair) is
+            // INTERNAL to the composition; this Activity only supplies the
+            // 6-digit code and renders the structured semantic result.
+            val result = runCatching { control.pairDiscovered(code) }.getOrElse { t ->
+                ATAdbPairingResult(
                     success = false,
-                    outcome = AdbPairingResultV2.Outcome.FAILED,
+                    outcome = ATAdbPairingResult.Outcome.FAILED,
                     error = t.message ?: "pairing threw",
                 )
             }
             val message = when (result.outcome) {
-                AdbPairingResultV2.Outcome.SUCCESS -> {
-                    // Pairing succeeded -> connect the now-trusted identity.
-                    val diag = AppRuntime.connectAuto()
-                    if (AppRuntime.adbState() == AdbRuntimeState.READY) {
+                ATAdbPairingResult.Outcome.SUCCESS -> {
+                    // Pairing succeeded -> the identity is now trusted; the
+                    // next ensureReady/connect will reach READY.
+                    val ready = control.ensureReady { }
+                    if (AppRuntime.adbState() == ATAdbReadinessState.READY) {
                         "配对成功 — ADB READY (guid=${result.deviceGuid})"
                     } else {
-                        "配对成功但连接未 READY: ${diag.code} ${diag.message}"
+                        "配对成功，连接建立中… (guid=${result.deviceGuid})"
                     }
                 }
-                AdbPairingResultV2.Outcome.SERVICE_NOT_FOUND ->
+                ATAdbPairingResult.Outcome.SERVICE_NOT_FOUND ->
                     "未发现无线调试配对服务\n\n请确认：\n系统「使用配对码配对设备」窗口仍处于打开状态\n\n[点配对 重新检测]"
-                AdbPairingResultV2.Outcome.MULTIPLE_ENDPOINTS ->
+                ATAdbPairingResult.Outcome.MULTIPLE_ENDPOINTS ->
                     "发现多个配对端点，请在高级模式下手动选择 host:port"
-                AdbPairingResultV2.Outcome.REJECTED ->
+                ATAdbPairingResult.Outcome.REJECTED ->
                     "配对被拒绝（配对码错误或已过期）：${result.error.ifBlank { "无详情" }}"
-                AdbPairingResultV2.Outcome.FAILED ->
+                ATAdbPairingResult.Outcome.FAILED ->
                     "配对失败：${result.error.ifBlank { "未知错误" }}"
             }
             mainHandler.post {

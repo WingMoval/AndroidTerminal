@@ -51,15 +51,14 @@ android {
 dependencies {
     // Reusable CLI consumer capability + AT composition.
     // DELIBERATELY ABSENT: :app (consumer isolation gate 搂25).
-    // V4-4: Consumer boundary closure
-    // Allowed: :at-engine-api + :at-composition-android + :at-cli
+    // V4-4.1: Consumer semantic type closure (CLOSED).
+    // Allowed: :at-engine-api + :at-composition-android + :at-cli.
+    // NO :adb-engine: all ADB semantics go through the composition control
+    // facade (ATAndroidAdbControl) which returns composition-owned semantic
+    // types (ATAdbReadinessState / ATAdbPairingResult) or primitives.
     implementation(project(":at-cli"))
     implementation(project(":at-engine-api"))
     implementation(project(":at-composition-android"))
-    
-    // TRANSITIONAL: :adb-engine needed for AdbRuntimeState/AdbConsumerBootstrap types
-    // (will be removed when these are projected in :at-composition-android)
-    implementation(project(":adb-engine"))
 
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")
