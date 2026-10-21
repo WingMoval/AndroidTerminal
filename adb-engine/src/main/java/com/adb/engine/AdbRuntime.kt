@@ -355,6 +355,98 @@ object AdbRuntime {
         return readiness() == AdbWirelessDebuggingState.ENABLED
     }
 
+    // ---- AT.V4-4.3: First-use Auto-WD permission self-grant -----------------
+
+    /**
+     * Result of the first-use WRITE_SECURE_SETTINGS self-grant bootstrap.
+     *
+     * This is a FIRST-USE PRODUCT BOOTSTRAP operation, NOT a normal
+     * readiness path. It runs exactly ONCE, after the first successful
+     * pairing + connect, to grant the app its own WRITE_SECURE_SETTINGS
+     * permission via the app's own verified ADB shell (uid=2000).
+     *
+     * The grant command is executed over the embedded ADB shell
+     * ([executeShell], which reuses the ONLINE connection established by
+     * [ensureReady]). The final truth is ALWAYS
+     * [checkSelfPermission] on the app process — NOT the pm grant exit code.
+     */
+    enum class SelfGrantResult {
+        /** Permission was already granted; no pm grant was executed. */
+        SKIPPED_ALREADY_GRANTED,
+
+        /** pm grant executed over embedded ADB shell; checkSelfPermission confirms granted. */
+        GRANT_SUCCESS,
+
+        /** pm grant was executed but checkSelfPermission still reports not granted. */
+        GRANT_FAILED,
+
+        /** Runtime not initialized or no ADB connection; cannot execute pm grant. */
+        NOT_READY,
+    }
+
+    /**
+     * AT.V4-4.3: First-use WRITE_SECURE_SETTINGS self-grant.
+     *
+     * MUST be called AFTER a successful pair + connect (state == READY).
+     * The method is IDEMPOTENT: if the permission is already granted it
+     * returns [SelfGrantResult.SKIPPED_ALREADY_GRANTED] without executing
+     * any pm grant command.
+     *
+     * The pm grant command is executed over the embedded ADB shell
+     * (uid=2000) — NOT via PC adb, Runtime.exec, su, or root.
+     *
+     * The target package is [Context.packageName] from the app's own
+     * [appContext] — never hardcoded.
+     *
+     * Failure semantics: a self-grant failure does NOT invalidate the
+     * pairing. The identity is NOT deleted, rotated, or re-paired. The
+     * pairing remains SUCCESS; only the auto-WD bootstrap is FAILED.
+     *
+     * @return the [SelfGrantResult] classification.
+     */
+    fun selfGrantWriteSecureSettings(): SelfGrantResult {
+        // Idempotency: if already granted, skip.
+        if (canWriteSecureSettings()) {
+            Log.i(TAG, "selfGrantWriteSecureSettings: already granted (skipped)")
+            return SelfGrantResult.SKIPPED_ALREADY_GRANTED
+        }
+
+        val ctx = appContext ?: run {
+            Log.w(TAG, "selfGrantWriteSecureSettings: no appContext")
+            return SelfGrantResult.NOT_READY
+        }
+
+        // Must have an ONLINE ADB connection to execute pm grant.
+        if (state != AdbRuntimeState.READY) {
+            Log.w(TAG, "selfGrantWriteSecureSettings: ADB not READY (state=$state)")
+            return SelfGrantResult.NOT_READY
+        }
+
+        val pkg = ctx.packageName
+        val cmd = "pm grant $pkg $WRITE_SECURE_SETTINGS"
+        Log.i(TAG, "selfGrantWriteSecureSettings: executing over embedded ADB shell: $cmd")
+
+        val result = try {
+            executeShell(cmd, timeoutMs = 10_000)
+        } catch (t: Throwable) {
+            Log.w(TAG, "selfGrantWriteSecureSettings: executeShell threw", t)
+            return SelfGrantResult.GRANT_FAILED
+        }
+
+        Log.i(TAG, "selfGrantWriteSecureSettings: pm grant exitCode=${result.exitCode} " +
+            "stdout='${result.stdout.trim()}' stderr='${result.stderr.trim()}'")
+
+        // Final truth: checkSelfPermission on the app process.
+        // (NOT the pm grant exit code — the permission model is the source of truth.)
+        return if (canWriteSecureSettings()) {
+            Log.i(TAG, "selfGrantWriteSecureSettings: GRANT_SUCCESS (checkSelfPermission confirms)")
+            SelfGrantResult.GRANT_SUCCESS
+        } else {
+            Log.w(TAG, "selfGrantWriteSecureSettings: GRANT_FAILED (checkSelfPermission still not granted)")
+            SelfGrantResult.GRANT_FAILED
+        }
+    }
+
     /**
      * Test-only bootstrap with injectable backends (deterministic lifecycle
      * tests). Production code must use [initialize].

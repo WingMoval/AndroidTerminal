@@ -316,4 +316,36 @@ class AdbConsumerBootstrap(private val identityDir: String) {
             }
         }
     }
+
+    /**
+     * AT.V4-4.3: Complete the first-use bootstrap after a successful pair +
+     * connect (AdbRuntime READY).
+     *
+     * This is the FIRST-USE PRODUCT BOOTSTRAP completion point. It runs the
+     * WRITE_SECURE_SETTINGS self-grant (idempotent) so that subsequent
+     * WD-OFF scenarios can auto-enable Wireless Debugging without user action.
+     *
+     * MUST be called:
+     *   1. AFTER [pairDiscovered] or [pair] returns success=true, AND
+     *   2. AFTER the caller has driven [AdbRuntime.ensureReady] to READY.
+     *
+     * The method is IDEMPOTENT: if WRITE_SECURE_SETTINGS is already granted
+     * (e.g. app restart, or a previous successful bootstrap), it skips the
+     * pm grant and returns [AdbRuntime.SelfGrantResult.SKIPPED_ALREADY_GRANTED].
+     *
+     * Failure semantics: a self-grant failure does NOT invalidate the pairing.
+     * The identity is NOT deleted, rotated, or re-paired. The caller should
+     * treat this as AUTO_WD_BOOTSTRAP = FAILED while PAIRING = SUCCESS.
+     *
+     * @return the [AdbRuntime.SelfGrantResult] classification.
+     */
+    fun completeFirstUseBootstrap(): AdbRuntime.SelfGrantResult {
+        if (!AdbRuntime.isInitialized()) {
+            return AdbRuntime.SelfGrantResult.NOT_READY
+        }
+        if (AdbRuntime.readinessState() != AdbRuntimeState.READY) {
+            return AdbRuntime.SelfGrantResult.NOT_READY
+        }
+        return AdbRuntime.selfGrantWriteSecureSettings()
+    }
 }

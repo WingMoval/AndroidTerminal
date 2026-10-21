@@ -94,6 +94,44 @@ class ATAndroidAdbControl internal constructor(
         AdbRuntime.ensureReady(identityDir, onStatusLine) == AdbRuntimeState.READY
 
     /**
+     * AT.V4-4.3: First-use bootstrap result (composition-owned projection).
+     *
+     * Maps 1:1 to [AdbRuntime.SelfGrantResult] without exposing the
+     * com.adb.engine type in the public signature.
+     */
+    enum class FirstUseBootstrapResult {
+        /** WRITE_SECURE_SETTINGS already granted; no pm grant executed. */
+        SKIPPED_ALREADY_GRANTED,
+
+        /** pm grant over embedded ADB shell; checkSelfPermission confirms granted. */
+        GRANT_SUCCESS,
+
+        /** pm grant executed but checkSelfPermission still not granted. */
+        GRANT_FAILED,
+
+        /** Runtime not initialized or ADB not READY. */
+        NOT_READY,
+    }
+
+    /**
+     * AT.V4-4.3: Complete the first-use bootstrap (WRITE_SECURE_SETTINGS
+     * self-grant) after a successful pair + connect.
+     *
+     * Delegates to the composition-owned [AdbConsumerBootstrap].
+     * MUST be called after [ensureReady] returns true (AdbRuntime READY).
+     * Idempotent: safe to call multiple times.
+     */
+    fun completeFirstUseBootstrap(): FirstUseBootstrapResult {
+        val r = bootstrap.completeFirstUseBootstrap()
+        return when (r) {
+            AdbRuntime.SelfGrantResult.SKIPPED_ALREADY_GRANTED -> FirstUseBootstrapResult.SKIPPED_ALREADY_GRANTED
+            AdbRuntime.SelfGrantResult.GRANT_SUCCESS -> FirstUseBootstrapResult.GRANT_SUCCESS
+            AdbRuntime.SelfGrantResult.GRANT_FAILED -> FirstUseBootstrapResult.GRANT_FAILED
+            AdbRuntime.SelfGrantResult.NOT_READY -> FirstUseBootstrapResult.NOT_READY
+        }
+    }
+
+    /**
      * The current AdbRuntime readiness state (pure projection).
      */
     fun readinessState(): ATAdbReadinessState =

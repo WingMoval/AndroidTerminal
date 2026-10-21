@@ -36,6 +36,7 @@ import android.widget.TextView
 import com.at.composition.android.ATAdbBootstrapState
 import com.at.composition.android.ATAdbPairingResult
 import com.at.composition.android.ATAdbReadinessState
+import com.at.composition.android.ATAndroidAdbControl
 
 class PairActivity : Activity() {
 
@@ -141,7 +142,21 @@ class PairActivity : Activity() {
                     // next ensureReady/connect will reach READY.
                     val ready = control.ensureReady { }
                     if (AppRuntime.adbState() == ATAdbReadinessState.READY) {
-                        "配对成功 — ADB READY (guid=${result.deviceGuid})"
+                        // AT.V4-4.3: first-use bootstrap — self-grant
+                        // WRITE_SECURE_SETTINGS over the embedded ADB shell.
+                        // Idempotent; does NOT invalidate pairing on failure.
+                        val grantResult = runCatching {
+                            control.completeFirstUseBootstrap()
+                        }.getOrDefault(ATAndroidAdbControl.FirstUseBootstrapResult.GRANT_FAILED)
+                        val bootstrapSuffix = when (grantResult) {
+                            ATAndroidAdbControl.FirstUseBootstrapResult.SKIPPED_ALREADY_GRANTED -> ""
+                            ATAndroidAdbControl.FirstUseBootstrapResult.GRANT_SUCCESS ->
+                                "（Auto-WD 权限已自举）"
+                            ATAndroidAdbControl.FirstUseBootstrapResult.GRANT_FAILED ->
+                                "\n⚠ Auto-WD 权限自举失败（配对成功，但后续需手动开启无线调试）"
+                            ATAndroidAdbControl.FirstUseBootstrapResult.NOT_READY -> ""
+                        }
+                        "配对成功 — ADB READY (guid=${result.deviceGuid})$bootstrapSuffix"
                     } else {
                         "配对成功，连接建立中… (guid=${result.deviceGuid})"
                     }

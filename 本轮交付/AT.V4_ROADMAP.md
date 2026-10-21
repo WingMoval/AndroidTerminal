@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-22
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED；所有 REQUIRED gates PASS；REQUIRED_AND_STILL_OPEN = 0）
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED）/ V4-4.3 **COMPLETE**（First-Use Auto-WD Bootstrap CLOSED；POST_BOOTSTRAP_AUTO_WD = PASS）
 
 ---
 
@@ -408,6 +408,40 @@
 - `AdbCliInteractiveTest.kt` i14: established-marker aligned to device output + uid=2000 confirmation before loss injection
 
 **Evidence:** `docs/evidence/at_v4_4_2_final/`（00-09）
+
+---
+
+### AT.V4-4.3：First-Use Auto-WD Permission Bootstrap Closure
+
+**Status**: **COMPLETE**（2026-10-22）
+
+**Goal**: 首次配对成功后，AT 自动通过 embedded ADB shell 自举 WRITE_SECURE_SETTINGS 权限，
+使后续 WD OFF 场景能自动开启 Wireless Debugging（无需用户手动操作）。
+
+**Frozen semantics**:
+- `FIRST_USE_MANUAL_WD_REQUIRED = YES`（首次仍需手动开 WD + 配对一次）
+- `FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES`（之后 AT 自主管理 WD）
+- `POST_BOOTSTRAP_AUTO_WD = PASS`
+- `POST_BOOTSTRAP_MANUAL_WD_REQUIRED = NO`
+- `PRODUCT_FIRST_USE_PAIRING_COUNT = 1`, `PRODUCT_NORMAL_REPAIRING_COUNT = 0`
+- `SELF_GRANT_SOURCE = EMBEDDED_ADB_SHELL`
+- `PC_PM_GRANT_USED_FOR_PRODUCT_BOOTSTRAP = NO`
+
+**Implementation**:
+- `AdbRuntime.selfGrantWriteSecureSettings()` — 幂等 self-grant（embedded ADB shell, uid=2000）
+- `AdbConsumerBootstrap.completeFirstUseBootstrap()` — first-use bootstrap completion point
+- `ATAndroidAdbControl.completeFirstUseBootstrap()` — composition facade（FirstUseBootstrapResult）
+- `PairActivity.doPair()` — READY 后调用 completeFirstUseBootstrap
+
+**Gates**（全部 PASS，direct am instrument）:
+- Gate A: BUILD PASS, PRODUCTION_CHANGE_SCOPE = FIRST_USE_BOOTSTRAP_ONLY
+- Gate B: permission absent → self-grant PASS（FP unchanged, no re-pair）
+- Gate C: pair-success wiring（source call-chain + automated test）
+- Gate D: auto-WD real-device closure（WD OFF → auto-enable → uid=2000）
+- Gate E: restart persistence（permission retained, no re-grant, no re-pair）
+
+**RECOMMENDED_NEXT** = AT.V4-5（Consumer Conformance + Architecture Enforcement）
+**NEXT_OPEN_AUTHORIZED** = NO（等待 Controller 授权）
 
 ---
 

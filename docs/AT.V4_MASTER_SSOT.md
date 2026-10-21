@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-4.2
+> **Version**: 4.0.0-v4-4.3
 > **Date**: 2026-10-22
-> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** (all REQUIRED gates PASS: C4-C6, A5, A6, A7, A8, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP, HOST_RESTART, Transport-Loss, APP_RESTART; REQUIRED_AND_STILL_OPEN = 0; V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS; debt1_* = EXCLUDED_VALIDATION_HARNESS)
+> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** / V4-4.3 First-Use Auto-WD Bootstrap — **COMPLETE** (all REQUIRED gates PASS; POST_BOOTSTRAP_AUTO_WD = PASS; FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES; V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS)
 
 ---
 
@@ -304,6 +304,8 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **V4-4.2**：**COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22）。所有 REQUIRED gates PASS（C4-C6, A5, A6, A7, A8, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP, HOST_RESTART, Transport-Loss, APP_RESTART）；REQUIRED_AND_STILL_OPEN = 0；V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS。Product FIRST_USE_PAIRING_COUNT=1 / NORMAL_REPAIRING_COUNT=0；ConsumerHost FIRST_USE_PAIRING_COUNT=1 / NORMAL_REPAIRING_COUNT=0。debt1_* = EXCLUDED_VALIDATION_HARNESS。i14 harness observability repair (TEST-only)。UTP uninstall/reinstall 分类为 VALIDATION_ENVIRONMENT_ARTIFACT。
 
+**V4-4.3**：**COMPLETE**（2026-10-22）。First-use Auto-WD permission self-grant bootstrap 闭环。PAIR_SUCCESS → READY → self-grant WRITE_SECURE_SETTINGS（via embedded ADB shell, uid=2000）→ POST_BOOTSTRAP_AUTO_WD = PASS。FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES。PRODUCTION_CHANGE_SCOPE = FIRST_USE_BOOTSTRAP_ONLY。Gate B/C/D/E 全部 PASS（direct am instrument）。
+
 ---
 
 ## N. Closed Tasks
@@ -320,6 +322,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.1 | COMPLETE（Consumer Semantic Type Closure；`com.adb.engine` consumer 泄漏闭合） |
 | AT.V4-4.1A | COMPLETE（Final Consumer Dependency Closure；`:app` 直接 `:at-backend-*` 依赖删除；composition `api(:at-engine-spi)` → `implementation`；APK native packaging 经 composition transitive 验证；CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED） |
 | AT.V4-4.2 | **COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22；所有 REQUIRED gates PASS；REQUIRED_AND_STILL_OPEN = 0；V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS） |
+| AT.V4-4.3 | **COMPLETE**（2026-10-22；First-use Auto-WD permission self-grant bootstrap；POST_BOOTSTRAP_AUTO_WD = PASS；FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES） |
 | AT.V4-4.2A | COMPLETE（Device Validation Readiness Audit；全量 blocker 识别；UNKNOWN=0；RECOMMENDED_NEXT=V4-4.2B） |
 | AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
 | AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |
@@ -338,9 +341,10 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | Backend SPI implementation migration | ABSORBED（V4-1 + V4-2） |
 | Consumer semantic type boundary（`:app` / `:at-cli-consumer-host` / `:at-cli` 的 `:adb-engine` 泄漏） | COMPLETED（V4-4.1） |
 | Consumer 直接 concrete backend / SPI 依赖（`:app` → `:at-backend-local`/`:at-backend-adb`；composition `api(:at-engine-spi)`） | COMPLETED（V4-4.1A — CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED，Gradle + source + packaging 三维度） |
-| Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（**V4-4.2**；B1/B2/B3 已修复；剩余 B4 pairing / B5-B7 install / B8 evidence） |
+| Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | **COMPLETED**（**V4-4.2** DEVICE_CLOSURE = CLOSED；所有 REQUIRED gates PASS） |
+| First-use Auto-WD permission self-grant bootstrap | **COMPLETED**（**V4-4.3**；POST_BOOTSTRAP_AUTO_WD = PASS） |
 | Validation infrastructure repair（B1/B2/B3 test-only blocker） | COMPLETED（**V4-4.2B**） |
-| Consumer Conformance / architecture enforcement | OPEN（V4-5 — 等待 V4-4.2 device closure） |
+| Consumer Conformance / architecture enforcement | OPEN（V4-5 — 等待 Controller 授权） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
 
 ---
@@ -366,13 +370,15 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.1A**：COMPLETED — Final Consumer Dependency Closure（`:app` 删除直接 `:at-backend-local`/`:at-backend-adb` 依赖（HISTORICAL 遗留，无 source 需求）；composition `api(:at-engine-spi)` → `implementation`（public surface 零 SPI 类型）；3 个 dead import 删除；APK 4 个 native .so 经 composition transitive packaging 验证；`CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED`（Gradle dependency + source import 双维度）；BUILD/TEST/APK = PASS）。
 
-**AT.V4-4.2**：OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS — Device Closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / App+Host restart identity / connection reuse / runtime ownership / shellless / adb-only / DebugBridge parity）。B1/B2/B3 已在 V4-4.2B 修复；剩余前置条件：B4 ConsumerHost first-use pairing / B5-B7 test host APK install / B8 observability evidence。详见 AT.V4-4.2B repair doc。
+**AT.V4-4.2**：**COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22）— 所有 REQUIRED gates PASS（C4-C6, A5, A6, A7, A8, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP, HOST_RESTART, Transport-Loss, APP_RESTART）；REQUIRED_AND_STILL_OPEN = 0；V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS。
+
+**AT.V4-4.3**：**COMPLETE**（2026-10-22）— First-use Auto-WD permission self-grant bootstrap。POST_BOOTSTRAP_AUTO_WD = PASS；FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES。
 
 **AT.V4-4.2A**：COMPLETE — Device Validation Readiness Audit（全量 validation carrier / test / build / identity / observability 审计；UNKNOWN=0；8 blockers identified；NO production regression；RECOMMENDED_NEXT=V4-4.2B Validation Infrastructure Repair）。
 
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization（method-level exact inventory = 251 test methods / 26 classes / 31 files；CSV parser integrity = PASS（0 parse errors, 0 bad rows）；mechanical classification recount = PASS（SUM=251）；36 device gates 0 coverage gap 0 broken refs；blocker recount = 8（P0=0/P1=3/P2=3/P3=2）；SSOT/Roadmap 同步；B1/B2/B3 结论不变；NO new blockers）。
 
-**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4.2 device closure）。
+**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 Controller 授权）。
 
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization。
 
@@ -380,9 +386,9 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2B.1**：COMPLETE — UTF-8 Semantic Restoration（B3 ASCII workaround 修正：Unicode escape `\u4E2D\u6587\u6D4B\u8BD5` + byte-level split inside U+4E2D（E4 B8 AD）offset 6；G7 device 1/1 PASS；multibyte UTF-8 validation semantic fully restored；1 test file changed / 0 production）。
 
-**RECOMMENDED_NEXT** = AT.V4-4.2 RETRY — Device Closure（需设备重连 + test host APK install + ConsumerHost first-use pairing）。
+**RECOMMENDED_NEXT** = AT.V4-5 — Consumer Conformance + Architecture Enforcement。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.2 retry）。
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-5）。
 
 ---
 
