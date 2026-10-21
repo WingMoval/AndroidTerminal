@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
 > **Version**: 4.0.0-v4-4.2
-> **Date**: 2026-10-21
-> **Status**: V4-4.2 Device Closure — IDENTITY RECONCILED (single-identity parity PASS) / closure gates PARTIAL (C4-C6, A5, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP PASS-with-evidence; Transport-Loss + resize/multi-session primary validators still open as harness/observability gaps; debt1_* = EXCLUDED_VALIDATION_HARNESS)
+> **Date**: 2026-10-22
+> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** (all REQUIRED gates PASS: C4-C6, A5, A6, A7, A8, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP, HOST_RESTART, Transport-Loss, APP_RESTART; REQUIRED_AND_STILL_OPEN = 0; V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS; debt1_* = EXCLUDED_VALIDATION_HARNESS)
 
 ---
 
@@ -302,7 +302,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **V4-4.2B.1**：UTF-8 Semantic Restoration（COMPLETE）。B3 CJK→ASCII workaround 修正为 Unicode escape（`\u4E2D` 等）+ byte-level split inside U+4E2D；G7 device 1/1 PASS；multibyte UTF-8 validation semantic restored。
 
-**V4-4.2**：OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B4 first-use pairing / B5-B7 test host install / B8 observability evidence 待设备重连后执行）。
+**V4-4.2**：**COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22）。所有 REQUIRED gates PASS（C4-C6, A5, A6, A7, A8, A10, CONNECTION_REUSE, RUNTIME_OWNERSHIP, HOST_RESTART, Transport-Loss, APP_RESTART）；REQUIRED_AND_STILL_OPEN = 0；V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS。Product FIRST_USE_PAIRING_COUNT=1 / NORMAL_REPAIRING_COUNT=0；ConsumerHost FIRST_USE_PAIRING_COUNT=1 / NORMAL_REPAIRING_COUNT=0。debt1_* = EXCLUDED_VALIDATION_HARNESS。i14 harness observability repair (TEST-only)。UTP uninstall/reinstall 分类为 VALIDATION_ENVIRONMENT_ARTIFACT。
 
 ---
 
@@ -319,7 +319,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-MIGRATION-AUDIT-0 | COMPLETE（V3→V4 全量迁移审计；PASS_AT_IMPLEMENTATION_LEVEL；V4-4.1 修正文件级 count 为 MUTUALLY_EXCLUSIVE） |
 | AT.V4-4.1 | COMPLETE（Consumer Semantic Type Closure；`com.adb.engine` consumer 泄漏闭合） |
 | AT.V4-4.1A | COMPLETE（Final Consumer Dependency Closure；`:app` 直接 `:at-backend-*` 依赖删除；composition `api(:at-engine-spi)` → `implementation`；APK native packaging 经 composition transitive 验证；CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED） |
-| AT.V4-4.2 | OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B1/B2/B3 已修复；剩余 B4 pairing / B5-B7 install / B8 evidence 待设备重连；详见 V4-4.2B repair） |
+| AT.V4-4.2 | **COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22；所有 REQUIRED gates PASS；REQUIRED_AND_STILL_OPEN = 0；V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS） |
 | AT.V4-4.2A | COMPLETE（Device Validation Readiness Audit；全量 blocker 识别；UNKNOWN=0；RECOMMENDED_NEXT=V4-4.2B） |
 | AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
 | AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |

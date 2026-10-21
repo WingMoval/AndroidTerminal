@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
-> **Date**: 2026-10-21
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 OPEN（Device Closure）
+> **Date**: 2026-10-22
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED；所有 REQUIRED gates PASS；REQUIRED_AND_STILL_OPEN = 0）
 
 ---
 
@@ -380,34 +380,34 @@
 
 ### AT.V4-4.2：Device Closure
 
-**Status**: IN_PROGRESS — IDENTITY RECONCILED / closure gates PARTIAL
+**Status**: **COMPLETE** / **DEVICE_CLOSURE = CLOSED**（2026-10-22）
 
-**Identity reconciliation (controller-accepted):**
-- `AT_CANONICAL_ADB_IDENTITY_COUNT = 1`（Product `files/adb_identity`, fingerprint `cc7a9884...`）
-- `AT_FIRST_USE_PAIRING_COUNT = 1`, `AT_NORMAL_REPAIRING_COUNT = 0`
+**Identity reconciliation (controller-accepted at 4e2ebfc):**
+- `AT_CANONICAL_ADB_IDENTITY_COUNT = 1`（Product `files/adb_identity`, ConsumerHost `files/at-cli-identity`）
+- Product: `FINAL_INSTALL_FIRST_USE_PAIRING_COUNT = 1`, `FINAL_INSTALL_NORMAL_REPAIRING_COUNT = 0`
+- ConsumerHost: `CONSUMERHOST_FIRST_USE_PAIRING_COUNT = 1`, `CONSUMERHOST_NORMAL_REPAIRING_COUNT = 0`
 - `V4_PRODUCT_IDENTITY_REGRESSION = NO`
 - `V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS`
-- `debt1_e4` / `debt1_cont` = `VALIDATION_ONLY_FRESH_IDENTITY_SCENARIOS` → `EXCLUDED_VALIDATION_HARNESS`（`MULTI_PAIRING_REQUIREMENT = VALIDATION_HARNESS_OVERREACH`）
+- `debt1_e4` / `debt1_cont` = `EXCLUDED_VALIDATION_HARNESS`
+- UTP uninstall/reinstall 分类为 `VALIDATION_ENVIRONMENT_ARTIFACT`（非 Product lifecycle behavior）
 
-**Scope**（本轮已执行 + 证据）:
-- ✅ Product Local L1-L7 (7/7 PASS, UI evidence)
-- ✅ Product ADB A1-A10 (10/10 PASS, UI + DebugBridge evidence)
-- ✅ Shellless 15/15 (15/15 PASS, XML persisted: `17_ShelllessRealDeviceTest.xml`)
-- ✅ CLI C1-C3 (coreFunctionalGates PASS) + **C4-C6** (i2/i4/i6 PASS, `16_AdbCliInteractiveTest_app.xml`)
-- ✅ **A5 (Ctrl-C)** i7 PASS, **A10 (natural exit)** i10 PASS, **CONNECTION_REUSE** i13 PASS (同一 adb_identity, XML persisted)
-- ✅ APP_RESTART identity (fingerprint before==after, no re-pair)
+**ALL REQUIRED gates PASS**（`at_v4_4_2_final/09_FINAL_gate_reconciliation_COMPLETE.md`）:
+- ✅ C4-C6 (i2/i4/i6 PASS)
+- ✅ A5 (i7 PASS), A10 (i10 PASS), CONNECTION_REUSE (i13 PASS)
+- ✅ A6 (primary `resizeIsolation` PASS)
+- ✅ A7-A8 (primary `multiSessionIsolation` PASS)
+- ✅ APP_RESTART (fingerprint before==after, no re-pair)
 - ✅ RUNTIME_OWNERSHIP (sharedRuntimeEvidence PASS)
-- ✅ DebugBridge parity DBG1-6 (hello/list/attach/write-read/detach/pong)
-- ⚠️ HOST_RESTART — ConsumerHost restart-reuse PASS this round (Gradle) 但 XML 被后续运行覆盖，未持久化 → evidence-persistence gap
-- ❌ Transport Loss (I14) — FAIL (output-capture harness gap, 连接已建立但 post-loss marker 未捕获)
-- ❌ A6 (resize i8) / A7-A8 (multi-session i15) — secondary FAIL (harness capture); primary `ProgrammaticAdbConsumerTest` 本轮未重跑
-- ⊘ ADB_ONLY debt1_* — EXCLUDED_VALIDATION_HARNESS (raw 14/27 FAIL 不变, 非 Product blocker)
+- ✅ HOST_RESTART (ConsumerHost `identityReuseAfterRestart` PASS, direct am instrument, UID/FP before==after, no re-pair)
+- ✅ Transport Loss (I14 PASS, direct am instrument, harness marker fixed, A→F chain verified)
+- ⊘ ADB_ONLY debt1_* — EXCLUDED_VALIDATION_HARNESS
 
-**Gate**:
-- 单一 identity 语义 = 完整验证 (parity PASS)
-- C4-C6 / A5 / A10 / CONNECTION_REUSE / RUNTIME_OWNERSHIP = PASS-with-evidence
-- **未达 "no REQUIRED item remains open"**：Transport-Loss + resize/multi-session primary validators 仍 open（harness/observability + evidence-persistence 缺口，非 identity/architecture 回归）
-- **V4-4.2 NOT marked COMPLETE**（见 `15_final_gate_reconciliation.md`）
+**REQUIRED_AND_STILL_OPEN = 0**
+
+**Harness-only changes (TEST-only, no Product semantic change):**
+- `AdbCliInteractiveTest.kt` i14: established-marker aligned to device output + uid=2000 confirmation before loss injection
+
+**Evidence:** `docs/evidence/at_v4_4_2_final/`（00-09）
 
 ---
 

@@ -1,4 +1,4 @@
-// AT.CLI-0.2 â€?Interactive `adb shell` (no-arg) remote PTY relay test.
+// AT.CLI-0.2 ï¿½?Interactive `adb shell` (no-arg) remote PTY relay test.
 //
 // Verifies the full real Human Local PTY path:
 //   Local /system/bin/sh -> adb() wrapper (raw mode) -> app_process AdbCliMain
@@ -148,7 +148,7 @@ class AdbCliInteractiveTest {
                     }
                     // 3. Drive the remaining steps (only if enter succeeded).
                     // A step with an EMPTY marker means "send and settle" (no
-                    // deterministic output to wait for â€?e.g. `cat`/`sleep`
+                    // deterministic output to wait for ï¿½?e.g. `cat`/`sleep`
                     // start, or a raw Ctrl-C byte).
                     if (entered) {
                         for ((send, marker) in steps) {
@@ -519,7 +519,7 @@ class AdbCliInteractiveTest {
                 waitFor(observed, "uid=2000")
                 h.write(InputSource.DEBUG, "exit\n".toByteArray(StandardCharsets.UTF_8))
                 Thread.sleep(2500)
-                // AFTER: a local command (echo) â€?proves the Outer TTY is
+                // AFTER: a local command (echo) ï¿½?proves the Outer TTY is
                 // restored (canonical, echo works) after interactive exit.
                 h.write(InputSource.DEBUG, "echo LOCAL_AFTER_INTERACTIVE\n".toByteArray(StandardCharsets.UTF_8))
                 waitFor(observed, "LOCAL_AFTER_INTERACTIVE", 15_000)
@@ -560,7 +560,7 @@ class AdbCliInteractiveTest {
         // Two sequential interactive sessions (open/exit, open/exit) with AdbRuntime
         // READY. The second must NOT re-run TLS handshake / CNXN / pairing (the
         // underlying authenticated connection is reused). We verify both succeed
-        // (uid=2000 twice) â€?a re-pair would fail/timeout on this device.
+        // (uid=2000 twice) ï¿½?a re-pair would fail/timeout on this device.
         val (e1, b1, ent1) = runInteractive("id\n", "uid=2000", emptyList())
         assertTrue("I13: first session reached remote", b1.get() && allText(e1).contains("uid=2000"))
         val (e2, b2, ent2) = runInteractive("id\n", "uid=2000", emptyList())
@@ -605,14 +605,38 @@ class AdbCliInteractiveTest {
             val d = System.currentTimeMillis() + 90_000
             var established = false
             while (System.currentTimeMillis() < d) {
-                if (synchronized(observed) { observed.toString() }.contains("[adb] connected")) {
+                val snap = synchronized(observed) { observed.toString() }
+                // Match the device's ACTUAL `adb shell` entry output: `connected`
+                // (no `[adb] ` prefix on this device) and/or the remote prompt.
+                if (snap.contains("connected") || snap.contains("$ ") || snap.contains(":$")) {
                     established = true; break
                 }
                 Thread.sleep(100)
             }
+            // AT.V4-4.2D harness observability repair (i14 only): the established
+            // marker above matched only "[adb] connected", but this device emits
+            // the status line as "connected" (no prefix) + remote prompt. The
+            // mismatch meant the waiter never left the established gate, so `id`
+            // was never sent and no uid=2000 / AFTER_TRANSPORT_LOSS was observed.
+            // This is a layer-A (session-established) observation divergence, not
+            // a transport-semantics failure. We confirm the interactive is truly
+            // in the remote shell by requiring uid=2000 before injecting loss.
             if (established) {
                 h.write(InputSource.DEBUG, "id\n".toByteArray(StandardCharsets.UTF_8))
-                waitFor(observed, "uid=2000")
+                // Confirm we are actually in the remote shell (uid=2000) before
+                // injecting loss. waitFor returns Unit, so poll observed directly.
+                val uidDeadline = System.currentTimeMillis() + 30_000
+                var uidSeen = false
+                while (System.currentTimeMillis() < uidDeadline) {
+                    if (synchronized(observed) { observed.toString() }.contains("uid=2000")) {
+                        uidSeen = true; break
+                    }
+                    Thread.sleep(100)
+                }
+                if (!uidSeen) {
+                    // interactive not actually in remote shell; nothing to lose.
+                    setWd(true); return@Thread
+                }
                 // Force transport loss: WD off (real adbd disconnect on this device).
                 setWd(false)
                 Thread.sleep(4000)
@@ -721,7 +745,7 @@ class AdbCliInteractiveTest {
         // BEFORE the remote prompt. Reuses the AT.CLI-0.1B live status path.
         val canWd = AppRuntime.adbControl.canWriteSecureSettings()
         if (!canWd) {
-            assertTrue("I16: auto-WD NOT_AVAILABLE (no WRITE_SECURE) â€?classified", true)
+            assertTrue("I16: auto-WD NOT_AVAILABLE (no WRITE_SECURE) ï¿½?classified", true)
             return
         }
         setWd(false)

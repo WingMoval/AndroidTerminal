@@ -1,0 +1,42 @@
+﻿      value: "com.androidterminal.app.AdbCliInteractiveTest#i14_transportLossTermination"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+???: No installables found in test fixture. Nothing to install.
+???: Installing [D:\codebank\AndCode\AndroidTerminal-V4\app\build\outputs\apk\debug\app-debug.apk] on device APLMUT4312005935.
+???: Installing [D:\codebank\AndCode\AndroidTerminal-V4\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk] on device APLMUT4312005935.
+???: Start logcat streaming.
+???: Running Android Instrumentation driver.
+
+> Task :app:connectedDebugAndroidTest
+Starting 1 tests on ALI-AN00 - 15
+
+ALI-AN00 - 15 Tests 0/1 completed. (0 skipped) (0 failed)
+
+> Task :app:connectedDebugAndroidTest
+
+com.androidterminal.app.AdbCliInteractiveTest > i14_transportLossTermination[ALI-AN00 - 15] [31mFAILED [0m
+	java.lang.AssertionError: I14: transport loss handled (local usable or invocation terminated) (out=[adb shell
+	checking connection...
+
+???: Stop logcat streaming.
+???: Uninstalling com.androidterminal.app for device APLMUT4312005935.
+???: Uninstalling com.androidterminal.app.test for device APLMUT4312005935.
+Finished 1 tests on ALI-AN00 - 15
+[XmlResultReporter]: XML test result file generated at D:\codebank\AndCode\AndroidTerminal-V4\app\build\outputs\androidTest-results\connected\debug\TEST-ALI-AN00 - 15-_app-.xml. Total tests 1, failure 1, 
+????: Execute com.androidterminal.app.AdbCliInteractiveTest.i14_transportLossTermination: FAILED
+java.lang.AssertionError: java.lang.AssertionError: I14: transport loss handled (local usable or invocation terminated) (out=[adb shell
+checking connection...
+discovering...
+connecting...
+retrying connection (2 of 3)...
+retrying connection (3 of 3)...
+connection failed: All discovered endpoints failed to connect
+not connected (identity present). If pairing is needed: adb pair <host>:<port> <code>
+adb: unexpected frame
+])
+at org.junit.Assert.fail(Assert.java:89)
+at org.junit.Assert.assertTrue(Assert.java:42)
+at com.androidterminal.app.AdbCliInteractiveTest.i14_transportLossTermination(AdbCliInteractiveTest.kt:664)
+java.lang.AssertionError: I14: transport loss handled (local usable or invocation terminated) (out=[adb shell

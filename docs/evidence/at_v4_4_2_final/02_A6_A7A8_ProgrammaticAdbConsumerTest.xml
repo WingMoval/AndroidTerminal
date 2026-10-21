@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.androidterminal.app.ProgrammaticAdbConsumerTest" tests="2" failures="0" errors="0" skipped="0" time="12.136" timestamp="2026-10-21T16:53:04" hostname="localhost">
+  <properties>
+    <property name="device" value="ALI-AN00 - 15" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="multiSessionIsolation" classname="com.androidterminal.app.ProgrammaticAdbConsumerTest" time="10.601" />
+  <testcase name="resizeIsolation" classname="com.androidterminal.app.ProgrammaticAdbConsumerTest" time="0.14" />
+</testsuite>
