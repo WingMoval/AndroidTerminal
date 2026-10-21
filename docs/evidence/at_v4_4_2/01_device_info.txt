@@ -1,0 +1,36 @@
+﻿DEVICE INFO
+Serial: APLMUT4312005935
+Model: ALI-AN00 (HONOR)
+Brand: HONOR
+Android: 15
+SDK: 35
+Fingerprint: HONOR/ALI-AN00/HNALI-Q:15/HONORALI-AN00/9DLDLD230CNC00E206:user/release-keys
+Build type: user
+SELinux: Enforcing
+ro.debuggable: 0
+ro.adb.secure: 1
+
+EXISTING PACKAGES (pre-V4-4.2):
+com.androidterminal.app (versionName=0.3.0, versionCode=1, updated 2026-10-20)
+com.androidterminal.atclihost (versionName=0.1.0, versionCode=1, updated 2026-10-20)
+com.androidterminal.app.test
+com.androidterminal.atclihost.test
+com.androidterminal.testhost / .test
+com.androidterminal.adbonlyhost / .test
+com.androidterminal.shelllesshost / .test
+
+IDENTITY STATE:
+Product (com.androidterminal.app):
+  files/adb_identity/adbkey (1704 bytes, 2026-10-20)
+  files/adb_identity/adbkey.pub (721 bytes)
+  files/adb_identity/adb_cert.pem (1131 bytes)
+  => IDENTITY_EXISTS = YES
+
+ConsumerHost (com.androidterminal.atclihost):
+  files/at-cli-identity/ (EMPTY — no adbkey)
+  => IDENTITY_EXISTS = NO
+
+WIRELESS_DEBUGGING:
+  settings get global adb_wifi_enabled = 0 (OFF)
+  persist.adb.wifi_enabled = (empty)
+  => WIRELESS_DEBUGGING = OFF

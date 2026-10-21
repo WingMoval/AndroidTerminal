@@ -1,0 +1,48 @@
+﻿AT.V4-4.2 STOP REPORT
+Date: 2026-10-21
+HEAD: 81d630a (AT.V4-4.1A)
+WORKTREE: CLEAN (before test run)
+
+FACT:
+AppDebugInputTest (7 tests) all FAIL with:
+  IllegalStateException: AppRuntime.initialize(context) not called
+  at com.androidterminal.app.AppRuntime.localEngine(AppRuntime.kt:163)
+
+BLOCKER_TYPE: TEST_INFRA_BLOCKER
+
+FAILED_GATE: PRODUCT_LOCAL_L1_L7 (specifically AppDebugInputTest)
+
+EXPECTED (V3 behavior):
+  AppTerminal() without explicit engine -> self-constructs ATEngine(LocalPersistentBackend)
+  -> works WITHOUT AppRuntime.initialize()
+
+OBSERVED (V4 behavior):
+  AppTerminal() without explicit engine -> delegates to AppRuntime.localEngine()
+  -> requires AppRuntime.initialize(context) (normally called by MainActivity.onCreate)
+  -> AppDebugInputTest does NOT launch MainActivity -> initialize never called -> FAIL
+
+EVIDENCE:
+  V3 AppTerminal.kt:48: private val engine = engine ?: ATEngine(oneShot=null, persistent=LocalPersistentBackend())
+  V4 AppTerminal.kt:48: private val engine = engine ?: AppRuntime.localEngine()
+  Changed in: AT.V4-4 commit (84936f8), NOT in V4-4.1/V4-4.1A
+
+WHY_NOT_SAFE_TO_CONTINUE:
+  1. Fixing AppDebugInputTest requires modifying test source (adding AppRuntime.initialize(ctx) call)
+     -> STOP Condition #3: "需要修改 test source"
+  2. Fixing AppTerminal to self-construct when uninitialized requires modifying production source
+     -> STOP Condition #2: "需要修改 production source"
+  3. Cannot verify L1-L7 Local PTY gates without a working Local test path
+
+MINIMUM_NEXT_ACTION:
+  Controller decision needed on ONE of:
+  A. Authorize test-source fix: add AppRuntime.initialize(ctx) to AppDebugInputTest (1-line change)
+  B. Authorize production fix: AppTerminal falls back to self-constructed engine when AppRuntime not initialized
+  C. Accept that AppDebugInputTest is the wrong vehicle for L1-L7 and use a different test path
+     (e.g., a new instrumentation test that self-initializes, or use DynamicSessionPagesTest which
+      goes through ActivityScenario and IS unaffected)
+
+NOTE:
+  - All other :app tests that use ActivityScenario or explicitly call AppRuntime.initialize() are UNAFFECTED
+  - DynamicSessionPagesTest (Local multi-session) goes through Activity -> initialize -> should work
+  - CommonConsumerPathTest C1-C4 (Local) explicitly calls AppRuntime.initialize() -> should work
+  - ADB/CLI/ConsumerHost tests are blocked by SEPARATE issues (ConsumerHost has no identity, needs pairing)

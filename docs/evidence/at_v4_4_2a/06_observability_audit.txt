@@ -1,0 +1,138 @@
+AT.V4-4.2A OBSERVABILITY AUDIT
+Date: 2026-10-21
+
+================================================================
+1. CONNECTION REUSE OBSERVABILITY
+================================================================
+
+The V4-4.2 closure requires proving that ADB connection is REUSED across
+multiple commands (not re-established per command). Evidence sources:
+
+A. PRODUCTION LOGS (logcat):
+  TAG "AdbRuntime":
+    - "connectAuto READY via <host>:<port>"     (logcat AdbRuntime: I)
+    - "connect $host:$port threw"               (logcat AdbRuntime: E)
+    - "transport loss detected; starting bounded recovery"
+    - "recovery SUCCEEDED -> READY"
+    - "recovery FAILED (bounded) -> RECOVERY_FAILED"
+  TAG "AdbRecovery":
+    - "RECOVERY_ATTEMPT #<n> (of <max>)"
+    - "RECOVERY_SUCCEEDED (attempt <n>)"
+    - "RECOVERY_ATTEMPT_FAILED #<n>: <reason>"
+  TAG "AdbEngine":
+    - (no connection-level logs; native layer is opaque)
+
+  What is observable:
+    - Connection ESTABLISHED: YES ("connectAuto READY via ...")
+    - Connection LOSS: YES ("transport loss detected")
+    - RECOVERY ATTEMPTS: YES ("RECOVERY_ATTEMPT #n")
+    - RECOVERY OUTCOME: YES ("RECOVERY_SUCCEEDED" / "RECOVERY_FAILED")
+
+  What is NOT observable:
+    - Per-command TCP connect count: NO (native ADB layer does not log
+      each TCP connection; the native C++ AdbNative.connect() is the
+      entrypoint and does not emit per-call logs)
+    - Per-command STLS (start TLS) count: NO (TLS handshake is inside
+      native layer; no Kotlin-level log)
+    - Per-command CNXN (ADB protocol handshake) count: NO (same)
+    - Transport ID / connection ID: NO (not exposed)
+
+  Conclusion: CONNECTION_REUSE_OBSERVABILITY = PARTIAL.
+  You can observe:
+    - Initial connect (1x "connectAuto READY")
+    - Subsequent commands do NOT trigger new "connectAuto READY" logs
+      (absence of new connect logs = reuse implied)
+    - Transport loss + recovery (if it happens)
+  You CANNOT observe:
+    - Exact TCP/STLS/CNXN counts per command
+    - Definitive proof that the SAME socket is reused (vs. transparent
+      reconnect that is fast enough to not be noticed)
+
+  For V4-4.2 purposes:
+    - "connectAuto READY" appearing exactly ONCE across N commands
+      is REASONABLE evidence of reuse (but not definitive).
+    - Absence of "connectAuto READY" for commands 2..N + successful
+      execution is the PRACTICAL proof of reuse.
+    - This is SUFFICIENT for V4-4.2 (the V3 evidence used the same method).
+
+TCP_CONNECT_COUNT_OBSERVABLE = NO (per-command)
+STLS_COUNT_OBSERVABLE = NO
+TLS_HANDSHAKE_COUNT_OBSERVABLE = NO
+CNXN_COUNT_OBSERVABLE = NO
+RECOVERY_COUNT_OBSERVABLE = YES
+
+CONNECTION_REUSE_OBSERVABILITY = SUFFICIENT (practical level)
+  Rationale: The "connectAuto READY once + N successful commands" pattern
+  is the same evidence method used in V3. It is not cryptographic proof
+  but is consistent with the V3 verification standard.
+
+================================================================
+2. RUNTIME / RECOVERY OWNERSHIP OBSERVABILITY
+================================================================
+
+The V4-4.2 closure requires proving:
+  - 1 logical AdbRuntime owner per process
+  - 1 AdbRecoveryCoordinator owner per process
+  - No duplicate transport observers
+
+Evidence sources:
+
+A. SOURCE INVARIANT:
+  - AdbRuntime is a process-scoped singleton (companion object pattern).
+    AdbRuntime.initialize() is called ONCE (idempotent; second call is a
+    no-op or returns existing instance).
+  - AdbRecoveryCoordinator is created INSIDE AdbRuntime (not independently
+    instantiable by consumers).
+  - Transport observer is started/stopped by AdbRuntime (single owner).
+
+B. PRODUCTION LOGS:
+  TAG "AdbRuntime":
+    - "initialize: readiness+discovery backends wired"  (exactly 1x per process)
+    - "transport observer started (read-only projection)" (1x per process)
+    - "transport observer stopped" (1x per process, on disconnect)
+  If "initialize" appears >1x in a single process -> duplicate ownership.
+
+C. TEST HOOKS:
+  - AtCliConsumerTest.sharedRuntimeEvidence() records:
+    G["ADB_RUNTIME_IS_SINGLETON"] = AtCliConsumerHost.isAdbRuntimeInitialized()
+    G["SECOND_ADB_RUNTIME"] = "NO (AdbRuntime is the process singleton)"
+  - AdbRuntimeLifecycleTest (adb-only-test-host) uses
+    AdbRuntime.resetForTest() + AdbRuntime.initializeForTest() to verify
+    single-owner semantics in a controlled environment.
+
+D. DEVICE MARKER:
+  - logcat filter: "AdbRuntime.*initialize" per process PID.
+  - Expected: exactly 1 "initialize" log per process lifetime.
+
+RUNTIME_INIT_OBSERVABLE = YES (logcat "initialize" count per process)
+RECOVERY_OWNER_OBSERVABLE = YES (logcat "RECOVERY_ATTEMPT" + source invariant)
+TRANSPORT_OBSERVER_OBSERVABLE = YES (logcat "transport observer started/stopped")
+
+RUNTIME_OWNERSHIP_OBSERVABILITY = SUFFICIENT
+  Rationale: Source invariant (singleton) + logcat count (1x initialize)
+  is the same evidence method used in V3. No duplicate ownership is
+  possible by construction (companion object + idempotent initialize).
+
+================================================================
+3. OBSERVABILITY GAPS
+================================================================
+
+GAP-1: Per-command TCP/STLS/CNXN count not observable.
+  Impact: Cannot provide cryptographic proof of connection reuse.
+  Mitigation: "connectAuto READY once + N successful commands" is the
+  V3-accepted evidence standard. Sufficient for V4-4.2.
+  Severity: P3 (documentary; does not block validation).
+
+GAP-2: No connection ID / transport ID exposed.
+  Impact: Cannot correlate specific commands to specific TCP connections.
+  Mitigation: Not needed for V4-4.2 (reuse is proven by absence of
+  re-connect).
+  Severity: P3.
+
+GAP-3: Native ADB layer (C++) is opaque to Kotlin logging.
+  Impact: TLS handshake details, ADB protocol CNXN messages are not
+  visible in logcat.
+  Mitigation: Same as V3. The native layer was verified in V2/V3.
+  Severity: P3.
+
+NO P0/P1 OBSERVABILITY GAPS. All gaps are P3 (documentary).

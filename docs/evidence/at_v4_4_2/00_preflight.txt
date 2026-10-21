@@ -1,0 +1,21 @@
+﻿AT.V4-4.2 PREFLIGHT
+Date: 2026-10-21
+START_HEAD: 81d630a
+WORKTREE: CLEAN
+DEVICE: APLMUT4312005935
+
+git log -8:
+81d630a AT.V4-4.1A: close final consumer dependencies
+e8372d3 AT.V4-4.1: close consumer semantic type boundary
+05f317a AT.V4-MIGRATION-AUDIT-0: audit full V3 to V4 migration
+84936f8 AT.V4-4: migrate product and CLI consumer boundary
+23889a5 AT.V4-2: establish Android composition root
+09f2ac9 AT.V4-1: extract engine API and backend SPI
+8bddf51 AT.V4-0.1: normalize V4 historical/DAG/migration semantics
+0ef538b AT.V4-0: bootstrap V4 physical architecture
+
+PRE-EXISTING BUILD ISSUES (NOT V4-4.x):
+- :at-shellless-test-host:compileDebugAndroidTestKotlin FAILED (ShelllessRealDeviceTest.kt:204 syntax error)
+- :test-host:compileDebugAndroidTestKotlin FAILED (AdbTransportLossAuditTest.kt:77 Unresolved DefaultATEngine)
+Both files last modified in V4-1 (09f2ac9), NOT in V4-4/V4-4.1/V4-4.1A.
+Core modules (app/at-cli/consumer-host/composition/adb-engine/engine) BUILD+TEST PASS.

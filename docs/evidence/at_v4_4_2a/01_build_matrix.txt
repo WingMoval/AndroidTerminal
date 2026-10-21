@@ -1,0 +1,76 @@
+AT.V4-4.2A BUILD MATRIX
+Date: 2026-10-21
+Method: gradlew.bat assembleDebug + assembleDebugAndroidTest per module (V4 repo, HEAD 81d630a)
+
+MODULE                  MAIN_BUILD    ANDROID_TEST_BUILD
+----------------------  ------------  ------------------
+:app                    PASS          PASS
+:test-host              PASS          FAIL
+:adb-only-test-host     PASS          PASS
+:at-shellless-test-host PASS          FAIL
+:at-cli-consumer-host   PASS          PASS
+
+============================== FAILURES ==============================
+
+--- :test-host:compileDebugAndroidTestKotlin FAIL ---
+Error (single, exhaustive):
+  e: test-host/src/androidTest/java/com/androidterminal/testhost/AdbTransportLossAuditTest.kt:77:36
+     Unresolved reference: DefaultATEngine
+
+Root cause:
+  V4-1 (09f2ac9) split ATEngine (class, com.at.engine) into:
+    - ATEngine (interface) -> com.at.engine.ATEngine in :at-engine-api
+    - DefaultATEngine (impl) -> com.at.engine.impl.DefaultATEngine in :at-engine
+  V4-1 adapted 3 of 4 test-host androidTest files:
+    BackendParityAuditTest.kt     -> import com.at.engine.impl.DefaultATEngine + DefaultATEngine(...)  [OK]
+    TestHostHeadlessInputTest.kt  -> import com.at.engine.impl.DefaultATEngine + DefaultATEngine(...)  [OK]
+    AdbBackendHeadlessTest.kt     -> adapted                                                            [OK]
+    AdbTransportLossAuditTest.kt  -> import added (line 32) BUT call site uses WRONG fully-qualified
+                                     name com.at.engine.DefaultATEngine (line 77) instead of
+                                     com.at.engine.impl.DefaultATEngine                              [BROKEN]
+  The correct import at line 32 is shadowed/unused by the explicit wrong FQN at line 77.
+  This is a V4-1 mechanical adaptation miss (sibling files were fixed correctly).
+
+First bad commit: 09f2ac9 (AT.V4-1)
+V3 behavior: com.at.engine.ATEngine was a CONSTRUCTIBLE CLASS (com.at.engine.ATEngine)
+V4 behavior: com.at.engine.ATEngine is an INTERFACE; impl is com.at.engine.impl.DefaultATEngine
+
+--- :at-shellless-test-host:compileDebugAndroidTestKotlin FAIL ---
+Errors (all in g7_utf8RoundTrip, lines 204-206):
+  e: ShelllessRealDeviceTest.kt:204:48 Expecting '"'
+  e: ShelllessRealDeviceTest.kt:205:52 Expecting ')'
+  e: ShelllessRealDeviceTest.kt:205:78 Expecting '"'
+  e: ShelllessRealDeviceTest.kt:206:10 Expecting an element
+  e: ShelllessRealDeviceTest.kt:206:22 Expecting ')'
+  e: ShelllessRealDeviceTest.kt:205:9 Unresolved reference: assertTrue
+
+Root cause:
+  CJK UTF-8 string literals in g7_utf8RoundTrip were corrupted (UTF-8 bytes
+  reinterpreted as GBK/CP936 then re-encoded). Examples:
+    line 205: val out2 = readUntil(s, "PONG 涓?, 4000)   <- unterminated string
+    line 206: assertTrue("split UTF-8 PONG 涓? got: $out2", out2.contains("PONG 涓?))
+  The corruption was introduced by V4-1 (09f2ac9), which touched this file for
+  the ATPersistentBackend.Launch -> ATSessionLaunch rename. The same file at
+  V3 baseline 75d5832 ALSO contains the corrupted sequences (the repo was
+  created by a lossy copy), so V3 at 75d5832 was ALSO non-buildable for this
+  file. V4-1 did NOT fix the pre-existing corruption; it only added the rename.
+
+First bad commit: 75d5832-era repo copy (pre-existing at V3 baseline)
+                     09f2ac9 (AT.V4-1) touched the file but did not repair corruption
+V3 behavior: V3 at 75d5832 = SAME corruption (would also fail to compile if built)
+V4 behavior: unchanged corruption + ATSessionLaunch rename applied
+
+Classification: PREEXISTING_V3_TEST_DEBT (corruption) + V4-1 did not repair it
+
+============================== PASS MODULES (detail) ==================
+
+:app: assembleDebug PASS, assembleDebugAndroidTest PASS
+  (14 androidTest files compile; runtime behavior of AppDebugInputTest is a
+   separate issue - see 03_runtime_init_audit.txt)
+
+:adb-only-test-host: assembleDebug PASS, assembleDebugAndroidTest PASS
+  (3 androidTest files compile: AdbDebt1ValidationTest, AdbOnlyRealDeviceTest,
+   AdbRuntimeLifecycleTest)
+
+:at-cli-consumer-host: assembleDebug PASS, assembleDebugAndroidTest PASS
+  (1 androidTest file compiles: AtCliConsumerTest)

@@ -1,0 +1,42 @@
+AT.V4-4.2A PREFLIGHT
+Date: 2026-10-21
+STEP: Device Validation Readiness Audit (DOCS/EVIDENCE ONLY)
+
+HEAD: 81d630a31fa0c779deaa0acecf6be230db16700b (AT.V4-4.1A)
+EXPECTED_HEAD: 81d630a
+HEAD_MATCH: PASS
+
+WORKTREE_STATUS:
+  ?? docs/evidence/at_v4_4_2/
+  ?? docs/evidence/at_v4_4_2a/   (this audit's evidence, created during preflight)
+PREEXISTING_DIRTY_PATHS: docs/evidence/at_v4_4_2/
+SOURCE_DIRTY: NO
+GRADLE_DIRTY: NO
+MANIFEST_DIRTY: NO
+
+EXISTING_V4_4_2_EVIDENCE (preserved, not modified):
+  00_preflight.txt (991 B)
+  01_device_info.txt (1118 B)
+  02_stop_report.txt (2465 B)
+  screenshot_home.png (178364 B)
+  screenshot_l1_launch.png (613432 B)
+
+GIT_LOG_10:
+  81d630a (HEAD -> master) AT.V4-4.1A: close final consumer dependencies
+  e8372d3 AT.V4-4.1: close consumer semantic type boundary
+  05f317a AT.V4-MIGRATION-AUDIT-0: audit full V3 to V4 migration
+  84936f8 AT.V4-4: migrate product and CLI consumer boundary
+  23889a5 AT.V4-2: establish Android composition root
+  09f2ac9 AT.V4-1: extract engine API and backend SPI
+  8bddf51 AT.V4-0.1: normalize V4 historical/DAG/migration semantics
+  0ef538b AT.V4-0: bootstrap V4 physical architecture
+  75d5832 (tag: AT.V3-TO-V4-BASELINE-V1, origin/master) AT.V3: close consumer-boundary audits before V4
+  f55973d AT.CONSUMER-CAPABILITY-AUDIT-0.1: normalize consumer audit semantics
+
+NOTE: 02_stop_report.txt preliminary classification (TEST_INFRA_BLOCKER) was NOT
+carried forward as final. This audit re-derives all classifications from source.
+
+DEVICE_STATE_DURING_AUDIT: DISCONNECTED (wireless debugging link dropped after
+V4-4.2 session). Static audit does not require device. Device-dependent items
+(identity existence, package UID, run-as availability) are recorded from the
+previous session's evidence (docs/evidence/at_v4_4_2/01_device_info.txt).

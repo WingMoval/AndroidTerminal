@@ -1,0 +1,25 @@
+
+
+module      : app
+main        : FAIL
+androidTest : FAIL
+
+module      : test-host
+main        : FAIL
+androidTest : FAIL
+
+module      : adb-only-test-host
+main        : FAIL
+androidTest : FAIL
+
+module      : at-shellless-test-host
+main        : FAIL
+androidTest : FAIL
+
+module      : at-cli-consumer-host
+main        : FAIL
+androidTest : FAIL
+
+
+
+

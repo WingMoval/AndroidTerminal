@@ -1,0 +1,147 @@
+AT.V4-4.2A RUNTIME INITIALIZATION AUDIT
+Date: 2026-10-21
+
+================================================================
+1. PRODUCT RUNTIME INIT CONTRACT (V4, HEAD 81d630a)
+================================================================
+
+AppRuntime.initialize(context) is called from EXACTLY TWO production sites:
+  - MainActivity.onCreate()   (app/src/main/.../MainActivity.kt:68)
+  - PairActivity.onCreate()   (app/src/main/.../PairActivity.kt:52)
+
+There is NO Application class in :app (V3 and V4 alike).
+There is NO BroadcastReceiver / Service entrypoint that initializes AppRuntime.
+
+All AppTerminal() production call sites (MainActivity.kt:134, :136) pass
+explicit `engine = engineFor(kind)` — they NEVER rely on the engine=null fallback.
+
+AppTerminal(engine=null) fallback:
+  V3: engine ?: ATEngine(oneShot=null, persistent=LocalPersistentBackend())
+      -> self-constructs; works WITHOUT AppRuntime.initialize
+  V4: engine ?: AppRuntime.localEngine()
+      -> delegates to AppRuntime; REQUIRES AppRuntime.initialize(context)
+      -> if not initialized: IllegalStateException("AppRuntime.initialize(context) not called")
+
+PRODUCTION REACHABILITY of the fallback:
+  NO production code path constructs AppTerminal(engine=null).
+  The fallback is TEST-ONLY reachable.
+
+APPDEBUGINPUT_ROOT_CLASSIFICATION:
+  The test AppDebugInputTest constructs AppTerminal(eventListener={}) without
+  launching an Activity and without calling AppRuntime.initialize().
+  In V3 this worked (self-constructed engine). In V4 it fails (delegation).
+
+  Is this a V4 PRODUCTION regression or a TEST harness regression?
+
+  Analysis:
+  - The V3 fallback (self-construct) was documented in V3 AppTerminal.kt as:
+    "@param engine the ATEngine to use (null = build a Local-only engine)."
+    It was a production-supported convenience (the class doc says the
+    composition helper is "shared by the Human UI (MainActivity) AND the
+    debug-only instrumentation (AppDebugInputTest)").
+  - V4 changed the fallback to delegate to AppRuntime.localEngine() in commit
+    84936f8 (AT.V4-4), with the comment "V4-4: Delegate to AppRuntime (which
+    uses ATAndroidComposition)."
+  - The V4-4 change made the fallback DEPEND on AppRuntime initialization,
+    which is only guaranteed when an Activity is running.
+  - No production code path is broken (all production call sites inject
+    explicit engine). The ONLY broken consumer is AppDebugInputTest.
+  - However, the V3 class documentation EXPLICITLY stated the fallback was
+    for "the debug-only instrumentation (AppDebugInputTest)" — meaning the
+    fallback was a CONTRACT for the test, and V4 broke that contract.
+
+  VERDICT: V4_TEST_HARNESS_REGRESSION (not a production semantic regression).
+  Rationale:
+  - No user-facing capability is lost (production always injects engine).
+  - The regression is in the TEST-CONVENIENCE contract (fallback behavior).
+  - The fix is a TEST-ONLY change (add AppRuntime.initialize(ctx) to the test)
+    OR a production fallback restoration (both are valid; see RECOMMENDED_OPTION).
+  - It is NOT a V4_PRODUCTION_REGRESSION_CANDIDATE because no production
+    call site is affected and no user-visible behavior changes.
+
+APPDEBUGINPUT_FIRST_BAD_COMMIT = 84936f8 (AT.V4-4)
+APPDEBUGINPUT_RECOMMENDED_OPTION = A (test-only fix: add AppRuntime.initialize(ctx))
+
+Rationale for A over B/C:
+  A (test fix): 1-line change in AppDebugInputTest (@Before: AppRuntime.initialize(ctx)).
+    Consistent with ALL other :app androidTest files that self-initialize
+    (CommonConsumerPathTest, ProgrammaticAdbConsumerTest, AdbCliBridgeTest, etc.).
+    Zero production risk. Preserves the V4-4 architectural intent
+    (single composition root via AppRuntime).
+  B (production fix): Restore self-construct fallback. Contradicts the V4-4
+    architectural decision (single AppRuntime composition root). Would create
+    TWO engine construction paths (AppRuntime AND AppTerminal fallback).
+  C (alternate validator): DynamicSessionPagesTest covers multi-session Local
+    via ActivityScenario (unaffected). But it does NOT cover the byte-stream
+    semantics (partial write, Ctrl-C, stdin) that AppDebugInputTest uniquely
+    validates. Losing AppDebugInputTest would reduce L2-L7 coverage.
+
+================================================================
+2. OTHER TESTS WITH SAME PATTERN (pre-init AppRuntime access)
+================================================================
+
+Scanned ALL :app androidTest files for:
+  - AppTerminal() without explicit engine
+  - AppRuntime.<method> without prior AppRuntime.initialize
+  - No ActivityScenario AND no explicit initialize
+
+Results:
+  AppDebugInputTest:    AppTerminal() no engine, NO Activity, NO initialize -> FAIL
+  All other 13 files:   either use ActivityScenario (which triggers
+                        MainActivity.onCreate -> initialize) OR call
+                        AppRuntime.initialize(ctx) explicitly in @Before/setup.
+
+  AdbCliInteractiveTest:  ActivityScenario (3x) -> initialize via Activity -> OK
+  AdbCliLifecycleTest:    ActivityScenario (3x) -> OK
+  AdbCliLiveStatusTest:   ActivityScenario (3x) -> OK
+  AdbCliOneShotTest:      ActivityScenario (3x) -> OK
+  AdbCliBridgeTest:       ActivityScenario (5x) + explicit initialize -> OK
+  AdbHumanPreviewTest:    ActivityScenario (3x) + explicit initialize -> OK
+  AppAdbProvisionTest:    explicit initialize (2x) -> OK
+  AppProcessProbeTest:    ActivityScenario (3x) -> OK
+  CommonConsumerPathTest: explicit initialize (3x) -> OK
+  DebugBridgeScreenshotTest: ActivityScenario (3x) + explicit initialize -> OK
+  DynamicSessionPagesTest:  ActivityScenario (3x) -> OK
+  ProgrammaticAdbConsumerTest: explicit initialize (1x) -> OK
+  SharedSessionBridgeTest:  ActivityScenario (3x) + explicit initialize -> OK
+
+CONCLUSION: AppDebugInputTest is the ONLY test with the pre-init AppRuntime
+access problem. No other test has the same pattern.
+
+================================================================
+3. TEST RUNTIME INIT CONTRACT (V4)
+================================================================
+
+Two valid initialization patterns for :app androidTest:
+  PATTERN 1: ActivityScenario.launch(MainActivity) -> MainActivity.onCreate()
+             -> AppRuntime.initialize(applicationContext)
+             Used by: AdbCli*Test, AdbHumanPreviewTest, AppProcessProbeTest,
+                      DynamicSessionPagesTest, SharedSessionBridgeTest,
+                      DebugBridgeScreenshotTest
+  PATTERN 2: Explicit AppRuntime.initialize(ctx) in @Before/setup
+             Used by: CommonConsumerPathTest, ProgrammaticAdbConsumerTest,
+                      AdbCliBridgeTest, AdbHumanPreviewTest, AppAdbProvisionTest
+
+AppDebugInputTest uses NEITHER pattern -> BROKEN.
+
+================================================================
+4. IMPLICIT DEPENDENCIES
+================================================================
+
+IMPLICIT_ACTIVITY_INIT_DEPENDENCY:
+  All ActivityScenario-based tests implicitly depend on MainActivity.onCreate()
+  calling AppRuntime.initialize(). This is a STABLE dependency (MainActivity
+  will always initialize in onCreate).
+
+IMPLICIT_GLOBAL_SINGLETON_DEPENDENCY:
+  AppRuntime is a process-scoped singleton (companion object). All tests in
+  the same instrumentation process share it. If one test initializes, others
+  in the same process can access it. BUT each instrumentation class runs in
+  its own process (AndroidJUnit4 default), so there is NO cross-class
+  singleton leakage.
+
+TEST_ORDER_DEPENDENCY:
+  NONE detected. Each test class is self-contained. No test depends on
+  another test's side effects (except AdbDebt1ValidationTest g4 which reuses
+  the identity created by g2 — but that is WITHIN the same class and is
+  documented as a prerequisite).

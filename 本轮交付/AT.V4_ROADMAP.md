@@ -225,13 +225,69 @@
 - `docs/implementation/AT.V4-4.1A_Final_Consumer_Dependency_Closure.md`
 - 更新后的 `AT.V4_MASTER_SSOT.md` / `AT.V4_ROADMAP.md`
 
-**RECOMMENDED_NEXT** = AT.V4-4.2（Device Closure）
+**RECOMMENDED_NEXT** = AT.V4-4.2A（Device Validation Readiness Audit）
+
+---
+
+### AT.V4-4.2A：Device Validation Readiness Audit
+
+**Status**: COMPLETE
+
+**Scope**:
+- 全量 validation carrier build matrix（5 modules × main + androidTest）
+- 全量 test inventory（31 files / ~200 methods / V3 vs V4 parity）
+- AppDebugInputTest 根因分类（V4_TEST_HARNESS_REGRESSION；first bad commit 84936f8）
+- test-host / shellless-host 编译 blocker 根因 + introduction commit
+- Runtime init contract（PRODUCT + TEST）
+- Identity ownership matrix（5 packages）
+- First-use pairing paths
+- Destructive test identification（5 tests）
+- Device preconditions
+- Connection reuse + runtime ownership observability
+- V3/V4 diff evidence（20 modified test files）
+- Device gate coverage matrix（34 gates）
+
+**Gate**:
+- UNKNOWN_COUNT = 0
+- ALL_BUILD_BLOCKERS_IDENTIFIED = YES
+- ALL_IDENTITY_PRECONDITIONS_IDENTIFIED = YES
+- ALL_DESTRUCTIVE_TESTS_IDENTIFIED = YES
+- ALL_V4_4_2_GATES_HAVE_VALIDATOR_MAPPING = YES
+
+**Deliverables**:
+- `docs/audit/AT.V4-4.2A_Device_Validation_Readiness_Audit.md`
+- `docs/audit/AT.V4-4.2A_Test_Harness_Matrix.csv`
+- `docs/audit/AT.V4-4.2A_Device_Gate_Coverage_Matrix.csv`
+- `docs/audit/AT.V4-4.2A_Blocker_Matrix.csv`
+- `docs/evidence/at_v4_4_2a/`（8 evidence files）
+
+**RECOMMENDED_NEXT** = AT.V4-4.2B（Validation Infrastructure Repair）
+
+---
+
+### AT.V4-4.2B：Validation Infrastructure Repair
+
+**Status**: OPEN（待 Controller 授权）
+
+**Scope**:
+- B1: AppDebugInputTest 加 `AppRuntime.initialize(ctx)`（1 行，test-only）
+- B2: AdbTransportLossAuditTest.kt:77 FQN 修正（1 行，test-only）
+- B3: ShelllessRealDeviceTest.kt CJK UTF-8 修复（3 行，test-only）
+- 不修改 production code / Gradle / Manifest
+- 修复后 build matrix 全量 PASS
+
+**Gate**:
+- 5 modules × androidTest = ALL PASS
+- PRODUCTION_CHANGED = NO
+- SEMANTIC_DELTA = NONE
+
+**RECOMMENDED_NEXT** = V4-4.2 RETRY（Device Closure）
 
 ---
 
 ### AT.V4-4.2：Device Closure
 
-**Status**: OPEN（V4-4.1 scope refinement 拆出，待 Controller 授权）
+**Status**: OPEN / BLOCKED_BY_VALIDATION_READINESS（V4-4.2A audit 识别 3 个 test-only blocker + ConsumerHost first-use pairing；待 V4-4.2B 修复后 retry）
 
 **Scope**（预留，本轮未执行）:
 - Product Local L1-L7

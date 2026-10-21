@@ -1,0 +1,152 @@
+AT.V4-4.2A V3/V4 DIFF EVIDENCE
+Date: 2026-10-21
+Method: git diff 75d5832..81d630a (V3 baseline -> V4 HEAD)
+V3_MODE: READ_ONLY (git show / git diff only; no V3 build)
+
+================================================================
+1. TEST FILE PARITY
+================================================================
+
+V3_TEST_FILE_PARITY = PASS
+
+All 14 V3 app/androidTest files exist in V4 (1:1, same names).
+All 4 V3 test-host/androidTest files exist in V4 (1:1).
+All 3 V3 adb-only-test-host/androidTest files exist in V4 (1:1).
+All 1 V3 at-shellless-test-host/androidTest file exists in V4 (1:1).
+All 1 V3 at-cli-consumer-host/androidTest file exists in V4 (1:1).
+All unit test files (at-engine, at-backend-local, adb-engine, at-cli) exist 1:1.
+
+V4-NEW test file (no V3 equivalent):
+  at-composition-android/src/test/.../ATAndroidTest.kt (5 test methods)
+  This is a V4-specific architecture conformance test (verifies composition
+  does not leak implementation types). Not a migration gap.
+
+Total V3 test files: 30
+Total V4 test files: 31 (30 migrated + 1 new)
+MISSING_V3_TEST_FILES = 0
+UNAUTHORIZED_DROP = 0
+
+================================================================
+2. TEST EXECUTABLE PARITY
+================================================================
+
+V3_TEST_EXECUTABLE_PARITY = FAIL
+
+Reasons:
+  a) AppDebugInputTest: V3 executable (self-construct engine),
+     V4 NOT executable (AppRuntime.initialize not called).
+     Root cause: V4-4 changed AppTerminal fallback.
+     Classification: V4_TEST_HARNESS_REGRESSION.
+
+  b) AdbTransportLossAuditTest (test-host): V3 executable,
+     V4 NOT executable (compile error: wrong FQN com.at.engine.DefaultATEngine).
+     Root cause: V4-1 API relocation adaptation miss.
+     Classification: V4_API_RELOCATION_ADAPTATION_DEBT.
+
+  c) ShelllessRealDeviceTest: V3 at 75d5832 was ALSO not executable
+     (CJK UTF-8 corruption in g7_utf8RoundTrip — pre-existing at V3 baseline).
+     V4: same corruption + ATSessionLaunch rename.
+     Classification: PREEXISTING_V3_TEST_DEBT.
+
+  d) All other test files: V3 executable, V4 executable (compile PASS).
+     Runtime behavior not yet verified (device disconnected during audit).
+
+Files with EXECUTABLE regression (V3->V4): 2
+  - AppDebugInputTest (V4_TEST_HARNESS_REGRESSION)
+  - AdbTransportLossAuditTest (V4_API_RELOCATION_ADAPTATION_DEBT)
+
+Files with PRE-EXISTING non-executability (V3 was also broken): 1
+  - ShelllessRealDeviceTest (PREEXISTING_V3_TEST_DEBT)
+
+================================================================
+3. MODIFIED TEST FILES (V3->V4, 20 files changed)
+================================================================
+
+app/src/androidTest/ (12 files):
+  AdbCliBridgeTest.kt      |  13 ++-  | V4-1: ATEngine -> DefaultATEngine, Launch -> ATSessionLaunch
+  AdbCliInteractiveTest.kt |  17 +--  | V4-1: same
+  AdbCliLifecycleTest.kt   |  18 +--  | V4-1: same
+  AdbCliLiveStatusTest.kt  |  29 ++---| V4-1: same + encoding fixes
+  AdbCliOneShotTest.kt     |  10 +-   | V4-1: same
+  AdbHumanPreviewTest.kt   |  21 ++-- | V4-1: same
+  AppAdbProvisionTest.kt   |  26 ++---| V4-4: composition semantic types
+  AppDebugInputTest.kt     |  0       | NOT MODIFIED (but broken by production change)
+  AppProcessProbeTest.kt   |  0       | NOT MODIFIED
+  CommonConsumerPathTest.kt|  21 ++-- | V4-4: composition semantic types
+  DebugBridgeScreenshotTest.kt | 11 +- | V4-4: composition semantic types
+  ProgrammaticAdbConsumerTest.kt | 17 +-- | V4-4: composition semantic types
+  SharedSessionBridgeTest.kt   |  11 +- | V4-4: composition semantic types
+
+test-host/src/androidTest/ (4 files):
+  AdbBackendHeadlessTest.kt    |  22 ++-  | V4-1: DefaultATEngine + ATSessionLaunch
+  AdbTransportLossAuditTest.kt |  13 ++-  | V4-1: import added but FQN wrong (BROKEN)
+  BackendParityAuditTest.kt    |  59 +++++----- | V4-1: DefaultATEngine + ATSessionLaunch
+  TestHostHeadlessInputTest.kt |  17 ++-  | V4-1: DefaultATEngine + ATSessionLaunch
+
+adb-only-test-host/src/androidTest/ (1 file):
+  AdbOnlyRealDeviceTest.kt     |  15 ++-  | V4-1: DefaultATEngine + ATSessionLaunch
+
+at-shellless-test-host/src/androidTest/ (1 file):
+  ShelllessRealDeviceTest.kt   |  27 +++--  | V4-1: ATSessionLaunch + CJK corruption
+
+at-cli-consumer-host/src/androidTest/ (1 file):
+  AtCliConsumerTest.kt         | 123 ++++++++++--------- | V4-4: composition semantic types (major rewrite)
+
+at-composition-android/src/test/ (1 file, V4-NEW):
+  ATAndroidTest.kt             | 104 +++++++++++++++++ | V4-2: composition conformance
+
+at-engine/src/test/ (1 file):
+  ATContractTest.kt            |   8 +-   | V4-1: ATEngine interface adaptation
+
+================================================================
+4. KEY PRODUCTION CHANGES AFFECTING TESTS
+================================================================
+
+a) V4-1 (09f2ac9): ATEngine class -> interface + DefaultATEngine impl
+   - ATEngine moved from at-engine (class) to at-engine-api (interface)
+   - DefaultATEngine created in at-engine/impl
+   - ATPersistentBackend.Launch -> ATSessionLaunch (top-level in at-engine-api)
+   - ALL test files using ATEngine(...) must use DefaultATEngine(...)
+   - ALL test files using ATPersistentBackend.Launch(...) must use ATSessionLaunch(...)
+   - 19 of 20 modified test files were adapted correctly
+   - 1 file (AdbTransportLossAuditTest.kt) has a WRONG FQN at line 77
+
+b) V4-4 (84936f8): AppTerminal fallback changed
+   - V3: engine ?: ATEngine(oneShot=null, persistent=LocalPersistentBackend())
+   - V4: engine ?: AppRuntime.localEngine()
+   - Affects ONLY AppDebugInputTest (no Activity, no explicit initialize)
+   - All other tests use ActivityScenario or explicit initialize
+
+c) V4-4.1 (e8372d3): Composition semantic types
+   - ATAdbReadinessState, ATAdbBootstrapState, ATAdbPairingDiscovery, etc.
+   - Replaced direct AdbRuntime state access in tests
+   - Affects: AtCliConsumerTest (major rewrite), AppAdbProvisionTest,
+     CommonConsumerPathTest, ProgrammaticAdbConsumerTest, AdbCliBridgeTest,
+     AdbHumanPreviewTest, DebugBridgeScreenshotTest, SharedSessionBridgeTest
+
+================================================================
+5. INTRODUCTION COMMIT ATTRIBUTION
+================================================================
+
+BLOCKER 1: AppDebugInputTest runtime failure
+  FIRST_BAD_COMMIT = 84936f8 (AT.V4-4)
+  INTRODUCED_PHASE = V4-4 (migrate product and CLI consumer boundary)
+  SOURCE_CHANGE = AppTerminal.kt:48 (fallback delegation)
+  WHY = V4-4 moved engine construction to AppRuntime composition root,
+        breaking the test-only fallback contract.
+
+BLOCKER 2: AdbTransportLossAuditTest compile failure
+  FIRST_BAD_COMMIT = 09f2ac9 (AT.V4-1)
+  INTRODUCED_PHASE = V4-1 (extract engine API and backend SPI)
+  SOURCE_CHANGE = AdbTransportLossAuditTest.kt:77 (wrong FQN)
+  WHY = V4-1 adapted the import (line 32) but missed the fully-qualified
+        name at the call site (line 77). Sibling files were adapted correctly.
+
+BLOCKER 3: ShelllessRealDeviceTest compile failure
+  FIRST_BAD_COMMIT = pre-75d5832 (repo copy corruption)
+  INTRODUCED_PHASE = PRE-V3 (lossy repo copy)
+  SOURCE_CHANGE = ShelllessRealDeviceTest.kt:204-206 (CJK corruption)
+  WHY = UTF-8 CJK characters were corrupted during repo creation.
+        V3 at 75d5832 has the SAME corruption (would also fail to compile).
+        V4-1 (09f2ac9) touched the file (ATSessionLaunch rename) but did not
+        repair the pre-existing corruption.

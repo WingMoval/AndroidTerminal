@@ -1,0 +1,92 @@
+AT.V4-4.2A IDENTITY OWNERSHIP MATRIX
+Date: 2026-10-21
+NOTE: Device was DISCONNECTED during this audit. Identity state is from the
+previous V4-4.2 session (docs/evidence/at_v4_4_2/01_device_info.txt).
+
+================================================================
+PACKAGE-LEVEL IDENTITY MATRIX
+================================================================
+
+PACKAGE                         IDENTITY_PROFILE    IDENTITY_PATH                          EXISTS  CREATION_OWNER          PAIRING_ENTRYPOINT        CAN_BOOTSTRAP  REQUIRES_MANUAL  KEY_COPY  READY
+----------------------------------------------------------------  ------------------  -------------------------------------------  ------  ------------------------  ------------------------  ---------------  ----------------  --------  -----
+com.androidterminal.app         adb_identity        /data/data/com.androidterminal.app/files/adb_identity  YES     AdbRuntime.loadOrCreate (first connectAuto)  AppAdbProvisionTest / PairActivity  YES            YES (6-digit)    NO      YES
+com.androidterminal.atclihost   at-cli-identity     /data/data/com.androidterminal.atclihost/files/at-cli-identity  NO      AdbRuntime.loadOrCreate (first connectAuto)  AtCliConsumerTest b3_pair / firstUsePairing (via composition adbControl.pairDiscovered)  YES  YES (6-digit)    NO      NO
+com.androidterminal.adbonlyhost (not installed)   debt1_<tag>       /data/data/com.androidterminal.adbonlyhost/files/debt1_<tag>  N/A     AdbRuntime.loadOrCreate (first connectAuto)  AdbDebt1ValidationTest g2_e4_pairingParity (AdbEngine.pair with -e code)  YES  YES (6-digit)    NO      N/A
+com.androidterminal.testhost    (not installed)     (uses host param)  N/A     AdbEngine.connect (explicit keyDir)          N/A (no pairing UI)           NO             NO               NO      N/A
+com.androidterminal.shelllesshost (not installed)  N/A               N/A                                     N/A     N/A (no ADB)                         N/A                            N/A            N/A              N/A      N/A
+
+================================================================
+DETAILS
+================================================================
+
+PRODUCT (com.androidterminal.app):
+  - Identity EXISTS on device (from previous session evidence).
+  - Identity profile: "adb_identity" (app-private filesDir/adb_identity).
+  - Created by AdbRuntime.loadOrCreate on first connectAuto.
+  - Pairing entrypoint: AppAdbProvisionTest (instrumentation, -e code)
+    OR PairActivity (human UI, first-run pairing flow).
+  - Identity is TRUSTED (previously paired). No re-pairing needed.
+  - READY_FOR_DEVICE_TEST = YES.
+
+CONSUMER HOST (com.androidterminal.atclihost):
+  - Identity does NOT exist (files/at-cli-identity/ is EMPTY).
+  - Identity profile: "at-cli-identity" (configured via ATAndroidConfig(identityProfile="at-cli-identity")).
+  - This is EXPECTED_FIRST_USE_STATE, not a regression.
+  - The ConsumerHost is a SEPARATE APK with its OWN UID and its OWN identity.
+  - It CANNOT reuse the Product's identity (different UID, different filesDir).
+  - Pairing entrypoint: AtCliConsumerTest.b3_pair() / firstUsePairing()
+    via AtCliConsumerHost.composition().adbControl.pairDiscovered(code).
+    Requires: (1) system pairing dialog open (user action), (2) 6-digit code
+    staged via -e code instrumentation argument.
+  - PAIRING_ENTRYPOINT_AVAILABLE = YES
+  - PAIRING_REQUIRES_USER_6_DIGIT_CODE = YES
+  - PAIRING_REQUIRES_SOURCE_CHANGE = NO
+  - FIRST_USE_PATH: NO_IDENTITY -> discoverPairing (mDNS) -> user 6-digit code
+    -> AdbConsumerBootstrap.pair -> AdbEngine.pair -> persistent identity
+    -> AdbRuntime.ensureReady -> READY
+  - Classification: FIRST_USE_BOOTSTRAP_REQUIRED (not a regression).
+  - READY_FOR_DEVICE_TEST = NO (until first-use pairing is completed by user).
+
+ADB-ONLY TEST HOST (com.androidterminal.adbonlyhost):
+  - NOT INSTALLED on device.
+  - Identity: per-gate fresh keyDir (debt1_<tag>) — each gate creates its
+    OWN identity via AdbRuntime.loadOrCreate.
+  - Pairing entrypoint: AdbDebt1ValidationTest.g2_e4_pairingParity()
+    (AdbEngine.pair with -e code).
+  - FIRST_USE_PATH: NO_IDENTITY -> connectAuto (creates identity, fails
+    untrusted) -> discoverPairing -> AdbEngine.pair(host, port, code, keyDir)
+    -> connectAuto (same keyDir) -> READY.
+  - Requires: (1) APK install, (2) system pairing dialog open, (3) 6-digit code.
+  - Classification: FIRST_USE_BOOTSTRAP_REQUIRED + ENVIRONMENT_PRECONDITION (not installed).
+  - READY_FOR_DEVICE_TEST = NO (not installed).
+
+TEST HOST (com.androidterminal.testhost):
+  - NOT INSTALLED on device.
+  - Does NOT use AdbRuntime (uses AdbEngine.connect directly with explicit
+    host/port/keyDir parameters).
+  - No identity management — the test supplies keyDir explicitly.
+  - No pairing entrypoint (test-only; assumes identity is pre-trusted or
+    paired externally).
+  - FIRST_USE_PATH: N/A (test requires pre-existing trusted identity OR
+    external pairing).
+  - Classification: ENVIRONMENT_PRECONDITION (not installed) +
+    V4_API_RELOCATION_ADAPTATION_DEBT (compile blocker).
+  - READY_FOR_DEVICE_TEST = NO (compile blocker).
+
+SHELLLESS HOST (com.androidterminal.shelllesshost):
+  - NOT INSTALLED on device.
+  - Does NOT use ADB at all (pure Local PTY via ShelllessPersistentBackend).
+  - No identity needed.
+  - Classification: PREEXISTING_V3_TEST_DEBT (compile blocker: CJK corruption).
+  - READY_FOR_DEVICE_TEST = NO (compile blocker).
+
+================================================================
+KEY COPY AUDIT
+================================================================
+
+KEY_COPY_USED = NO for ALL packages.
+- Each consumer generates its OWN identity via AdbRuntime.loadOrCreate.
+- No test or production code copies adbkey/adbkey.pub between packages.
+- AtCliConsumerTest.identityFreshState() explicitly VERIFIES that the
+  ConsumerHost's public key body does NOT match the Product's public key body
+  (CONSUMER_KEY_COPIED = NO assertion).
