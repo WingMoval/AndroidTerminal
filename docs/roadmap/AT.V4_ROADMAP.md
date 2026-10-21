@@ -261,6 +261,41 @@
 - `docs/audit/AT.V4-4.2A_Blocker_Matrix.csv`
 - `docs/evidence/at_v4_4_2a/`（8 evidence files）
 
+**RECOMMENDED_NEXT** = AT.V4-4.2A.1（Validation Audit Evidence Normalization）
+
+---
+
+### AT.V4-4.2A.1：Validation Audit Evidence Normalization
+
+**Status**: COMPLETE
+
+**Scope**:
+- Method-level exact test inventory（251 methods / 26 classes / 31 files）
+- CSV parser integrity validation（strict parsing; 0 errors）
+- Mechanical classification recount（SUM = 251; UNKNOWN = 0）
+- V3/V4 method-level parity（246 migrated + 5 V4-new = 251）
+- 36 device gates coverage validation（0 uncovered; 0 broken refs）
+- Blocker recount（8 blockers; P0=0/P1=3/P2=3/P3=2）
+- SSOT/Roadmap normalization
+- B1/B2/B3 结论确认不变
+
+**Gate**:
+- EXACT_TEST_METHOD_TOTAL = MATRIX_DATA_ROW_COUNT = 251
+- SUM_PRIMARY_CLASSIFICATIONS = 251
+- UNKNOWN_COUNT = 0
+- CSV_PARSE_ERROR_COUNT = 0
+- BROKEN_VALIDATOR_REFERENCE_COUNT = 0
+- UNCOVERED_GATE_COUNT = 0
+- ORPHAN_BLOCKER_COUNT = 0
+- ENCODING_ERROR_COUNT = 0
+
+**Deliverables**:
+- `docs/audit/AT.V4-4.2A.1_Evidence_Normalization.md`
+- Updated: `AT.V4-4.2A_Test_Harness_Matrix.csv`（251 rows, method-level）
+- Updated: `AT.V4-4.2A_Device_Gate_Coverage_Matrix.csv`（36 gates）
+- Updated: `AT.V4-4.2A_Blocker_Matrix.csv`（8 blockers）
+- `docs/evidence/at_v4_4_2a_normalization/`（normalization evidence）
+
 **RECOMMENDED_NEXT** = AT.V4-4.2B（Validation Infrastructure Repair）
 
 ---

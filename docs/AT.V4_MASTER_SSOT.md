@@ -294,7 +294,11 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 ## M. Current Phase
 
-**V4-4.1A**：Final Consumer Dependency Closure（COMPLETE — Gradle/visibility/packaging 验证；device closure 留给 V4-4.2）。
+**V4-4.2A.1**：Validation Audit Evidence Normalization（COMPLETE）。
+
+**V4-4.2**：OPEN / BLOCKED_BY_VALIDATION_READINESS（等待 V4-4.2B 修复后 retry）。
+
+**V4-4.2B**：OPEN / WAITING_CONTROLLER_AUTHORIZATION（Validation Infrastructure Repair）。
 
 ---
 
@@ -313,6 +317,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.1A | COMPLETE（Final Consumer Dependency Closure；`:app` 直接 `:at-backend-*` 依赖删除；composition `api(:at-engine-spi)` → `implementation`；APK native packaging 经 composition transitive 验证；CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED） |
 | AT.V4-4.2 | OPEN / BLOCKED_BY_VALIDATION_READINESS（device closure 被 test/harness blocker 阻断；详见 V4-4.2A audit） |
 | AT.V4-4.2A | COMPLETE（Device Validation Readiness Audit；全量 blocker 识别；UNKNOWN=0；RECOMMENDED_NEXT=V4-4.2B） |
+| AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
 
 ---
 
@@ -358,9 +363,13 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2A**：COMPLETE — Device Validation Readiness Audit（全量 validation carrier / test / build / identity / observability 审计；UNKNOWN=0；8 blockers identified；NO production regression；RECOMMENDED_NEXT=V4-4.2B Validation Infrastructure Repair）。
 
+**AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization（method-level exact inventory = 251 test methods / 26 classes / 31 files；CSV parser integrity = PASS（0 parse errors, 0 bad rows）；mechanical classification recount = PASS（SUM=251）；36 device gates 0 coverage gap 0 broken refs；blocker recount = 8（P0=0/P1=3/P2=3/P3=2）；SSOT/Roadmap 同步；B1/B2/B3 结论不变；NO new blockers）。
+
 **AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 V4-4.2 device closure）。
 
-**AT.V4-4.2B**：OPEN — Validation Infrastructure Repair（修复 B1/B2/B3 test-only blocker；不修改 production code）。
+**AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization。
+
+**AT.V4-4.2B**：OPEN / WAITING_CONTROLLER_AUTHORIZATION — Validation Infrastructure Repair（修复 B1/B2/B3 test-only blocker；不修改 production code）。
 
 **NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.2B）。
 

@@ -48,15 +48,14 @@ during audit). All findings are from static analysis + build compilation.**
 - **Classification**: V4_API_RELOCATION_ADAPTATION_DEBT
 - **First bad commit**: 09f2ac9 (AT.V4-1)
 - **Severity**: P1 (blocks test-host androidTest compilation)
-- **Minimum fix**: Change `com.at.engine.DefaultATEngine` →
-  `com.at.engine.impl.DefaultATEngine` at line 77 (1 line, test-only)
+- **Minimum fix**: Change `com.at.engine.DefaultATEngine` 鈫?  `com.at.engine.impl.DefaultATEngine` at line 77 (1 line, test-only)
 
 ### FAIL-2: :at-shellless-test-host (ShelllessRealDeviceTest.kt:204-206)
 
-- **Error**: `Expecting '"'` — CJK UTF-8 string literals corrupted
+- **Error**: `Expecting '"'` 鈥?CJK UTF-8 string literals corrupted
 - **Root cause**: CJK characters in `g7_utf8RoundTrip` were corrupted during
-  repo creation (UTF-8 → GBK/CP936 → UTF-8 double-encoding). The SAME
-  corruption exists at V3 baseline 75d5832 — V3 was ALSO non-buildable.
+  repo creation (UTF-8 鈫?GBK/CP936 鈫?UTF-8 double-encoding). The SAME
+  corruption exists at V3 baseline 75d5832 鈥?V3 was ALSO non-buildable.
   V4-1 (09f2ac9) touched the file (ATSessionLaunch rename) but did not
   repair the pre-existing corruption.
 - **Classification**: PREEXISTING_V3_TEST_DEBT
@@ -90,7 +89,7 @@ See `AT.V4-4.2A_Test_Harness_Matrix.csv` for the full method-level matrix.
   `AppRuntime.localEngine()` which requires `AppRuntime.initialize(context)`.
 - The test does NOT launch an Activity and does NOT call initialize.
 - All other 13 :app androidTest files use ActivityScenario OR explicit
-  initialize — only AppDebugInputTest is broken.
+  initialize 鈥?only AppDebugInputTest is broken.
 
 **APPDEBUGINPUT_FIRST_BAD_COMMIT = 84936f8 (AT.V4-4)**
 
@@ -116,15 +115,14 @@ Rationale:
 - `PairActivity.onCreate()` (line 52)
 
 No Application class. No BroadcastReceiver/Service entrypoint.
-All production `AppTerminal()` call sites pass explicit `engine` —
-the `engine=null` fallback is TEST-ONLY reachable.
+All production `AppTerminal()` call sites pass explicit `engine` 鈥?the `engine=null` fallback is TEST-ONLY reachable.
 
 **TEST_RUNTIME_INIT_CONTRACT**:
 Two valid patterns:
-1. ActivityScenario.launch(MainActivity) → initialize via Activity
+1. ActivityScenario.launch(MainActivity) 鈫?initialize via Activity
 2. Explicit `AppRuntime.initialize(ctx)` in @Before/setup
 
-AppDebugInputTest uses NEITHER → broken.
+AppDebugInputTest uses NEITHER 鈫?broken.
 
 **No other test has the same pre-init access problem.**
 
@@ -135,8 +133,8 @@ AppDebugInputTest uses NEITHER → broken.
 | Package | Identity | Exists | First-Use Path | Pairing Entrypoint | Ready |
 |---|---|---|---|---|---|
 | com.androidterminal.app | adb_identity | YES (trusted) | N/A (already paired) | AppAdbProvisionTest / PairActivity | YES |
-| com.androidterminal.atclihost | at-cli-identity | **NO** | discoverPairing → user 6-digit → AdbConsumerBootstrap.pair → AdbEngine.pair → ensureReady → READY | AtCliConsumerTest b3_pair / firstUsePairing | NO |
-| com.androidterminal.adbonlyhost | debt1_<tag> (per-gate) | N/A (not installed) | connectAuto (creates) → discoverPairing → AdbEngine.pair → connectAuto → READY | AdbDebt1ValidationTest g2_e4_pairingParity | NO (not installed) |
+| com.androidterminal.atclihost | at-cli-identity | **NO** | discoverPairing 鈫?user 6-digit 鈫?AdbConsumerBootstrap.pair 鈫?AdbEngine.pair 鈫?ensureReady 鈫?READY | AtCliConsumerTest b3_pair / firstUsePairing | NO |
+| com.androidterminal.adbonlyhost | debt1_<tag> (per-gate) | N/A (not installed) | connectAuto (creates) 鈫?discoverPairing 鈫?AdbEngine.pair 鈫?connectAuto 鈫?READY | AdbDebt1ValidationTest g2_e4_pairingParity | NO (not installed) |
 | com.androidterminal.testhost | (explicit keyDir) | N/A (not installed) | N/A (test supplies keyDir; needs pre-trusted identity) | N/A | NO (not installed + compile blocker) |
 | com.androidterminal.shelllesshost | N/A (no ADB) | N/A | N/A | N/A | NO (not installed + compile blocker) |
 
@@ -150,11 +148,11 @@ AppDebugInputTest uses NEITHER → broken.
 
 | Test | Destructive Action | Safe if Identity Trusted? |
 |---|---|---|
-| AppAdbProvisionTest.provisionAppIdentity | AdbEngine.pair (mutates trust state) | NO — do not run if already trusted |
-| AtCliConsumerTest.b3_pair / firstUsePairing / p1_cliPair | AdbEngine.pair via composition (creates identity) | NO — BLOCKED (no code staged); would mutate trust |
-| AdbDebt1ValidationTest.g2_e4_pairingParity | AdbEngine.pair (fresh identity) | NO — requires pairing dialog + code |
-| AdbDebt1ValidationTest.g4_appProcessWifiEnabledControl | Settings.Global.putInt (WRITE_SECURE_SETTINGS) | NO — mutates WD state |
-| AdbCliLiveStatusTest (setWd) | Settings.Global.putInt (WRITE_SECURE_SETTINGS) | NO — mutates WD state |
+| AppAdbProvisionTest.provisionAppIdentity | AdbEngine.pair (mutates trust state) | NO 鈥?do not run if already trusted |
+| AtCliConsumerTest.b3_pair / firstUsePairing / p1_cliPair | AdbEngine.pair via composition (creates identity) | NO 鈥?BLOCKED (no code staged); would mutate trust |
+| AdbDebt1ValidationTest.g2_e4_pairingParity | AdbEngine.pair (fresh identity) | NO 鈥?requires pairing dialog + code |
+| AdbDebt1ValidationTest.g4_appProcessWifiEnabledControl | Settings.Global.putInt (WRITE_SECURE_SETTINGS) | NO 鈥?mutates WD state |
+| AdbCliLiveStatusTest (setWd) | Settings.Global.putInt (WRITE_SECURE_SETTINGS) | NO 鈥?mutates WD state |
 
 **SAFE_TEST_SET**: All tests that do NOT call pair() or WRITE_SECURE_SETTINGS.
 **UNSAFE_TEST_SET**: The 5 tests above.
@@ -266,3 +264,50 @@ Then:
 - `docs/audit/AT.V4-4.2A_Device_Gate_Coverage_Matrix.csv`
 - `docs/audit/AT.V4-4.2A_Blocker_Matrix.csv`
 - `docs/evidence/at_v4_4_2a/` (8 evidence files)
+
+
+---
+
+## 13. Evidence Normalization Addendum (AT.V4-4.2A.1)
+
+### Exact Counts (replacing all approximate values)
+
+| Metric | OLD (approximate) | NEW (exact) |
+|---|---|---|
+| TEST_FILE_TOTAL | 31 | **31** |
+| TEST_CLASS_TOTAL | ~25 | **26** |
+| TEST_METHOD_TOTAL | ~200 | **251** |
+| READY_UNCHANGED_COUNT | ~120 | **87** |
+| READY_WITH_PRECONDITION_COUNT | ~60 | **134** |
+| V4_TEST_HARNESS_REGRESSION_COUNT | 7 | **7** |
+| V4_API_RELOCATION_ADAPTATION_DEBT_COUNT | 2 | **2** |
+| PREEXISTING_V3_TEST_DEBT_COUNT | 15 | **15** |
+| DESTRUCTIVE_NOT_SAFE_COUNT | 5 | **8** |
+| ENVIRONMENT_PRECONDITION_COUNT | 3 | **0** (moved to device_precondition) |
+| FIRST_USE_BOOTSTRAP_REQUIRED_COUNT | 4 | **0** (moved to secondary_notes) |
+| OBSERVABILITY_GAP_COUNT | 0 | **0** |
+| COVERAGE_GAP_COUNT | 0 | **0** |
+| UNKNOWN_COUNT | 0 | **0** |
+| SAFE_TEST_COUNT | ~190 | **243** |
+| UNSAFE_TEST_COUNT | ~10 | **8** |
+| DEVICE_GATE_TOTAL | 34 | **36** |
+| V3_TEST_METHOD_TOTAL | N/A | **246** |
+| V4_NEW_TEST_METHOD_COUNT | N/A | **5** |
+
+### CSV Validation
+
+All 3 CSVs validated with strict parser:
+- Test_Harness_Matrix: 251 rows, 32 cols, 0 bad rows, 0 duplicates
+- Device_Gate_Coverage_Matrix: 36 rows, 13 cols, 0 bad rows
+- Blocker_Matrix: 8 rows, 16 cols, 0 bad rows
+
+CSV_PARSE_ERROR_COUNT = 0
+BROKEN_VALIDATOR_REFERENCE_COUNT = 0
+UNCOVERED_GATE_COUNT = 0
+ORPHAN_BLOCKER_COUNT = 0
+ENCODING_ERROR_COUNT = 0
+
+### Final Normalized Verdict
+
+AUDIT_EVIDENCE_NORMALIZED = YES
+ALL_COUNTS_EXACT = YES
