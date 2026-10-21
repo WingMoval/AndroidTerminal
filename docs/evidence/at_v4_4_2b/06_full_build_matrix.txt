@@ -1,0 +1,17 @@
+FULL VALIDATION CARRIER BUILD MATRIX
+Date: 2026-10-21
+
+:app:assembleDebug : PASS
+:app:assembleDebugAndroidTest : PASS
+:test-host:assembleDebug : PASS
+:test-host:assembleDebugAndroidTest : PASS
+:adb-only-test-host:assembleDebug : PASS
+:adb-only-test-host:assembleDebugAndroidTest : PASS
+:at-shellless-test-host:assembleDebug : PASS
+:at-shellless-test-host:assembleDebugAndroidTest : PASS
+:at-cli-consumer-host:assembleDebug : PASS
+:at-cli-consumer-host:assembleDebugAndroidTest : PASS
+
+BUILD_MATRIX_MAIN = 5/5 PASS
+BUILD_MATRIX_ANDROIDTEST = 5/5 PASS
+TOTAL = 10/10 PASS

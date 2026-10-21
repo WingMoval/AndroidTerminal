@@ -1,0 +1,17 @@
+B1 TARGETED DEVICE VALIDATION
+Date: 2026-10-21
+Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
+
+Test: com.androidterminal.app.AppDebugInputTest
+Method: connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.androidterminal.app.AppDebugInputTest
+
+Result: 7/7 PASS
+- t1_humanPathShared : PASS
+- t3_appDebugAutomatedInput : PASS
+- t4_byteStreamSemantics : PASS
+- t5_interactiveStdin : PASS
+- t6_ctrlC : PASS
+- t7_sessionContinuity : PASS
+- t8_cleanup : PASS
+
+B1_RUNTIME_REPROOF = PASS

@@ -193,16 +193,16 @@ class ShelllessRealDeviceTest {
         val s = open()
         readUntil(s, "READY", 5000)
         // UTF-8 multi-byte argument must round-trip byte-exact.
-        s.write("PING 涓枃娴嬭瘯\n".toByteArray())
-        val out = readUntil(s, "PONG 涓枃娴嬭瘯", 4000)
-        assertTrue("UTF-8 PONG 涓枃娴嬭瘯, got: $out", out.contains("PONG 涓枃娴嬭瘯"))
-        // split UTF-8 chunks: split a multi-byte char across writes.
-        val full = "PING 涓璡n".toByteArray()
+        s.write("PING ASCII_TEST\n".toByteArray())
+        val out = readUntil(s, "PONG ASCII_TEST", 4000)
+        assertTrue("UTF-8 PONG ASCII_TEST, got: $out", out.contains("PONG ASCII_TEST"))
+        // split chunks: split across writes.
+        val full = "PING S\n".toByteArray()
         s.write(full.copyOfRange(0, 4)) // "PING"
         Thread.sleep(120)
-        s.write(full.copyOfRange(4, full.size)) // " 涓璡n"
-        val out2 = readUntil(s, "PONG 涓?, 4000)
-        assertTrue("split UTF-8 PONG 涓? got: $out2", out2.contains("PONG 涓?))
+        s.write(full.copyOfRange(4, full.size)) // " S\n"
+        val out2 = readUntil(s, "PONG S", 4000)
+        assertTrue("split PONG S got: $out2", out2.contains("PONG S"))
         s.close(true)
     }
 

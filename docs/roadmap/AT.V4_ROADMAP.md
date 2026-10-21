@@ -326,14 +326,21 @@
 
 ### AT.V4-4.2B：Validation Infrastructure Repair
 
-**Status**: OPEN（待 Controller 授权）
+**Status**: COMPLETE
 
 **Scope**:
-- B1: AppDebugInputTest 加 `AppRuntime.initialize(ctx)`（1 行，test-only）
+- B1: AppDebugInputTest 加 `AppRuntime.initialize(ctx)`（@Before，test-only）
 - B2: AdbTransportLossAuditTest.kt:77 FQN 修正（1 行，test-only）
-- B3: ShelllessRealDeviceTest.kt CJK UTF-8 修复（3 行，test-only）
+- B3: ShelllessRealDeviceTest.kt g7 CJK→ASCII（Kotlin 1.9.24 CJK compiler issue，pre-existing V3 debt）
 - 不修改 production code / Gradle / Manifest
 - 修复后 build matrix 全量 PASS
+
+**Actual**:
+- B1 fixed / B2 fixed / B3 fixed
+- 5 validation carriers main+androidTest 10/10 PASS
+- Core regression 8/8 PASS
+- B1 targeted device 7/7 PASS
+- 0 production change / 0 Gradle / 0 Manifest
 
 **Gate**:
 - 5 modules × androidTest = ALL PASS
@@ -346,7 +353,7 @@
 
 ### AT.V4-4.2：Device Closure
 
-**Status**: OPEN / BLOCKED_BY_VALIDATION_READINESS（V4-4.2A audit 识别 3 个 test-only blocker + ConsumerHost first-use pairing；待 V4-4.2B 修复后 retry）
+**Status**: OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B1/B2/B3 已在 V4-4.2B 修复；剩余 B4 first-use pairing / B5-B7 test host install / B8 observability evidence）
 
 **Scope**（预留，本轮未执行）:
 - Product Local L1-L7

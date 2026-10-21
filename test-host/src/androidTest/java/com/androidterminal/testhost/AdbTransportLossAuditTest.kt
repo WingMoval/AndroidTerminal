@@ -74,7 +74,7 @@ class AdbTransportLossAuditTest {
     @Test(timeout = 240_000)
     fun t1_adbTransportLossSessionSignal() {
         assertTrue("connect", AdbEngine.connect(host, port, keyDir))
-        val engine = com.at.engine.DefaultATEngine(
+        val engine = com.at.engine.impl.DefaultATEngine(
             AdbOneShotBackend(AdbConnectionRequest(host, port, keyDir)),
             AdbPersistentBackend(AdbConnectionRequest(host, port, keyDir)),
         )

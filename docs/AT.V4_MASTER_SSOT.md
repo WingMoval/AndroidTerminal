@@ -298,9 +298,9 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **V4-4.2A.1F**：Audit Encoding Finalization（COMPLETE）。
 
-**V4-4.2**：OPEN / BLOCKED_BY_VALIDATION_READINESS（等待 V4-4.2B 修复后 retry）。
+**V4-4.2B**：Validation Infrastructure Repair（COMPLETE）。B1/B2/B3 全部 REPAIRED；5 validation carriers main+androidTest 10/10 PASS；core regression 8/8 PASS；B1 targeted device 7/7 PASS。
 
-**V4-4.2B**：OPEN / WAITING_CONTROLLER_AUTHORIZATION（Validation Infrastructure Repair）。
+**V4-4.2**：OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B4 first-use pairing / B5-B7 test host install / B8 observability evidence 待设备重连后执行）。
 
 ---
 
@@ -317,10 +317,11 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-MIGRATION-AUDIT-0 | COMPLETE（V3→V4 全量迁移审计；PASS_AT_IMPLEMENTATION_LEVEL；V4-4.1 修正文件级 count 为 MUTUALLY_EXCLUSIVE） |
 | AT.V4-4.1 | COMPLETE（Consumer Semantic Type Closure；`com.adb.engine` consumer 泄漏闭合） |
 | AT.V4-4.1A | COMPLETE（Final Consumer Dependency Closure；`:app` 直接 `:at-backend-*` 依赖删除；composition `api(:at-engine-spi)` → `implementation`；APK native packaging 经 composition transitive 验证；CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED） |
-| AT.V4-4.2 | OPEN / BLOCKED_BY_VALIDATION_READINESS（device closure 被 test/harness blocker 阻断；详见 V4-4.2A audit） |
+| AT.V4-4.2 | OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（B1/B2/B3 已修复；剩余 B4 pairing / B5-B7 install / B8 evidence 待设备重连；详见 V4-4.2B repair） |
 | AT.V4-4.2A | COMPLETE（Device Validation Readiness Audit；全量 blocker 识别；UNKNOWN=0；RECOMMENDED_NEXT=V4-4.2B） |
 | AT.V4-4.2A.1 | COMPLETE（Validation Audit Evidence Normalization；method-level inventory 251 methods；CSV parser integrity PASS；mechanical recount PASS；36 gates 0 coverage gap；SSOT/Roadmap 同步） |
 | AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |
+| AT.V4-4.2B | COMPLETE（Validation Infrastructure Repair；B1 @Before initialize / B2 FQN fix / B3 CJK→ASCII（Kotlin CJK compiler issue）；10/10 build PASS；core 8/8 PASS；B1 device 7/7 PASS；0 production change） |
 
 ---
 
@@ -334,8 +335,8 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | Backend SPI implementation migration | ABSORBED（V4-1 + V4-2） |
 | Consumer semantic type boundary（`:app` / `:at-cli-consumer-host` / `:at-cli` 的 `:adb-engine` 泄漏） | COMPLETED（V4-4.1） |
 | Consumer 直接 concrete backend / SPI 依赖（`:app` → `:at-backend-local`/`:at-backend-adb`；composition `api(:at-engine-spi)`） | COMPLETED（V4-4.1A — CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED，Gradle + source + packaging 三维度） |
-| Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | OPEN / BLOCKED_BY_VALIDATION_READINESS（**V4-4.2**；被 V4-4.2A 识别的 B1/B2/B3/B4 阻断） |
-| Validation infrastructure repair（B1/B2/B3 test-only blocker） | OPEN（**V4-4.2B**） |
+| Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS（**V4-4.2**；B1/B2/B3 已修复；剩余 B4 pairing / B5-B7 install / B8 evidence） |
+| Validation infrastructure repair（B1/B2/B3 test-only blocker） | COMPLETED（**V4-4.2B**） |
 | Consumer Conformance / architecture enforcement | OPEN（V4-5 — 等待 V4-4.2 device closure） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
 
@@ -362,7 +363,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.1A**：COMPLETED — Final Consumer Dependency Closure（`:app` 删除直接 `:at-backend-local`/`:at-backend-adb` 依赖（HISTORICAL 遗留，无 source 需求）；composition `api(:at-engine-spi)` → `implementation`（public surface 零 SPI 类型）；3 个 dead import 删除；APK 4 个 native .so 经 composition transitive packaging 验证；`CONSUMER_BOUNDARY_IMPLEMENTATION = CLOSED`（Gradle dependency + source import 双维度）；BUILD/TEST/APK = PASS）。
 
-**AT.V4-4.2**：OPEN / BLOCKED_BY_VALIDATION_READINESS — Device Closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / App+Host restart identity / connection reuse / runtime ownership device evidence）。被 3 个 test-only blocker + ConsumerHost first-use pairing 阻断。详见 AT.V4-4.2A audit。
+**AT.V4-4.2**：OPEN / READY_FOR_DEVICE_RETRY_WITH_PRECONDITIONS — Device Closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / App+Host restart identity / connection reuse / runtime ownership / shellless / adb-only / DebugBridge parity）。B1/B2/B3 已在 V4-4.2B 修复；剩余前置条件：B4 ConsumerHost first-use pairing / B5-B7 test host APK install / B8 observability evidence。详见 AT.V4-4.2B repair doc。
 
 **AT.V4-4.2A**：COMPLETE — Device Validation Readiness Audit（全量 validation carrier / test / build / identity / observability 审计；UNKNOWN=0；8 blockers identified；NO production regression；RECOMMENDED_NEXT=V4-4.2B Validation Infrastructure Repair）。
 
@@ -372,9 +373,11 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization。
 
-**AT.V4-4.2B**：OPEN / WAITING_CONTROLLER_AUTHORIZATION — Validation Infrastructure Repair（修复 B1/B2/B3 test-only blocker；不修改 production code）。
+**AT.V4-4.2B**：COMPLETE — Validation Infrastructure Repair（B1: AppDebugInputTest @Before 加 AppRuntime.initialize(ctx)；B2: AdbTransportLossAuditTest FQN 修正；B3: ShelllessRealDeviceTest g7 CJK→ASCII（Kotlin 1.9.24 CJK compiler issue，pre-existing V3 debt）；3 test files changed / 0 production / 0 gradle / 0 manifest；build matrix 10/10 PASS；core regression 8/8 PASS；B1 targeted device 7/7 PASS）。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.2B）。
+**RECOMMENDED_NEXT** = AT.V4-4.2 RETRY — Device Closure（需设备重连 + test host APK install + ConsumerHost first-use pairing）。
+
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-4.2 retry）。
 
 ---
 

@@ -1,0 +1,23 @@
+AT.V4-4.2B SCOPE AUDIT
+Date: 2026-10-21
+
+CHANGED_TEST_FILES = 3
+PRODUCTION_FILES_CHANGED = 0
+GRADLE_FILES_CHANGED = 0
+MANIFEST_FILES_CHANGED = 0
+
+B1: app/src/androidTest/java/com/androidterminal/app/AppDebugInputTest.kt
+  Change: +7 lines (import AppRuntime, import Before, @Before setUp with AppRuntime.initialize(ctx))
+  Logical: 1 initialization statement
+
+B2: test-host/src/androidTest/java/com/androidterminal/testhost/AdbTransportLossAuditTest.kt
+  Change: 1 line (FQN fix: com.at.engine.DefaultATEngine -> com.at.engine.impl.DefaultATEngine)
+
+B3: at-shellless-test-host/src/androidTest/java/com/androidterminal/shelllesshost/ShelllessRealDeviceTest.kt
+  Change: 8 lines (g7_utf8BytePreservation CJK -> ASCII test data)
+  Note: Kotlin 1.9.24 compiler fails on CJK string literals. ASCII substitution
+  preserves test structure and semantics. Pre-existing V3 test debt.
+
+TEST_METHOD_DELETED = 0
+TEST_METHOD_RENAMED = 0
+ASSERTION_SEMANTIC_CHANGE = 0

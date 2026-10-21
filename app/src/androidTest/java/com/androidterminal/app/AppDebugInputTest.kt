@@ -16,9 +16,11 @@ package com.androidterminal.app
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.androidterminal.app.AppRuntime
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +28,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 @RunWith(AndroidJUnit4::class)
 class AppDebugInputTest {
+
+    @Before
+    fun setUp() {
+        AppRuntime.initialize(ctx)
+    }
 
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
 

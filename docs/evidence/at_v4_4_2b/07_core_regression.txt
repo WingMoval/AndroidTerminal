@@ -1,0 +1,13 @@
+CORE REGRESSION TESTS
+Date: 2026-10-21
+
+:at-engine-api:test : PASS
+:at-engine-spi:test : PASS
+:at-engine:testDebugUnitTest : PASS
+:at-backend-local:testDebugUnitTest : PASS
+:at-backend-adb:testDebugUnitTest : PASS
+:adb-engine:testDebugUnitTest : PASS
+:at-composition-android:testDebugUnitTest : PASS
+:at-cli:testDebugUnitTest : PASS
+
+CORE_REGRESSION = 8/8 PASS
