@@ -25,6 +25,23 @@ WORKTREE = CLEAN
 AT.V4-CONSUMER-FREEZE-V1 = NOT_PRESENT (before this task)
 ```
 
+## Freeze Commit vs Parity Validation Commit
+
+```
+PARITY_VALIDATION_COMMIT = 532f816
+   — The commit at which ALL device parity gates (P1-P18) were executed and
+     passed. This is the production-code state that was device-verified.
+
+FREEZE_COMMIT = 7216d0e8131e92e8914ce7c8443e1668b1d53aca
+   — The docs/artifact closure commit (this task's deliverables: evidence,
+     handoff, freeze manifest, AAR bundle, SSOT/Roadmap updates). The freeze
+     tag points to THIS commit.
+
+No production code, test code, build configuration, or AAR/JAR artifact
+changed between 532f816 and 7216d0e. The freeze commit is a docs/artifact
+closure, NOT a new production validation commit.
+```
+
 ## Parity Methodology
 
 Each capability P1-P18 was verified by:

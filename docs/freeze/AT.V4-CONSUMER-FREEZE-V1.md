@@ -3,10 +3,16 @@ Date: 2026-10-22
 
 ## Freeze Identity
 ```
-FREEZE_COMMIT = 532f816 (AT.V4-5: close consumer conformance and architecture enforcement)
+PARITY_VALIDATION_COMMIT = 532f816 (AT.V4-5: close consumer conformance and architecture enforcement)
+FREEZE_COMMIT = 7216d0e8131e92e8914ce7c8443e1668b1d53aca (AT.V4-6: close device parity and freeze V4 consumer boundary)
 FREEZE_TAG = AT.V4-CONSUMER-FREEZE-V1
 DATE = 2026-10-22
 ```
+
+Note: PARITY_VALIDATION_COMMIT (532f816) is the commit at which all device
+parity gates were executed and passed. FREEZE_COMMIT (7216d0e) is the
+docs/artifact closure commit that the freeze tag points to. No production
+code changed between the two.
 
 ## Allowed Consumer Dependencies
 ```

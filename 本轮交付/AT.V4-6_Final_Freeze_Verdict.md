@@ -2,6 +2,18 @@ AT.V4-6 — Final Freeze Verdict
 Date: 2026-10-22
 Baseline: HEAD 532f816 (worktree CLEAN)
 
+## Freeze Identity
+```
+BASELINE_HEAD = 532f816
+PARITY_VALIDATION_COMMIT = 532f816 (all device parity gates executed at this commit)
+FINAL_HEAD = 7216d0e8131e92e8914ce7c8443e1668b1d53aca (docs/artifact closure commit)
+FREEZE_TAG = AT.V4-CONSUMER-FREEZE-V1
+TAG_TARGET_CORRECT = YES (tag -> 7216d0e)
+WORKTREE = CLEAN
+PUSH = NO
+TAG_PUSH = NO
+```
+
 ## DEVICE PARITY
 ```
 V3_V4_DEVICE_PARITY = PASS

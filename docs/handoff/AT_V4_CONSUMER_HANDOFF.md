@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-22
 **Freeze Tag:** AT.V4-CONSUMER-FREEZE-V1
-**Freeze Commit:** 532f816
+**Parity Validation Commit:** 532f816
+**Freeze Commit:** 7216d0e8131e92e8914ce7c8443e1668b1d53aca
 
 This document is the formal entry point for any Android Consumer
 (AndroidTerminal Product, AndroidAgent Android Host, or other Android
