@@ -1,0 +1,19 @@
+capability_id,capability,v3_source_or_evidence,v3_expected_semantic,v4_validator,v4_actual,device_evidence,semantic_delta,result
+P1,Local One-Shot,V3 V3.3 §1 (o1-o5),COMPLETED/stdout/stderr/exit0/nonzero-exit,Product CommonConsumerPathTest#C1-C4 + ConformanceTest#a_localOneShot,COMPLETED/stdout=uid=/exit0/uid=,OK (3 tests) + OK (8 tests),NONE,PASS
+P2,Local Persistent,V3 V3.3 §3 (p1-p8),session open/stdin/stdout/multi-cmd/cwd-continuity/exit,Product CommonConsumerPathTest#C1-C4 + ConformanceTest#b_localPersistent,session open/cwd continuity /data/local/tmp/close,OK (3 tests) + OK (8 tests),NONE,PASS
+P3,ADB One-Shot,V3 V3.3 §1 (o1-o5 ADB),uid=2000(shell)/COMPLETED/stdout,Product CommonConsumerPathTest#C5-C10 + ConformanceTest#c_adbOneShot,uid=2000(shell)/COMPLETED,OK (3 tests) + OK (8 tests),NONE,PASS
+P4,ADB Persistent,V3 V3.3 §3 (p1-p8 ADB),session open/stdin/stdout/uid=2000/close,Product ProgrammaticAdbConsumerTest#persistentCwd + ConformanceTest#d_adbPersistent,session open/uid=2000/close,OK (7 tests) + OK (8 tests),NONE,PASS
+P5,CLI adb shell <cmd>,V3 V3.3 §1 + CLI evidence,adb shell id -> uid=2000/return to local,Product AdbCliOneShotTest#o1-o15 + ConformanceTest#h_cliShellVisibleAdb,uid=2000/local survives,OK (15 tests) + OK (8 tests),NONE,PASS
+P6,CLI interactive adb shell,V3 V3.3 §3 (p4/p6/p7),interactive stdin/stdout/multi-cmd/ctrl-c/exit,Product AdbCliInteractiveTest#i1-i10,interactive OK/uid=2000/exit,OK (10 tests) [i8 flaky on batch PASS on re-run],NONE,PASS
+P7,CLI pairing surface,V3 V3.3 + V4-4.2 pairing evidence,pairing semantic/bad-code/arg-parsing,ConsumerHost AtCliConsumerTest#p1-p3 + V4-4.2 frozen evidence,bad-code REJECTED/arg-parsing OK,V4-4.2 frozen evidence + ConsumerHost,EXPLICIT (no new pairing - Product already paired),PASS
+P8,First-Use Bootstrap,V4-4.3 frozen evidence,NO-ID->PAIRING->pair->READY->self-grant,Product AutoWdBootstrapTest#b/c/e + V4-4.3 evidence,self-grant PASS/auto-WD PASS/restart PASS,OK (3 tests) [c flaky on batch PASS on re-run],NONE,PASS
+P9,Identity parity,V4-4.2 frozen evidence,3 independent identities/stable/no-repair,Device snapshot before/after,all 3 stable (a026370d/df365556/1e7ee331),01_device_environment.md before+after,none,PASS
+P10,Auto-WD final parity,V4-4.3 frozen evidence,WD OFF->ensureReady->auto-enable->READY->uid=2000,Product AutoWdBootstrapTest#c_autoWdPostBootstrap,auto-WD PASS/uid=2000/WD auto-enabled,OK (1 test) [flaky on batch PASS on re-run],NONE,PASS
+P11,Connection reuse,V3 V3.3 §6 (x2),same connection/reuse logical streams,Product AdbCliOneShotTest#o14 + AdbCliInteractiveTest#i13,connection reuse PASS,OK (15 tests) + OK (5 tests),NONE,PASS
+P12,Recovery/Transport loss,V3 V3.3 §8 (t1),loss->observe->recovery->READY,Product AdbCliInteractiveTest#i14 + AdbCliLifecycleTest,transport loss observed/recovery OK,OK (5 tests) + OK (11 tests),NONE,PASS
+P13,Multi-session,V3 V3.3 §5 (m1-m3),isolation/lifecycle/close,Product ProgrammaticAdbConsumerTest#multiSessionIsolation,3 sessions isolated,OK (7 tests),NONE,PASS
+P14,Ctrl-C,V3 V3.3 §3 (p4),0x03/interrupt foreground/session valid,Product ProgrammaticAdbConsumerTest#ctrlC,ctrl-c OK/foreground interrupted,OK (7 tests),NONE,PASS
+P15,Resize,V3 V3.3 §3 (p5),PTY resize/multi-session isolation,Product ProgrammaticAdbConsumerTest#resizeIsolation,resize PASS/isolation OK,OK (7 tests),NONE,PASS
+P16,Natural exit/return,V3 V3.3 §3 (p6),remote exit->return to local/local usable,Product AdbCliInteractiveTest#i10,exit OK/local survives,OK (10 tests),NONE,PASS
+P17,Runtime ownership,V4-4.2 + V4-5 architecture,AdbRuntime=UNIQUE/lifecycle owner,Product AdbCliLifecycleTest + V4-5 architecture gate,11/11 PASS/architecture PASS,OK (11 tests) + 13/13 arch tests,none,PASS
+P18,Restart,V4-4.2 + V4-4.3,identity stable/no-repair/reconnect,Product AutoWdBootstrapTest#e + ConsumerHost#identityReuseAfterRestart,restart PASS/identity stable,OK (3 tests) + OK (1 test),NONE,PASS

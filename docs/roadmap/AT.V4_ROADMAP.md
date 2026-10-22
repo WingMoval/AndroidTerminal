@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-22
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED）/ V4-4.3 **COMPLETE**（First-Use Auto-WD Bootstrap CLOSED；POST_BOOTSTRAP_AUTO_WD = PASS）/ V4-5 **COMPLETE**（Consumer Conformance + Architecture Enforcement CLOSED；CONSUMER_CONTRACT_GAP = NO）
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE** / V4-4.3 **COMPLETE** / V4-5 **COMPLETE** / V4-6 **COMPLETE** — **V4 = COMPLETE** / V4_PHYSICAL_CLOSURE = CLOSED / V4_CONSUMER_BOUNDARY = FROZEN
 
 ---
 
@@ -482,31 +482,33 @@
 
 ### AT.V4-6：Device Parity + V4 Consumer Freeze
 
-**Status**: OPEN
+**Status**: **COMPLETE**（2026-10-22）
 
 **Scope**:
-- 真机全量 parity 验证（V3 vs V4）：
-  - Local one-shot / Local persistent
-  - ADB one-shot / ADB persistent
-  - CLI `adb shell` / `adb shell` interactive / `adb pair`
-  - Pairing / Bootstrap / Identity
-  - Recovery / Connection reuse
-  - Multi-session / Resize / Ctrl-C
+- 真机全量 parity 验证（V3 vs V4）：18/18 gates PASS
 - 发布 V4 consumer handoff（`AT_V4_CONSUMER_HANDOFF.md`）
-- 发布 V4 AAR bundle（`at-engine-api-debug.aar` + 其他 AAR）
+- 发布 V4 AAR bundle（8 artifacts: 6 AAR + 2 JAR）
 - 冻结 V4 consumer boundary（`AT.V4-CONSUMER-FREEZE-V1` tag）
 
-**Deliverables**:
-- 真机 parity 验证报告
-- `AT_V4_CONSUMER_HANDOFF.md`
-- V4 AAR bundle
+**Deliverables**（全部完成）:
+- `docs/evidence/at_v4_6/` — 15 evidence files（parity matrix + 所有 gates）
+- `docs/handoff/AT_V4_CONSUMER_HANDOFF.md`
+- `dist/AT.V4-CONSUMER-FREEZE-V1/` — AAR bundle（8 artifacts + SHA256SUMS + README）
+- `docs/freeze/AT.V4-CONSUMER-FREEZE-V1.md` — freeze manifest
 - `AT.V4-CONSUMER-FREEZE-V1` tag
 
-**Gate**:
-- 真机全量 parity = PASS（V3 vs V4 语义 delta = NONE）
-- V4 consumer handoff 发布
-- V4 AAR bundle 发布
-- V4 consumer boundary frozen
+**Gate**（全部 PASS）:
+- V3_V4_DEVICE_PARITY = PASS / V3_V4_SEMANTIC_DELTA = NONE
+- 18/18 parity gates PASS
+- CONSUMER_HANDOFF = PUBLISHED
+- V4_AAR_BUNDLE = PUBLISHED
+- V4_CONSUMER_BOUNDARY = FROZEN
+- ARCHITECTURE_GATE_FINAL = PASS
+- ARTIFACT_DEPENDENCY_CLOSURE = PASS / NATIVE_ARTIFACT_CLOSURE = PASS
+- AAR_BUNDLE_CONSUMER_BUILD = PASS / ARTIFACT_SELF_CONTAINMENT = PASS
+
+**RECOMMENDED_NEXT** = POST_V4_CONTROLLER_DECISION
+**NEXT_OPEN_AUTHORIZED** = NO（等待 Controller 决定 Post-V4 阶段）
 
 ---
 

@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-5
+> **Version**: 4.0.0-v4-6
 > **Date**: 2026-10-22
-> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** / V4-4.3 First-Use Auto-WD Bootstrap — **COMPLETE** / V4-5 Consumer Conformance + Architecture Enforcement — **COMPLETE** (CONSUMER_CONFORMANCE = CLOSED; ARCHITECTURE_ENFORCEMENT = CLOSED; CONSUMER_CONTRACT_GAP = NO; AT_ENGINE_API_PUBLIC_LEAK_COUNT = 0; FORBIDDEN_DIRECT_DEPENDENCY_COUNT = 0; MODULE_DAG_CYCLE_COUNT = 0; AT_ENGINE_PUBLIC_API_CHANGE = NO)
+> **Status**: V4-4.2 **COMPLETE** / V4-4.3 **COMPLETE** / V4-5 **COMPLETE** / V4-6 **COMPLETE** — V4 = **COMPLETE** / V4_PHYSICAL_CLOSURE = **CLOSED** / V4_DEVICE_PARITY = **CLOSED** / V4_CONSUMER_BOUNDARY = **FROZEN** (V3_V4_DEVICE_PARITY = PASS; V3_V4_SEMANTIC_DELTA = NONE; CONSUMER_HANDOFF = PUBLISHED; V4_AAR_BUNDLE = PUBLISHED)
 
 ---
 
@@ -329,6 +329,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.2B | COMPLETE（Validation Infrastructure Repair；B1 @Before initialize / B2 FQN fix / B3 CJK→ASCII（Kotlin CJK compiler issue）；10/10 build PASS；core 8/8 PASS；B1 device 7/7 PASS；0 production change） |
 | AT.V4-4.2B.1 | COMPLETE（UTF-8 Semantic Restoration；B3 ASCII→Unicode escape + byte-level split inside U+4E2D；G7 device 1/1 PASS；multibyte UTF-8 semantic restored；0 production change） |
 | AT.V4-5 | **COMPLETE**（2026-10-22；Consumer Conformance + Architecture Enforcement；`:at-consumer-conformance-host` reference consumer + `:at-architecture-gate` machine-enforced gates；8/8 conformance gates PASS；13/13 architecture tests PASS；CONSUMER_CONFORMANCE = CLOSED；ARCHITECTURE_ENFORCEMENT = CLOSED；CONSUMER_CONTRACT_GAP = NO） |
+| AT.V4-6 | **COMPLETE**（2026-10-22；Device Parity + V4 Consumer Freeze；18/18 parity gates PASS；V3_V4_SEMANTIC_DELTA = NONE；CONSUMER_HANDOFF = PUBLISHED；V4_AAR_BUNDLE = PUBLISHED；V4_CONSUMER_BOUNDARY = FROZEN；AT.V4-CONSUMER-FREEZE-V1 tag） |
 
 ---
 
@@ -346,7 +347,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | First-use Auto-WD permission self-grant bootstrap | **COMPLETED**（**V4-4.3**；POST_BOOTSTRAP_AUTO_WD = PASS） |
 | Validation infrastructure repair（B1/B2/B3 test-only blocker） | COMPLETED（**V4-4.2B**） |
 | Consumer Conformance / architecture enforcement | **COMPLETED**（**V4-5**；CONSUMER_CONFORMANCE = CLOSED；ARCHITECTURE_ENFORCEMENT = CLOSED；CONSUMER_CONTRACT_GAP = NO） |
-| Device parity / V4 Consumer Freeze | OPEN（V4-6） |
+| Device parity / V4 Consumer Freeze | **COMPLETED**（**V4-6**；V3_V4_DEVICE_PARITY = PASS；V3_V4_SEMANTIC_DELTA = NONE；CONSUMER_HANDOFF = PUBLISHED；V4_AAR_BUNDLE = PUBLISHED；V4_CONSUMER_BOUNDARY = FROZEN） |
 
 ---
 
@@ -387,9 +388,11 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2B.1**：COMPLETE — UTF-8 Semantic Restoration（B3 ASCII workaround 修正：Unicode escape `\u4E2D\u6587\u6D4B\u8BD5` + byte-level split inside U+4E2D（E4 B8 AD）offset 6；G7 device 1/1 PASS；multibyte UTF-8 validation semantic fully restored；1 test file changed / 0 production）。
 
-**RECOMMENDED_NEXT** = AT.V4-6 — Device Parity + V4 Consumer Freeze。
+**AT.V4-6**：**COMPLETE**（2026-10-22）— Device Parity + V4 Consumer Freeze。V3_V4_DEVICE_PARITY = PASS；V3_V4_SEMANTIC_DELTA = NONE；18/18 parity gates PASS；CONSUMER_HANDOFF = PUBLISHED；V4_AAR_BUNDLE = PUBLISHED（8 artifacts: 6 AAR + 2 JAR）；V4_CONSUMER_BOUNDARY = FROZEN；AT.V4-CONSUMER-FREEZE-V1 tag created。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-6）。
+**RECOMMENDED_NEXT** = POST_V4_CONTROLLER_DECISION（AT.EMULATOR-0 / AT.ARTIFACT-BUNDLE-0 / AG.INTEGRATION-0 / AT.CONTRACT-1 均 DEFERRED）。
+
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 决定 Post-V4 阶段）。
 
 ---
 
