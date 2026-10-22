@@ -17,16 +17,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_library(log-lib log)
 
-# BoringSSL vendored static library + headers (migrated from V2).
+# BoringSSL vendored static libraries + headers.
+# Upstream: https://github.com/google/boringssl commit df82113 (2026-10-22)
+# License: Apache-2.0. Built with NDK 26.1.10909125, Clang 17.0.2.
+# See third_party/boringssl/UPSTREAM_VERSION.md for build details.
 set(BORINGSSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boringssl)
 set(BORINGSSL_INCLUDE ${BORINGSSL_DIR}/include)
 set(BORINGSSL_LIB_DIR ${BORINGSSL_DIR}/lib/${ANDROID_ABI})
-set(BORINGSSL_LIB ${BORINGSSL_LIB_DIR}/libboringssl.a)
+set(BORINGSSL_CRYPTO_LIB ${BORINGSSL_LIB_DIR}/libcrypto.a)
+set(BORINGSSL_SSL_LIB ${BORINGSSL_LIB_DIR}/libssl.a)
 
-if(NOT EXISTS ${BORINGSSL_LIB})
+if(NOT EXISTS ${BORINGSSL_CRYPTO_LIB} OR NOT EXISTS ${BORINGSSL_SSL_LIB})
     message(FATAL_ERROR
-        "BoringSSL static library not found at ${BORINGSSL_LIB}\n"
-        "Migrate it from V2: at-core/src/main/cpp/third_party/boringssl")
+        "BoringSSL static libraries not found at ${BORINGSSL_LIB_DIR}\n"
+        "Expected: libcrypto.a and libssl.a\n"
+        "Build from source: see UPSTREAM_VERSION.md for instructions.")
 endif()
 
 add_library(
@@ -75,7 +80,8 @@ target_include_directories(adbd_engine PRIVATE
 
 target_link_libraries(adbd_engine
     ${log-lib}
-    ${BORINGSSL_LIB}
+    ${BORINGSSL_SSL_LIB}
+    ${BORINGSSL_CRYPTO_LIB}
 )
 
 # BoringSSL depends on libz for some crypto ops (not needed for our use case,
@@ -105,10 +111,11 @@ set_target_properties(pairing_selftest PROPERTIES
 )
 target_link_libraries(pairing_selftest
     ${log-lib}
-    ${BORINGSSL_LIB}
+    ${BORINGSSL_SSL_LIB}
+    ${BORINGSSL_CRYPTO_LIB}
 )
 if(z-lib)
     target_link_libraries(pairing_selftest ${z-lib})
 endif()
 
-message(STATUS "BoringSSL: linking ${BORINGSSL_LIB}")
+message(STATUS "BoringSSL: linking ${BORINGSSL_SSL_LIB} + ${BORINGSSL_CRYPTO_LIB}")

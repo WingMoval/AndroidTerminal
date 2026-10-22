@@ -16,14 +16,15 @@ permissions and limitations under the License.
 ---
 
 This project includes BoringSSL, a fork of OpenSSL developed by
-Google. The exact version of the vendored BoringSSL library could not
-be determined. The applicable license depends on the version:
+Google.
 
-- Pre-February 2025: OpenSSL BSD + SSLeay BSD + ISC + MIT
-- February 2025+: Apache-2.0
+- **Version:** commit df821137838169360f82f94fd39cebe803c7c2d6 (2026-10-22)
+- **Source:** https://github.com/google/boringssl
+- **License:** Apache License, Version 2.0
+- **Build:** NDK 26.1.10909125, Clang 17.0.2, CMake 3.22.1
 
 The original OpenSSL copyright notices (Eric Young, Tim Hudson, and
-others) are preserved in the individual source file headers.
+others) are preserved in the individual header file comments.
 
 This product includes software developed by the OpenSSL Project for
 use in the OpenSSL Toolkit (http://www.openssl.org/).
@@ -33,7 +34,9 @@ This product includes cryptographic software written by Eric Young
 Hudson (tjh@cryptsoft.com).
 
 See adb-engine/src/main/cpp/third_party/boringssl/LICENSE for the
-full license text and redistribution obligations.
+full Apache-2.0 license text.
+See adb-engine/src/main/cpp/third_party/boringssl/UPSTREAM_VERSION.md
+for upstream commit, build parameters, and library hashes.
 
 The ADB protocol implementations in this project are independent
 implementations that reference AOSP protocol semantics (documented
