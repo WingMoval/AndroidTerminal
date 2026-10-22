@@ -1,0 +1,67 @@
+AT.V4-5 — Final Verdict
+Date: 2026-10-22
+Baseline: HEAD ae9f0ad, worktree CLEAN
+
+## CONFORMANCE
+```
+CONFORMANCE_HOST_MODULE            = PRESENT
+CONFORMANCE_HOST_ALLOWED_DIRECT_DEPS = PASS
+LOCAL_ONE_SHOT_CONFORMANCE         = PASS
+LOCAL_PERSISTENT_CONFORMANCE       = PASS
+ADB_ONE_SHOT_CONFORMANCE           = PASS
+ADB_PERSISTENT_CONFORMANCE         = PASS
+READINESS_CONFORMANCE              = PASS
+BOOTSTRAP_CONFORMANCE              = PASS
+IDENTITY_CONFORMANCE               = PASS
+CLI_CONFORMANCE                    = PASS
+DEVICE_CONFORMANCE                 = PASS
+CONFORMANCE_HOST_FIRST_USE_PAIRING_COUNT = 1
+CONFORMANCE_HOST_NORMAL_REPAIRING_COUNT  = 0
+```
+
+## ARCHITECTURE
+```
+APP_CONSUMER_BOUNDARY              = PASS
+AT_CLI_CONSUMER_HOST_BOUNDARY      = PASS
+CONFORMANCE_HOST_BOUNDARY          = PASS
+AT_ENGINE_API_PUBLIC_LEAK_COUNT    = 0
+FORBIDDEN_DIRECT_DEPENDENCY_COUNT  = 0
+FORBIDDEN_CONSUMER_IMPORT_COUNT    = 0
+MODULE_DAG_CYCLE_COUNT             = 0
+ARCHITECTURE_NEGATIVE_TESTS        = PASS
+CONSUMER_CONTRACT_GAP              = NO
+ARCHITECTURE_REGRESSION            = NO
+AT_ENGINE_PUBLIC_API_CHANGE        = NO
+```
+
+## FROZEN ARCHITECTURE (unchanged)
+```
+ADB_PROTOCOL_CHANGE        = NO
+TLS_CHANGE                 = NO
+SHELL_V2_CHANGE            = NO
+PTY_CHANGE                 = NO
+IDENTITY_ARCHITECTURE_CHANGE = NO
+PAIRING_ARCHITECTURE_CHANGE  = NO
+ADBRUNTIME_OWNERSHIP_CHANGE  = NO
+RECOVERY_OWNERSHIP_CHANGE    = NO
+```
+
+## VERDICT
+```
+AT.V4-4.2 = CLOSED (unchanged)
+AT.V4-4.3 = COMPLETE (unchanged)
+AT.V4-5   = COMPLETE
+
+CONSUMER_CONFORMANCE      = CLOSED
+ARCHITECTURE_ENFORCEMENT  = CLOSED
+
+RECOMMENDED_NEXT         = AT.V4-6
+NEXT_OPEN_AUTHORIZED     = NO
+```
+
+## Key evidence
+- 8/8 conformance gates PASS (direct am instrument, identity preserved)
+- 13/13 architecture gate tests PASS (4 negative + 2 sanity + 7 production)
+- Conformance host uses ONLY :at-engine-api + :at-composition-android + :at-cli
+- Independent conformance identity (1e7ee331...) — no Product/ConsumerHost/PC key
+- No Product / ConsumerHost impact (no uninstall/clear/re-pair)

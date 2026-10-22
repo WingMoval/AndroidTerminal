@@ -55,3 +55,12 @@ include(":at-cli")
 // Local Terminal -> shell-visible adb -> uid=2000(shell) environment without
 // depending on :app or copying the AndroidTerminal identity.
 include(":at-cli-consumer-host")
+// AT.V4-5: Reference Consumer + Conformance Fixture. Proves a fully LEGAL
+// consumer (only :at-engine-api + :at-composition-android + :at-cli) can
+// complete the full AndroidTerminal surface (Local/ADB one-shot + persistent,
+// Readiness/Bootstrap/Identity, CLI). Not a Product; a conformance fixture.
+include(":at-consumer-conformance-host")
+// AT.V4-5: Automated Architecture Enforcement (pure JVM). Machine-enforces the
+// frozen V4 Consumer Boundary (direct deps / source imports / API surface /
+// DAG cycles / negative proof). Verification-only; modifies no Product code.
+include(":at-architecture-gate")

@@ -1,7 +1,7 @@
 # AndroidTerminal V4 — Roadmap
 
 > **Date**: 2026-10-22
-> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED）/ V4-4.3 **COMPLETE**（First-Use Auto-WD Bootstrap CLOSED；POST_BOOTSTRAP_AUTO_WD = PASS）
+> **Status**: V4-0 COMPLETE / V4-1 COMPLETE / V4-2 COMPLETE / V4-4 IMPLEMENTATION_COMPLETE / V4-4.1 COMPLETE / V4-4.1A COMPLETE / V4-4.2 **COMPLETE**（Device Closure CLOSED）/ V4-4.3 **COMPLETE**（First-Use Auto-WD Bootstrap CLOSED；POST_BOOTSTRAP_AUTO_WD = PASS）/ V4-5 **COMPLETE**（Consumer Conformance + Architecture Enforcement CLOSED；CONSUMER_CONTRACT_GAP = NO）
 
 ---
 
@@ -447,7 +447,7 @@
 
 ### AT.V4-5：Consumer Conformance + Architecture Enforcement
 
-**Status**: OPEN
+**Status**: **COMPLETE**（2026-10-22）
 
 **Scope**:
 - 创建 `:at-consumer-conformance-host` module（只依赖 `:at-engine-api` + `:at-composition-android` + `:at-cli` optional）
@@ -462,14 +462,21 @@
 
 **Deliverables**:
 - `:at-consumer-conformance-host` module（Kotlin source + build.gradle.kts）
+- `:at-architecture-gate` module（pure JVM machine-enforced 架构 gates）
 - Gradle dependency rules（forbidden dependencies）
-- Architecture test（public signature leak test + DAG cycle test）
+- Architecture test（direct dependency + source import + public signature leak + DAG cycle + negative proof）
 
-**Gate**:
-- `:at-consumer-conformance-host` 可以正常构建
+**Gate**（全部 PASS）:
+- `:at-consumer-conformance-host` 可以正常构建（main + androidTest APK）
 - `:at-consumer-conformance-host` 只依赖 `:at-engine-api` + `:at-composition-android` + `:at-cli`
-- Gradle dependency rules 验证 `:app` / `:at-cli-consumer-host` / `:at-consumer-conformance-host` 不依赖 forbidden modules
-- Architecture test 验证 `:at-engine-api` 不包含 forbidden types + DAG 无环
+- 8/8 conformance gates PASS（Local/ADB one-shot + persistent / Readiness / Bootstrap / Identity / CLI；direct am instrument，identity 保留）
+- 13/13 architecture gate tests PASS（4 negative + 2 sanity + 7 production）
+- CONSUMER_CONFORMANCE = CLOSED / ARCHITECTURE_ENFORCEMENT = CLOSED / CONSUMER_CONTRACT_GAP = NO
+- AT_ENGINE_API_PUBLIC_LEAK_COUNT = 0 / FORBIDDEN_DIRECT_DEPENDENCY_COUNT = 0 / FORBIDDEN_CONSUMER_IMPORT_COUNT = 0 / MODULE_DAG_CYCLE_COUNT = 0
+- AT_ENGINE_PUBLIC_API_CHANGE = NO
+
+**RECOMMENDED_NEXT** = AT.V4-6（Device Parity + V4 Consumer Freeze）
+**NEXT_OPEN_AUTHORIZED** = NO（等待 Controller 授权）
 
 ---
 

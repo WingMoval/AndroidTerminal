@@ -1,8 +1,8 @@
 # AndroidTerminal V4 — Master SSOT
 
-> **Version**: 4.0.0-v4-4.3
+> **Version**: 4.0.0-v4-5
 > **Date**: 2026-10-22
-> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** / V4-4.3 First-Use Auto-WD Bootstrap — **COMPLETE** (all REQUIRED gates PASS; POST_BOOTSTRAP_AUTO_WD = PASS; FIRST_USE_ONE_MANUAL_PAIRING_THEN_AUTONOMOUS_WD = YES; V3_TO_V4_SINGLE_IDENTITY_PARITY = PASS)
+> **Status**: V4-4.2 Device Closure — **COMPLETE** / **DEVICE_CLOSURE = CLOSED** / V4-4.3 First-Use Auto-WD Bootstrap — **COMPLETE** / V4-5 Consumer Conformance + Architecture Enforcement — **COMPLETE** (CONSUMER_CONFORMANCE = CLOSED; ARCHITECTURE_ENFORCEMENT = CLOSED; CONSUMER_CONTRACT_GAP = NO; AT_ENGINE_API_PUBLIC_LEAK_COUNT = 0; FORBIDDEN_DIRECT_DEPENDENCY_COUNT = 0; MODULE_DAG_CYCLE_COUNT = 0; AT_ENGINE_PUBLIC_API_CHANGE = NO)
 
 ---
 
@@ -328,6 +328,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | AT.V4-4.2A.1F | COMPLETE（Audit Encoding Finalization；23 mojibake restored；U+FFFD=0；CSV revalidation PASS；0 semantic changes） |
 | AT.V4-4.2B | COMPLETE（Validation Infrastructure Repair；B1 @Before initialize / B2 FQN fix / B3 CJK→ASCII（Kotlin CJK compiler issue）；10/10 build PASS；core 8/8 PASS；B1 device 7/7 PASS；0 production change） |
 | AT.V4-4.2B.1 | COMPLETE（UTF-8 Semantic Restoration；B3 ASCII→Unicode escape + byte-level split inside U+4E2D；G7 device 1/1 PASS；multibyte UTF-8 semantic restored；0 production change） |
+| AT.V4-5 | **COMPLETE**（2026-10-22；Consumer Conformance + Architecture Enforcement；`:at-consumer-conformance-host` reference consumer + `:at-architecture-gate` machine-enforced gates；8/8 conformance gates PASS；13/13 architecture tests PASS；CONSUMER_CONFORMANCE = CLOSED；ARCHITECTURE_ENFORCEMENT = CLOSED；CONSUMER_CONTRACT_GAP = NO） |
 
 ---
 
@@ -344,7 +345,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 | Device closure（L1-L7 / A1-A10 / C1-C6 / H1-H7 / restart identity / runtime ownership device evidence） | **COMPLETED**（**V4-4.2** DEVICE_CLOSURE = CLOSED；所有 REQUIRED gates PASS） |
 | First-use Auto-WD permission self-grant bootstrap | **COMPLETED**（**V4-4.3**；POST_BOOTSTRAP_AUTO_WD = PASS） |
 | Validation infrastructure repair（B1/B2/B3 test-only blocker） | COMPLETED（**V4-4.2B**） |
-| Consumer Conformance / architecture enforcement | OPEN（V4-5 — 等待 Controller 授权） |
+| Consumer Conformance / architecture enforcement | **COMPLETED**（**V4-5**；CONSUMER_CONFORMANCE = CLOSED；ARCHITECTURE_ENFORCEMENT = CLOSED；CONSUMER_CONTRACT_GAP = NO） |
 | Device parity / V4 Consumer Freeze | OPEN（V4-6） |
 
 ---
@@ -378,7 +379,7 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization（method-level exact inventory = 251 test methods / 26 classes / 31 files；CSV parser integrity = PASS（0 parse errors, 0 bad rows）；mechanical classification recount = PASS（SUM=251）；36 device gates 0 coverage gap 0 broken refs；blocker recount = 8（P0=0/P1=3/P2=3/P3=2）；SSOT/Roadmap 同步；B1/B2/B3 结论不变；NO new blockers）。
 
-**AT.V4-5**：OPEN — Consumer Conformance / architecture enforcement（等待 Controller 授权）。
+**AT.V4-5**：**COMPLETE**（2026-10-22）— Consumer Conformance + Architecture Enforcement。新建 `:at-consumer-conformance-host`（reference consumer，只依赖 `:at-engine-api` + `:at-composition-android` + `:at-cli`）+ `:at-architecture-gate`（machine-enforced 架构 gates）。8/8 conformance gates PASS（direct am instrument，identity 保留）；13/13 architecture gate tests PASS（4 negative + 2 sanity + 7 production）。CONSUMER_CONFORMANCE = CLOSED；ARCHITECTURE_ENFORCEMENT = CLOSED；CONSUMER_CONTRACT_GAP = NO；AT_ENGINE_API_PUBLIC_LEAK_COUNT = 0；FORBIDDEN_DIRECT_DEPENDENCY_COUNT = 0；FORBIDDEN_CONSUMER_IMPORT_COUNT = 0；MODULE_DAG_CYCLE_COUNT = 0；AT_ENGINE_PUBLIC_API_CHANGE = NO。
 
 **AT.V4-4.2A.1**：COMPLETE — Validation Audit Evidence Normalization。
 
@@ -386,9 +387,9 @@ presentation string 只在 CLI boundary（`AdbCliBridgeServer`）最终生成。
 
 **AT.V4-4.2B.1**：COMPLETE — UTF-8 Semantic Restoration（B3 ASCII workaround 修正：Unicode escape `\u4E2D\u6587\u6D4B\u8BD5` + byte-level split inside U+4E2D（E4 B8 AD）offset 6；G7 device 1/1 PASS；multibyte UTF-8 validation semantic fully restored；1 test file changed / 0 production）。
 
-**RECOMMENDED_NEXT** = AT.V4-5 — Consumer Conformance + Architecture Enforcement。
+**RECOMMENDED_NEXT** = AT.V4-6 — Device Parity + V4 Consumer Freeze。
 
-**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-5）。
+**NEXT_OPEN_AUTHORIZED = NO**（等待 Controller 授权 V4-6）。
 
 ---
 
