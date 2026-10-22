@@ -1,0 +1,29 @@
+AndroidTerminal (AT)
+Copyright (C) 2024-2026
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+---
+
+This project includes BoringSSL, a fork of OpenSSL developed by
+Google. BoringSSL is licensed under the Apache License, Version 2.0.
+The original OpenSSL copyright notices (Eric Young, Tim Hudson, and
+others) are preserved in the individual source file headers.
+
+See adb-engine/src/main/cpp/third_party/boringssl/LICENSE for the
+full BoringSSL license text.
+
+The ADB protocol implementations in this project are independent
+implementations that reference AOSP protocol semantics (documented
+in source comments). No AOSP source code is distributed in this
+repository.
