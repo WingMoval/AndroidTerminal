@@ -24,10 +24,39 @@ android {
         applicationId = "com.androidterminal.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.3.0"
+        versionCode = 2
+        versionName = "0.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // AT.APP-RELEASE-2: Release signing from environment variables.
+    // Debug builds use the default debug keystore (unchanged).
+    // Release builds require AT_RELEASE_* env vars; fails fast if missing.
+    signingConfigs {
+        create("release") {
+            val sf = System.getenv("AT_RELEASE_STORE_FILE")
+            if (sf != null && File(sf).exists()) {
+                storeFile = File(sf)
+                storePassword = System.getenv("AT_RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("AT_RELEASE_KEY_ALIAS") ?: "androidterminal"
+                keyPassword = System.getenv("AT_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            val storeFile = System.getenv("AT_RELEASE_STORE_FILE")
+            if (storeFile != null && File(storeFile).exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // No release keystore: use debug signing as fallback for local
+                // testing only. CI / official builds MUST set AT_RELEASE_*.
+                signingConfig = signingConfigs.getByName("debug")
+            }
+        }
     }
 
     compileOptions {

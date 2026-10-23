@@ -125,11 +125,24 @@ class AppCliExecution : ATCliExecution {
             else -> ATCliPairingState.CONNECT_FAILED
         }
 
-    override fun pair(host: String, port: Int, code: String): ATCliPairingResult =
-        toCliResult(AppRuntime.adbControl.pair(host, port, code))
+    override fun pair(host: String, port: Int, code: String): ATCliPairingResult {
+        val result = toCliResult(AppRuntime.adbControl.pair(host, port, code))
+        if (result.success) {
+            // AT.APP-RELEASE-2: CLI pairing also triggers first-use bootstrap
+            // (WRITE_SECURE_SETTINGS self-grant for post-bootstrap Auto-WD).
+            // Previously only PairActivity UI pairing triggered this.
+            AppRuntime.adbControl.completeFirstUseBootstrap()
+        }
+        return result
+    }
 
-    override fun pairDiscovered(code: String): ATCliPairingResult =
-        toCliResult(AppRuntime.adbControl.pairDiscovered(code))
+    override fun pairDiscovered(code: String): ATCliPairingResult {
+        val result = toCliResult(AppRuntime.adbControl.pairDiscovered(code))
+        if (result.success) {
+            AppRuntime.adbControl.completeFirstUseBootstrap()
+        }
+        return result
+    }
 
     /** Host mapping: composition semantic result -> CLI semantic result. */
     private fun toCliResult(r: ATAdbPairingResult): ATCliPairingResult =
