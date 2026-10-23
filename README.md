@@ -1,67 +1,96 @@
-# AndroidTerminal-V3
+# AndroidTerminal
 
-**Canonical Production Mainline** for the AndroidTerminal / AT Engine platform.
+**Android Execution Subsystem** — one-shot command execution and ADB
+wireless debugging for Android devices, from an Android app.
 
-> V2 = Verified Reference / Evidence Repository / Migration Source (READ-ONLY).
-> V3 = New Production Mainline. **Verified migration, not rewrite.**
+## What It Does
 
-## Roles
+- **One-shot shell execution** over ADB wireless debugging (TLS 1.3)
+- **ADB identity management** (RSA-2048 keypair, auto-generated on first use)
+- **Wireless Debugging pairing** (SPAKE2, AOSP-compatible)
+- **Auto-WD permission bootstrap** (first-use manual pairing, then
+  automatic `WRITE_SECURE_SETTINGS` self-grant for subsequent sessions)
+- **Local backend** (on-device shell execution without ADB)
 
-| Repo | Role |
-|---|---|
-| `AndroidTerminal` | Legacy + SSOT source authority (READ-ONLY) |
-| `AndroidTerminal-Public` | Known-good production source (READ-ONLY) |
-| `AndroidTerminal-V2` | Verified reference implementation / evidence repo / migration source (READ-ONLY) |
-| `AndroidTerminal-V3` | **Canonical production mainline (this repo)** |
-
-## Canonical Architecture (V1)
-
-The controlling architecture document is:
-`docs/architecture/AndroidTerminal_Canonical_V1.md`
-
-Summary:
+## Architecture
 
 ```text
-Consumer / Product
+Consumer / Product (Android App, CLI, AG)
         │
         ▼
-AT Engine Public Boundary
+AT Engine Public Boundary (:at-engine-api)
         │
         ▼
-AT Engine
+AT Engine (:at-engine)
    ├─ One-shot Execution
-   └─ Persistent Terminal (TerminalSession / Emulator / Screen State)
+   └─ Persistent Terminal
         │
         ▼
 Backend Adapter
-   ├─ Local Backend
-   ├─ ADB Backend
-   └─ Future SSH Backend
+   ├─ Local Backend (:at-backend-local)
+   └─ ADB Backend (:at-backend-adb)
         │
         ▼
 Execution Provider
    ├─ Local Process / PTY
-   └─ ADB Engine → adbd
+   └─ ADB Engine (:adb-engine) → adbd (TLS 1.3, shell v2)
 ```
 
-- **AT Engine** = reusable Terminal Execution Capability (one-shot + persistent), independent of UI / Agent / ADB protocol / specific shell.
-- **ADB Engine** = independent ADB capability provider (pairing / identity / discovery / TLS / connection / protocol / streams / recovery).
-- **AT Engine → ADB Backend → ADB Engine** is a *consumer → provider* relationship, NOT containment.
-- **Terminal Emulator + Screen State** belong to AT Engine. **Android Renderer** belongs to the Product / Human UI.
+| Module | Role |
+|--------|------|
+| `:at-engine-api` | Public consumer contract (interfaces only) |
+| `:at-engine` | AT Engine implementation (one-shot + persistent) |
+| `:at-engine-spi` | Backend SPI (internal) |
+| `:at-backend-local` | Local shell execution (no ADB) |
+| `:at-backend-adb` | ADB backend adapter |
+| `:adb-engine` | ADB engine (pairing, TLS, connection, shell v2) |
+| `:at-composition-android` | Android composition root (assembly) |
+| `:at-cli` | CLI frontend (optional) |
+| `:app` | Android app (host) |
+| `:test-host` | Test host (provisional) |
 
-## Development Discipline
+## Version Status
 
-- Do NOT reimplement already-verified V2 primitives (pairing / TLS / connection / shell-v2 / interactive stream / Local PTY / resize / Ctrl-C / cleanup).
-- Migrate by responsibility, not by copying old modules wholesale.
-- Architecture frozen first; final Kotlin/C++/Gradle API frozen only after real vertical slices.
-- No unauthorized auto-start of the next phase. STOP after each task.
+```text
+Stable Consumer Baseline = AT.V4-CONSUMER-FREEZE-V1
+Freeze Commit            = 7216d0e
+Freeze Tag               = AT.V4-CONSUMER-FREEZE-V1
+```
 
-## Track Map
+The `master` branch restores the V4 freeze BoringSSL dependency
+(pre-2025-02, device-verified). A BoringSSL upgrade to `df82113`
+(Apache-2.0) was attempted but reverted pending device verification.
+See `docs/audit/AT.GITHUB-STABLE-BASELINE-1.md`.
 
-- **AT.V3-0** — Canonical Bootstrap (this repo baseline).
-- **AT.V3-1** — ADB Engine Extraction / Migration Baseline.
-- **Track A** — ADB Engine evolution.
-- **Track B** — AT Engine (one-shot → persistent → emulator → contract freeze → Human UI / AG TerminalTool).
-- **Track C** — AndroidAgent (AG Engine / Tool Set / TerminalTool as a Tool branch).
+## Build
 
-See `docs/migration/Migration_Manifest_V2_to_V3.md` and `docs/migration/V2_Responsibility_Inventory.md`.
+Prerequisites:
+- Android SDK (platform-34+)
+- NDK (r26+)
+- CMake 3.22.1
+- JDK 21
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+Output: `app/build/outputs/apk/debug/app-debug.apk`
+
+ABI: `arm64-v8a` (BoringSSL static library is arm64-only).
+
+## License
+
+- **AT original code:** Apache-2.0 (`LICENSE`)
+- **BoringSSL (pre-2025-02):** OpenSSL BSD + SSLeay BSD + ISC + MIT
+  (`adb-engine/src/main/cpp/third_party/boringssl/LICENSE`)
+- **Notices:** `NOTICE`, `THIRD_PARTY_NOTICES.md`
+- **BoringSSL compliance:** `docs/legal/boringssl/`
+
+## Consumer Integration
+
+AndroidAgent (AG) consumes the V4 freeze consumer boundary:
+- `:at-engine-api` (REQUIRED)
+- `:at-composition-android` (REQUIRED)
+- `:at-cli` (OPTIONAL)
+
+See `docs/AT_V4_CONSUMER_HANDOFF.md` for the integration guide.

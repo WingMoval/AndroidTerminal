@@ -16,35 +16,27 @@ permissions and limitations under the License.
 ---
 
 This project includes BoringSSL, a fork of OpenSSL developed by
-Google. The current master HEAD and the historical V4 freeze use
-different BoringSSL versions:
+Google.
 
-### Current (master HEAD)
-
-- **Version:** commit df821137838169360f82f94fd39cebe803c7c2d6 (2026-10-22)
+- **Version:** UNKNOWN (pre-2025-02-03 BoringSSL; exact upstream commit
+  unrecoverable)
 - **Source:** https://github.com/google/boringssl
-- **License:** Apache License, Version 2.0
-- **Build:** NDK 26.1.10909125, Clang 17.0.2, CMake 3.22.1
-- **Files:** `adb-engine/src/main/cpp/third_party/boringssl/`
-
-### Historical (V4 freeze, AG consumer)
-
-- **Version:** UNKNOWN (pre-2025-02-03 BoringSSL)
-- **Source:** https://github.com/google/boringssl (exact commit unrecoverable)
-- **License:** OpenSSL BSD + SSLeay BSD + ISC + MIT (pre-switch)
+- **License:** OpenSSL BSD + SSLeay BSD + ISC + MIT (pre-2025-02 switch)
 - **Build:** NDK r27, Clang 18.0.1, 2026-09-24
 - **SHA-256:** `602A6D6C6DA1C5017A6C19C7EEE3F40C5653D200E2DA0B22B6238DA214F865D2`
-- **Present in:** Git history (commit `a40387e`), freeze tag `AT.V4-CONSUMER-FREEZE-V1`, frozen AAR
+- **Files:** `adb-engine/src/main/cpp/third_party/boringssl/`
 
-The historical BoringSSL license text is preserved at:
-`docs/legal/boringssl/HISTORICAL_BORINGSSL_LICENSE.md`
+The BoringSSL license text is at:
+`adb-engine/src/main/cpp/third_party/boringssl/LICENSE`
 
-The historical BoringSSL compliance audit is at:
+The BoringSSL compliance audit is at:
 `docs/legal/boringssl/HISTORICAL_BORINGSSL_COMPLIANCE.md`
 
+The BoringSSL provenance record is at:
+`docs/legal/boringssl/HISTORICAL_BORINGSSL_PROVENANCE.md`
+
 The original OpenSSL copyright notices (Eric Young, Tim Hudson, and
-others) are preserved in the individual header file comments in both
-versions.
+others) are preserved in the individual header file comments.
 
 This product includes software developed by the OpenSSL Project for
 use in the OpenSSL Toolkit (http://www.openssl.org/).
@@ -52,11 +44,6 @@ use in the OpenSSL Toolkit (http://www.openssl.org/).
 This product includes cryptographic software written by Eric Young
 (eay@cryptsoft.com). This product includes software written by Tim
 Hudson (tjh@cryptsoft.com).
-
-See adb-engine/src/main/cpp/third_party/boringssl/LICENSE for the
-current Apache-2.0 license text.
-See adb-engine/src/main/cpp/third_party/boringssl/UPSTREAM_VERSION.md
-for current upstream commit, build parameters, and library hashes.
 
 The ADB protocol implementations in this project are independent
 implementations that reference AOSP protocol semantics (documented
