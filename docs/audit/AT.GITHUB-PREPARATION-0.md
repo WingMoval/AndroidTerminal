@@ -1,4 +1,4 @@
-# AT.GITHUB-PREPARATION-0 — GitHub 正式发布前审计与准备
+# AT.GITHUB-PREPARATION-0 �?GitHub 正式发布前审计与准备
 
 **Date:** 2026-10-22
 **Nature:** GIT_AUDIT + PUBLICATION_PREPARATION (read-only; no modifications made)
@@ -6,8 +6,7 @@
 
 ---
 
-## 最终报告
-
+## 最终报�?
 ```text
 STEP = AT.GITHUB-PREPARATION-0
 VERDICT = READY_WITH_GAPS
@@ -16,9 +15,9 @@ AT_ROOT = D:\codebank\AndCode\AndroidTerminal-V4
 AT_START_HEAD = 7f3a7dface6e504970714631ba4fb2224052f5ef
 AT_FINAL_HEAD = 7f3a7dface6e504970714631ba4fb2224052f5ef (unchanged; read-only audit)
 AT_BRANCH = master
-AT_WORKTREE = CLEAN (4 untracked files in 本轮交付/ — not committed)
+AT_WORKTREE = CLEAN (4 untracked files in 本轮交付/ �?not committed)
 
-EXISTING_REMOTE = origin → D:\codebank\AndCode\AndroidTerminal-V3 (local path)
+EXISTING_REMOTE = origin �?D:\codebank\AndCode\AndroidTerminal-V3 (local path)
 REMOTE_PUSHED = NO
 
 V1_HISTORY_FOUND = NO (AndroidTerminal/ has source files but NO .git)
@@ -63,15 +62,14 @@ STOP = YES
 
 ## 阶段 A：Git 仓库 Preflight
 
-### A1. 仓库状态
-
-| 字段 | 值 |
+### A1. 仓库状�?
+| 字段 | �?|
 |------|-----|
 | toplevel | `D:/codebank/AndCode/AndroidTerminal-V4` |
 | HEAD | `7f3a7dface6e504970714631ba4fb2224052f5ef` |
 | branch | `master` |
 | worktree status | `## master...origin/master [ahead 20]` + 4 untracked (本轮交付/) |
-| remotes | `origin → D:\codebank\AndCode\AndroidTerminal-V3` (local path) |
+| remotes | `origin �?D:\codebank\AndCode\AndroidTerminal-V3` (local path) |
 | shallow | `false` |
 | total commits | 65 |
 | branches | `master` (only local); `remotes/origin/master` (= `75d5832`) |
@@ -83,7 +81,7 @@ STOP = YES
 | `AT.PRE-EMULATOR-FREEZE-V1` | annotated | `7ccb1bf` | V3 时代 |
 | `AT.AG-CONSUMER-FREEZE-V1` | annotated | `a6f23d7` | V3 AG consumer freeze |
 | `AT.V3-TO-V4-BASELINE-V1` | annotated | `064a855` | V3→V4 基线 (= `75d5832` commit) |
-| `AT.V4-CONSUMER-FREEZE-V1` | annotated | `75aacc5` (tag obj) → `7216d0e` (commit) | **V4 冻结标签** |
+| `AT.V4-CONSUMER-FREEZE-V1` | annotated | `75aacc5` (tag obj) �?`7216d0e` (commit) | **V4 冻结标签** |
 
 ### A3. 冻结标签验证
 
@@ -105,42 +103,39 @@ DIFF 7216d0e..7f3a7df = 8 files (all docs), 0 production code
 
 ### A4. Ahead commits (vs origin/master = 75d5832)
 
-20 commits: `0ef538b` (AT.V4-0) → `7f3a7df` (AT.V4-6.1), all V4 work.
+20 commits: `0ef538b` (AT.V4-0) �?`7f3a7df` (AT.V4-6.1), all V4 work.
 
 ---
 
 ## 阶段 B：从 V1 开始的完整历史核验
 
-### B1. 各版本仓库清单
-
-| 仓库路径 | .git | 最早提交 | 当前 HEAD | 分支 | 标签 | 提交数 | 与 V4 关系 | 历史完整性 |
+### B1. 各版本仓库清�?
+| 仓库路径 | .git | 最早提�?| 当前 HEAD | 分支 | 标签 | 提交�?| �?V4 关系 | 历史完整�?|
 |---------|------|---------|----------|------|------|--------|----------|----------|
-| `AndroidTerminal-V4` | YES (dir) | `cf66e53` 2026-10-10 "AT.V3-0" | `7f3a7df` | master | 4 | 65 | **主仓库** (V3 45 + V4 20) | V3→V4 连续已验证 |
-| `AndroidTerminal-V2` | YES (file=worktree) | `2baa189` "AT.V2-0" | `726a441` | main | 2 (at-v0.1.0, at-v2-baseline-0) | 30 | **独立历史** | 已验证 |
-| `AndroidTerminal-V3` | YES (file=worktree) | `cf66e53` (same as V4) | `75d5832` | master | (shared with V4) | 45 | V4 的 V3 部分 (origin) | 已验证 |
-| `AndroidTerminal-Public` | YES (dir) | — (empty) | — | master | 0 | 0 | 无关 | 空仓库 |
-| `AndroidTerminal` | **NO** | — | — | — | — | 0 | **无 Git 历史** | **历史丢失** |
+| `AndroidTerminal-V4` | YES (dir) | `cf66e53` 2026-10-10 "AT.V3-0" | `7f3a7df` | master | 4 | 65 | **主仓�?* (V3 45 + V4 20) | V3→V4 连续已验�?|
+| `AndroidTerminal-V2` | YES (file=worktree) | `2baa189` "AT.V2-0" | `726a441` | main | 2 (at-v0.1.0, at-v2-baseline-0) | 30 | **独立历史** | 已验�?|
+| `AndroidTerminal-V3` | YES (file=worktree) | `cf66e53` (same as V4) | `75d5832` | master | (shared with V4) | 45 | V4 �?V3 部分 (origin) | 已验�?|
+| `AndroidTerminal-Public` | YES (dir) | �?(empty) | �?| master | 0 | 0 | 无关 | 空仓�?|
+| `AndroidTerminal` | **NO** | �?| �?| �?| �?| 0 | **�?Git 历史** | **历史丢失** |
 
-### B2. Git 关系图
-
+### B2. Git 关系�?
 ```text
 V2 (INDEPENDENT repo, 30 commits, branch main)
-  2baa189 → ... → 726a441 [main]
+  2baa189 �?... �?726a441 [main]
   tags: at-v0.1.0, at-v2-baseline-0
   NO shared ancestry with V4 repo
-  has worktree at C:\Users\Wing\AppData\Local\Temp\atrv_pre3b (detached 7a979a6)
+  has worktree at <USER_HOME>\AppData\Local\Temp\atrv_pre3b (detached 7a979a6)
 
 V4 repo (master, 65 commits)
   V3 portion (45 commits):
-    cf66e53 (2026-10-10) → f0016d6 → d11cd3c → ... → 75d5832 [origin/master]
+    cf66e53 (2026-10-10) �?f0016d6 �?d11cd3c �?... �?75d5832 [origin/master]
   V4 portion (20 commits):
-    0ef538b (AT.V4-0) → ... → 7216d0e [AT.V4-CONSUMER-FREEZE-V1] → 7f3a7df [HEAD]
+    0ef538b (AT.V4-0) �?... �?7216d0e [AT.V4-CONSUMER-FREEZE-V1] �?7f3a7df [HEAD]
 
 V1 (AndroidTerminal/): source files only, NO .git, NO commit history
 ```
 
-### B3. 历史连续性判定
-
+### B3. 历史连续性判�?
 ```text
 HISTORY_CONTINUITY = MULTIPLE_INDEPENDENT_HISTORIES
 
@@ -174,42 +169,39 @@ V1:
     (clearly labeled, no fake history)
 ```
 
-**为什么不合并 V2 到 master：**
-- 无共享祖先；合并会创建 merge commit 暗示 V2 是 V4 前身
-- 伪造历史连续性
-- 独立分支保留 V2 原始 SHA、作者、时间
-
+**为什么不合并 V2 �?master�?*
+- 无共享祖先；合并会创�?merge commit 暗示 V2 �?V4 前身
+- 伪造历史连续�?- 独立分支保留 V2 原始 SHA、作者、时�?
 ---
 
 ## 阶段 C：公开发布安全审计
 
-### C1. 密钥和敏感数据
-
+### C1. 密钥和敏感数�?
 | 检查项 | 结果 | 风险 |
 |--------|------|------|
-| adbkey / 私钥 / 身份文件 | 未发现 | — |
-| API Key / Token / 密码 | 未发现 | — |
-| 签名密钥 / 密钥库 (.p12/.keystore) | 未发现 | — |
-| 配对码明文 | 未发现 | — |
-| 个人主机名 | `Wing@DESKTOP-PG78M2N` 在 3 处 | LOW |
-| 内部 IP | `192.168.137.44` 在 2 处 | LOW |
-| 个人路径 (D:\codebank, C:\Users) | 未在 tracked 源码中发现 | — |
-| Git 历史敏感文件 | 无（仅上述主机名/IP） | LOW |
+| adbkey / 私钥 / 身份文件 | 未发�?| �?|
+| API Key / Token / 密码 | 未发�?| �?|
+| 签名密钥 / 密钥�?(.p12/.keystore) | 未发�?| �?|
+| 配对码明�?| 未发�?| �?|
+| 个人主机�?| `developer@HOST` �?3 �?| LOW |
+| 内部 IP | `<LAN_IP>` �?2 �?| LOW |
+| 个人路径 (D:\codebank, C:\Users) | 未在 tracked 源码中发�?| �?|
+| Git 历史敏感文件 | 无（仅上述主机名/IP�?| LOW |
 
 **个人主机名出现位置：**
 
-| 文件 | 行 | 内容摘要 |
+| 文件 | �?| 内容摘要 |
 |------|-----|---------|
-| `docs/evidence/at_v3_2_2/EVIDENCE.md` | 42 | "PC adbkey `Wing@DESKTOP-PG78M2N`" |
-| `docs/evidence/at_v3_2_3/EVIDENCE.md` | 42 | "PC adbkey `Wing@DESKTOP-PG78M2N`" |
-| `test-host/src/androidTest/.../AdbBackendHeadlessTest.kt` | 39 | "device already trusts Wing@DESKTOP-PG78M2N" |
+| `docs/evidence/at_v3_2_2/EVIDENCE.md` | 42 | "PC adbkey `developer@HOST`" |
+| `docs/evidence/at_v3_2_3/EVIDENCE.md` | 42 | "PC adbkey `developer@HOST`" |
+| `test-host/src/androidTest/.../AdbBackendHeadlessTest.kt` | 39 | "device already trusts developer@HOST" |
 
-**内部 IP 出现位置：**
+**内部 IP 出现位置�?*
 
-| 文件 | 行 | 内容摘要 |
+| 文件 | �?| 内容摘要 |
 |------|-----|---------|
-| `at-cli/src/test/java/com/at/cli/AdbCliArgsTest.kt` | 188,191 | test fixture `192.168.137.44:38619` |
-| `docs/implementation/AT.CONSUMER-BOOTSTRAP-0.md` | 132 | evidence `adb pair 192.168.137.44:38619` |
+| `at-cli/src/test/java/com/at/cli/AdbCliArgsTest.kt` | 188,191 | test fixture `<LAN_IP>:38619` |
+| `docs/implementation/AT.CONSUMER-BOOTSTRAP-0.md` | 132 | evidence `adb pair <LAN_IP>:38619` |
 
 ### C2. 大文件和生成文件
 
@@ -219,22 +211,19 @@ Total tracked size: 15.53 MB
 
 | 文件 | 大小 | 建议 |
 |------|------|------|
-| `adb-engine/src/main/cpp/third_party/boringssl/lib/arm64-v8a/libboringssl.a` | 4.2 MB | 纳入仓库（构建依赖）或 D6 决策 |
-| `dist/AT.V4-CONSUMER-FREEZE-V1/artifacts/*.aar` (6 files) | ~1.6 MB total | 纳入仓库（受控目录）或 Release 附件（D5） |
+| `adb-engine/src/main/cpp/third_party/boringssl/lib/arm64-v8a/libboringssl.a` | 4.2 MB | 纳入仓库（构建依赖）�?D6 决策 |
+| `dist/AT.V4-CONSUMER-FREEZE-V1/artifacts/*.aar` (6 files) | ~1.6 MB total | 纳入仓库（受控目录）�?Release 附件（D5�?|
 | `dist/AT.V4-CONSUMER-FREEZE-V1/artifacts/*.jar` (2 files) | ~25 KB | 同上 |
 | `docs/evidence/**/*.png` (多张) | ~3 MB total | 纳入仓库（审计证据） |
 | `gradle/wrapper/gradle-wrapper.jar` | 42 KB | 纳入仓库（标准） |
-| `adb-engine/src/main/cpp/third_party/boringssl/include/**/*.h` | ~1 MB | 纳入仓库（头文件） |
+| `adb-engine/src/main/cpp/third_party/boringssl/include/**/*.h` | ~1 MB | 纳入仓库（头文件�?|
 
-所有文件 < GitHub 100MB 限制。无需 LFS。
-
+所有文�?< GitHub 100MB 限制。无需 LFS�?
 ### C3. 许可证与 README
 
-**LICENSE：** 不存在。`LICENSE_DECISION_REQUIRED`。
-
-**README.md (2658B)：** 标题 "AndroidTerminal-V3"，内容为 V3 时代。未提及 V4、冻结标签、消费者制品。需要更新。
-
-**.gitignore (298B)：** PASS。覆盖：
+**LICENSE�?* 不存在。`LICENSE_DECISION_REQUIRED`�?
+**README.md (2658B)�?* 标题 "AndroidTerminal-V3"，内容为 V3 时代。未提及 V4、冻结标签、消费者制品。需要更新�?
+**.gitignore (298B)�?* PASS。覆盖：
 - `local.properties`, `.gradle/`, `build/`, `.cxx/`
 - `*.apk`, `*.aab`, `*.jar` (!gradle-wrapper), `*.so`
 - `.idea/`, `*.iml`, `.vscode/`, `.DS_Store`
@@ -242,21 +231,19 @@ Total tracked size: 15.53 MB
 
 ---
 
-## 阶段 D：V4 冻结标签与消费者制品核验
-
+## 阶段 D：V4 冻结标签与消费者制品核�?
 ### D1. 冻结标签
 
-| 字段 | 值 |
+| 字段 | �?|
 |------|-----|
-| 标签名 | `AT.V4-CONSUMER-FREEZE-V1` |
+| 标签�?| `AT.V4-CONSUMER-FREEZE-V1` |
 | 类型 | annotated (tag object `75aacc5`) |
 | 目标提交 | `7216d0e8131e92e8914ce7c8443e1668b1d53aca` |
 | 预期匹配 | YES |
 | 后续提交 | `7f3a7df` (docs-only, 8 files, 0 production code) |
-| 标签被修改 | NO |
+| 标签被修�?| NO |
 
-### D2. 消费者制品
-
+### D2. 消费者制�?
 ```text
 Bundle path: dist/AT.V4-CONSUMER-FREEZE-V1/
 Contents:
@@ -274,87 +261,76 @@ Contents:
   docs/AT_V4_CONSUMER_HANDOFF.md     7358B
 ```
 
-**SHA256 验证：8/8 PASS, 0 MISMATCH, 0 MISSING**
+**SHA256 验证�?/8 PASS, 0 MISMATCH, 0 MISSING**
 
 **Bundle 敏感文件扫描：无**
 
-**POM 文件：无**（raw AAR/JAR，非 Maven publication；消费者需自行构建依赖描述）
-
+**POM 文件：无**（raw AAR/JAR，非 Maven publication；消费者需自行构建依赖描述�?
 ### D3. GitHub 制品分发策略
 
 | 方案 | 优点 | 缺点 |
 |------|------|------|
-| A: Git 仓库受控目录（当前） | 版本追溯、hash 验证、与源码同仓库 | 仓库略大（~1.6MB AARs） |
-| B: GitHub Release 附件 | 仓库轻量、下载便利 | 需额外管理、版本追溯弱 |
-| C: 两者结合 | 源码仓库有目录 + Release 有附件 | 维护两份 |
+| A: Git 仓库受控目录（当前） | 版本追溯、hash 验证、与源码同仓�?| 仓库略大（~1.6MB AARs�?|
+| B: GitHub Release 附件 | 仓库轻量、下载便�?| 需额外管理、版本追溯弱 |
+| C: 两者结�?| 源码仓库有目�?+ Release 有附�?| 维护两份 |
 
-推荐：方案 A（当前已实现），制品在 git 中受版本控制。Release 附件作为可选补充。
-
+推荐：方�?A（当前已实现），制品�?git 中受版本控制。Release 附件作为可选补充�?
 ---
 
-## 阶段 E：发布准备结果
-
-### E1. 发布阻断项
-
+## 阶段 E：发布准备结�?
+### E1. 发布阻断�?
 | 级别 | 项目 | 说明 |
 |------|------|------|
 | **BLOCKER** | LICENSE 缺失 | 无许可证文件，无法公开 |
 | **BLOCKER** | README 过期 | 标题 "AndroidTerminal-V3"，V3 时代内容 |
-| RECOMMENDED | 个人主机名 | `Wing@DESKTOP-PG78M2N` 在 3 处 evidence/test 文件 |
-| RECOMMENDED | 测试 IP | `192.168.137.44` 在 2 处 test/evidence 文件 |
+| RECOMMENDED | 个人主机�?| `developer@HOST` �?3 �?evidence/test 文件 |
+| RECOMMENDED | 测试 IP | `<LAN_IP>` �?2 �?test/evidence 文件 |
 | RECOMMENDED | BoringSSL 第三方库 | 4.2MB static lib + 1MB headers |
 | PASS | .gitignore | 覆盖完整 |
 | PASS | SHA256 | 8/8 |
-| PASS | 冻结标签 | 存在、类型正确、目标正确 |
-| PASS | 消费者制品 | 8 个完整、无敏感文件 |
-| PASS | 无密钥/密码 | tracked + history 均无 |
+| PASS | 冻结标签 | 存在、类型正确、目标正�?|
+| PASS | 消费者制�?| 8 个完整、无敏感文件 |
+| PASS | 无密�?密码 | tracked + history 均无 |
 
-### E2. Controller 决策项
-
+### E2. Controller 决策�?
 | # | 决策 | 选项 |
 |---|------|------|
-| D1 | 许可证 | Apache-2.0 / MIT / GPL-3.0 / 其他 / 不公开 |
-| D2 | V2 历史导入 | 分支（推荐）/ 独立仓库 / 不导入 |
-| D3 | README 更新 | 最小更新（加 V4 段落）/ 全面重写 |
-| D4 | 个人主机名脱敏 | 修改 3 个文件 / 接受 |
-| D5 | 制品分发 | git 目录（推荐）/ Release 附件 / 两者 |
-| D6 | BoringSSL 第三方库 | 保留 / 移除（需评估构建影响） |
+| D1 | 许可�?| Apache-2.0 / MIT / GPL-3.0 / 其他 / 不公开 |
+| D2 | V2 历史导入 | 分支（推荐）/ 独立仓库 / 不导�?|
+| D3 | README 更新 | 最小更新（�?V4 段落�? 全面重写 |
+| D4 | 个人主机名脱�?| 修改 3 个文�?/ 接受 |
+| D5 | 制品分发 | git 目录（推荐）/ Release 附件 / 两�?|
+| D6 | BoringSSL 第三方库 | 保留 / 移除（需评估构建影响�?|
 
-### E3. 推荐的首次推送命令草案
-
+### E3. 推荐的首次推送命令草�?
 ```powershell
-# Step 1: GitHub 创建空仓库（不初始化）
-#   手动: github.com → New repository → 不勾选 README/.gitignore/LICENSE
+# Step 1: GitHub 创建空仓库（不初始化�?#   手动: github.com �?New repository �?不勾�?README/.gitignore/LICENSE
 
 # Step 2: 添加 remote
 Set-Location "D:\codebank\AndCode\AndroidTerminal-V4"
 git remote add github https://github.com/<user>/android-terminal.git
 
-# Step 3: 推送 master + 标签
+# Step 3: 推�?master + 标签
 git push github master
 git push github --tags
 
-# Step 4: 导入 V2 历史为独立分支
-git fetch "D:\codebank\AndCode\AndroidTerminal-V2" main
+# Step 4: 导入 V2 历史为独立分�?git fetch "D:\codebank\AndCode\AndroidTerminal-V2" main
 git push github FETCH_HEAD:refs/heads/v2-history
 git push github at-v0.1.0 at-v2-baseline-0
 
-# Step 5: (可选) 清理本地 remote
+# Step 5: (可�? 清理本地 remote
 # git remote remove origin
 # git remote rename github origin
 ```
 
-### E4. 上传后远端验证
-
+### E4. 上传后远端验�?
 ```powershell
 # 1. master SHA
 git ls-remote github refs/heads/master
 # 期望: 7f3a7dface6e504970714631ba4fb2224052f5ef
 
-# 2. 所有标签
-git ls-remote github --tags
-# 期望: 6 个标签
-
+# 2. 所有标�?git ls-remote github --tags
+# 期望: 6 个标�?
 # 3. 冻结标签目标
 git ls-remote github "refs/tags/AT.V4-CONSUMER-FREEZE-V1^{}"
 # 期望: 7216d0e8131e92e8914ce7c8443e1668b1d53aca
@@ -371,7 +347,7 @@ git -C /tmp/verify rev-list --count v2-history    # 30
 # 6. SHA256 验证
 cd /tmp/verify/dist/AT.V4-CONSUMER-FREEZE-V1/artifacts
 Get-FileHash *.aar *.jar -Algorithm SHA256
-# 与 SHA256SUMS.txt 逐一对比
+# �?SHA256SUMS.txt 逐一对比
 ```
 
 ---
@@ -388,6 +364,5 @@ PUSH = NO
 RELEASE_CREATED = NO
 ```
 
-本轮为纯只读审计，未修改任何文件。
-
+本轮为纯只读审计，未修改任何文件�?
 **STOP.**

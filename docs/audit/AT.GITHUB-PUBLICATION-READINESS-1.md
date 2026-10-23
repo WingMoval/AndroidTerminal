@@ -1,4 +1,4 @@
-# AT.GITHUB-PUBLICATION-READINESS-1 — GitHub 发布前审计与 BoringSSL 版本策略冻结
+# AT.GITHUB-PUBLICATION-READINESS-1 �?GitHub 发布前审计与 BoringSSL 版本策略冻结
 
 **Date:** 2026-10-23
 **Nature:** READ-ONLY + DOCS-ONLY (1 minor doc fix; 0 production changes)
@@ -6,8 +6,7 @@
 
 ---
 
-## 最终报告
-
+## 最终报�?
 ```text
 STEP = AT.GITHUB-PUBLICATION-READINESS-1
 
@@ -48,7 +47,7 @@ PUBLICATION_READINESS = BLOCKED
 PUBLICATION_BLOCKERS =
   1. README is V3-era (title "AndroidTerminal-V3", V3 architecture)
   2. BoringSSL version strategy not finalized (master has unvalidated new version)
-  3. Historical PII (hostname Wing@DESKTOP-PG78M2N, IP 192.168.137.44) in docs
+  3. Historical PII (hostname developer@HOST, IP <LAN_IP>) in docs
 
 COMMIT = NO
 PUSH = NO
@@ -61,27 +60,27 @@ STOP = YES
 
 ---
 
-## Gate A — BoringSSL 版本确认
+## Gate A �?BoringSSL 版本确认
 
 ### Master (15394b7)
 
-| 项 | 值 |
+| �?| �?|
 |----|-----|
 | CMakeLists | Links `libcrypto.a` + `libssl.a` |
 | Comment | "Upstream: https://github.com/google/boringssl commit df82113 (2026-10-22)" |
 | libcrypto.a | 30,514,318 B, SHA256: `4CF2E4FA...` |
 | libssl.a | 11,658,154 B, SHA256: `8E684C63...` |
-| 许可证 | Apache-2.0 |
+| 许可�?| Apache-2.0 |
 | 真机验证 | **NOT DONE** |
 
 ### Freeze (7216d0e)
 
-| 项 | 值 |
+| �?| �?|
 |----|-----|
 | CMakeLists | Links `libboringssl.a` |
 | Comment | "BoringSSL vendored static library + headers (migrated from V2)" |
 | libboringssl.a | 4,343,398 B, SHA256: `602A6D6C...` (verified via V1 original) |
-| 许可证 | pre-2025-02 (OpenSSL BSD + SSLeay BSD + ISC + MIT) |
+| 许可�?| pre-2025-02 (OpenSSL BSD + SSLeay BSD + ISC + MIT) |
 | 真机验证 | **DONE** (V4 device regression) |
 
 ```text
@@ -90,13 +89,13 @@ BORINGSSL_UPGRADE_ACTIVE_IN_MASTER = YES
 
 **GATE_A = PASS**
 
-## Gate B — Git 安全扫描
+## Gate B �?Git 安全扫描
 
-| 项 | 结果 |
+| �?| 结果 |
 |----|------|
 | 本地 master | `15394b7` |
 | origin/master | `75d5832` (V3 baseline) |
-| 未推送提交 | **24** (V4 architecture + license docs) |
+| 未推送提�?| **24** (V4 architecture + license docs) |
 | Keystore 文件 | 0 |
 | local.properties 跟踪 | NO |
 | 私钥 (BEGIN ... PRIVATE KEY) | 0 |
@@ -105,22 +104,20 @@ BORINGSSL_UPGRADE_ACTIVE_IN_MASTER = YES
 | AWS Key (AKIA...) | 0 |
 | **SECRET_SCAN** | **PASS** |
 
-**注意：** 未推送的 24 个提交包含完整 V4 架构 + 许可证文档。推送到 GitHub 后全部公开。
-
+**注意�?* 未推送的 24 个提交包含完�?V4 架构 + 许可证文档。推送到 GitHub 后全部公开�?
 **GATE_B = PASS**
 
-## Gate C — 许可证一致性
-
+## Gate C �?许可证一致�?
 ### 修正
 
-| 文件 | 旧值 | 新值 |
+| 文件 | 旧�?| 新�?|
 |------|------|------|
 | THIRD_PARTY_NOTICES.md L27 | "44 Google ISC, 34 OpenSSL BSD, 13 other" | "49 Google ISC, 34 OpenSSL BSD, 11 SSLeay, 3 other, 1 no notice" |
 | THIRD_PARTY_NOTICES.md L46 | "98/98 headers... 50 BSD/ISC, 103 SSLeay" | "97/98 headers... 49 Google ISC, 34 OpenSSL BSD, 47 SSLeay" |
 
 ### 验证
 
-| 指标 | 值 |
+| 指标 | �?|
 |------|-----|
 | TOTAL_HEADERS | 98 |
 | HEADERS_WITH_COPYRIGHT | 97 |
@@ -128,37 +125,31 @@ BORINGSSL_UPGRADE_ACTIVE_IN_MASTER = YES
 | SSLEAY_HEADERS | 47 |
 | FIAT_LICENSE_STATUS | SATISFIED |
 
-**GATE_C = PASS**（修正后）
+**GATE_C = PASS**（修正后�?
+## Gate D �?BoringSSL 版本策略
 
-## Gate D — BoringSSL 版本策略
-
-### 三方案比较
-
+### 三方案比�?
 | 维度 | A: 回退旧版 | B: 保留新版 | C: 双轨 |
 |------|-----------|-----------|---------|
-| **STABILITY** | ✅ master = 已验证 | ❌ master = 未验证 | ✅ 冻结版 = 已验证 |
-| **COMPATIBILITY** | ✅ 与 AG 一致 | ❌ AG 需重新验证 | ✅ AG 用冻结版 |
-| **LICENSE** | ✅ pre-2025-02 已闭合 | ✅ Apache-2.0 | ✅ 两者都已闭合 |
-| **SECURITY** | ✅ 已验证 | ⚠️ 未验证 | ✅ 冻结版已验证 |
-| **MAINTENANCE** | ✅ 无额外工作 | ⚠️ 需真机验证 | ⚠️ 需维护两版本文档 |
-| **AG_RISK** | ✅ 零风险 | ❌ 需 AG 重新集成 | ✅ AG 用冻结版 |
-| **GITHUB** | ✅ 发布即稳定 | ⚠️ 发布含未验证代码 | ✅ 冻结版可发布 |
+| **STABILITY** | �?master = 已验�?| �?master = 未验�?| �?冻结�?= 已验�?|
+| **COMPATIBILITY** | �?�?AG 一�?| �?AG 需重新验证 | �?AG 用冻结版 |
+| **LICENSE** | �?pre-2025-02 已闭�?| �?Apache-2.0 | �?两者都已闭�?|
+| **SECURITY** | �?已验�?| ⚠️ 未验�?| �?冻结版已验证 |
+| **MAINTENANCE** | �?无额外工�?| ⚠️ 需真机验证 | ⚠️ 需维护两版本文�?|
+| **AG_RISK** | �?零风�?| �?需 AG 重新集成 | �?AG 用冻结版 |
+| **GITHUB** | �?发布即稳�?| ⚠️ 发布含未验证代码 | �?冻结版可发布 |
 
 ### 推荐
 
 ```text
 REVERT_RECOMMENDED = YES
 REVERT_REASON = 
-  master 应代表已验证的稳定版本。
-  新版 BoringSSL (df82113) 仅完成构建验证，未真机验证。
-  发布未验证的加密库到 GitHub 主分支不符合"Verified migration, not rewrite"原则。
-  回退后 master = V4 冻结版 BoringSSL = AG 消费版 = 真机验证版。
-
+  master 应代表已验证的稳定版本�?  新版 BoringSSL (df82113) 仅完成构建验证，未真机验证�?  发布未验证的加密库到 GitHub 主分支不符合"Verified migration, not rewrite"原则�?  回退�?master = V4 冻结�?BoringSSL = AG 消费�?= 真机验证版�?
 REVERT_SCOPE = 
-  1 个 commit: 恢复 libboringssl.a + 旧 CMakeLists + 旧头文件
+  1 �?commit: 恢复 libboringssl.a + �?CMakeLists + 旧头文件
   不影响冻结标签、冻结包、AG
 
-NEW_DEVICE_VALIDATION_REQUIRED = NO (旧版已验证)
+NEW_DEVICE_VALIDATION_REQUIRED = NO (旧版已验�?
 ```
 
 ### 回退操作（未来执行，非本轮）
@@ -171,21 +162,17 @@ git checkout AT.V4-CONSUMER-FREEZE-V1 -- \
 git commit -m "Revert BoringSSL to V4 freeze version (proven, device-verified)"
 ```
 
-新版 BoringSSL (df82113) 保留在 `d1e5883` 提交中，作为未来候选。
-
-## Gate E — 冻结包分发
-
+新版 BoringSSL (df82113) 保留�?`d1e5883` 提交中，作为未来候选�?
+## Gate E �?冻结包分�?
 ```text
 FROZEN_AAR_UNCHANGED = YES (SHA256 verified)
 DISTRIBUTION_LICENSE_GAP = YES (no LICENSE/NOTICE in bundle)
 ```
 
-### 建议发布包结构
-
+### 建议发布包结�?
 ```text
-dist/AT.V4-PUBLICATION-1/           ← 新目录（不修改原冻结包）
-  artifacts/                         ← 从原冻结包复制（哈希不变）
-    adb-engine-debug.aar
+dist/AT.V4-PUBLICATION-1/           �?新目录（不修改原冻结包）
+  artifacts/                         �?从原冻结包复制（哈希不变�?    adb-engine-debug.aar
     at-backend-adb-debug.aar
     at-backend-local-debug.aar
     at-cli-debug.aar
@@ -193,36 +180,34 @@ dist/AT.V4-PUBLICATION-1/           ← 新目录（不修改原冻结包）
     at-engine-api.jar
     at-engine-debug.aar
     at-engine-spi.jar
-  LICENSE                             ← 从仓库根目录复制
-  NOTICE                              ← 从仓库根目录复制
-  THIRD_PARTY_NOTICES.md              ← 从仓库根目录复制
-  HISTORICAL_BORINGSSL_LICENSE.md     ← 从 docs/legal/boringssl/ 复制
-  README.md                           ← 发布说明
-  SHA256SUMS.txt                      ← 新清单（含许可证文件）
-```
+  LICENSE                             �?从仓库根目录复制
+  NOTICE                              �?从仓库根目录复制
+  THIRD_PARTY_NOTICES.md              �?从仓库根目录复制
+  HISTORICAL_BORINGSSL_LICENSE.md     �?�?docs/legal/boringssl/ 复制
+  README.md                           �?发布说明
+  SHA256SUMS.txt                      �?新清单（含许可证文件�?```
 
 **GATE_E = PASS**
 
-## Gate F — README
+## Gate F �?README
 
 ```text
 README_ACCURACY = FAIL
 ```
 
-| 项 | 当前 | 应为 |
+| �?| 当前 | 应为 |
 |----|------|------|
-| 标题 | "AndroidTerminal-V3" | "AndroidTerminal" 或 "AndroidTerminal-V4" |
-| 角色 | "V3 = Canonical Production Mainline" | V4 是生产主线 |
-| 架构 | V3 时代描述 | V4 消费者边界 |
-| BoringSSL | 未提及 | 应区分当前版和历史版 |
-| License | 未提及 | 应引用 LICENSE + THIRD_PARTY_NOTICES |
-| 构建方法 | 未提及 | 应包含 Gradle 命令 |
+| 标题 | "AndroidTerminal-V3" | "AndroidTerminal" �?"AndroidTerminal-V4" |
+| 角色 | "V3 = Canonical Production Mainline" | V4 是生产主�?|
+| 架构 | V3 时代描述 | V4 消费者边�?|
+| BoringSSL | 未提�?| 应区分当前版和历史版 |
+| License | 未提�?| 应引�?LICENSE + THIRD_PARTY_NOTICES |
+| 构建方法 | 未提�?| 应包�?Gradle 命令 |
 
-**需要更新 README，但本轮不执行（避免大范围重写）。**
+**需要更�?README，但本轮不执行（避免大范围重写）�?*
 
-## 发布放行检查
-
-| 标准 | 状态 |
+## 发布放行检�?
+| 标准 | 状�?|
 |------|------|
 | GIT_HISTORY_AUDITED | PASS |
 | SECRET_SCAN | PASS |
@@ -236,19 +221,13 @@ README_ACCURACY = FAIL
 PUBLICATION_READINESS = BLOCKED
 ```
 
-### 阻塞项
-
-1. **README 过期** — 标题 "AndroidTerminal-V3"，内容全部是 V3 时代
-2. **BoringSSL 版本策略** — master 含未验证新版，需回退或明确标记
-3. **历史 PII** — 3 处 `Wing@DESKTOP-PG78M2N`，2 处 `192.168.137.44`（在 docs/evidence 中）
+### 阻塞�?
+1. **README 过期** �?标题 "AndroidTerminal-V3"，内容全部是 V3 时代
+2. **BoringSSL 版本策略** �?master 含未验证新版，需回退或明确标�?3. **历史 PII** �?3 �?`developer@HOST`�? �?`<LAN_IP>`（在 docs/evidence 中）
 
 ## 7. 后续步骤
 
-1. **Controller 决策 BoringSSL 版本策略**（推荐 Option A: 回退）
-2. **更新 README**（V4 身份 + 架构 + License + 构建方法）
-3. **PII 脱敏**（3 处主机名 + 2 处 IP）
-4. **回退 BoringSSL**（如选 Option A）
-5. **GitHub 仓库创建 + 首次推送**
-6. **发布包打包**（如需要）
+1. **Controller 决策 BoringSSL 版本策略**（推�?Option A: 回退�?2. **更新 README**（V4 身份 + 架构 + License + 构建方法�?3. **PII 脱敏**�? 处主机名 + 2 �?IP�?4. **回退 BoringSSL**（如�?Option A�?5. **GitHub 仓库创建 + 首次推�?*
+6. **发布包打�?*（如需要）
 
 **STOP.**

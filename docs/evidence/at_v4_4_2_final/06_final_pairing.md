@@ -1,4 +1,4 @@
-AT.V4-4.2D.2 â€” Final Product First-Use Pairing (authorized, ONE)
+AT.V4-4.2D.2 â€?Final Product First-Use Pairing (authorized, ONE)
 Date: 2026-10-22
 Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
 
@@ -14,7 +14,7 @@ Port discovery: user initially provided 43233 (typo). UI dump of the pairing
 dialog showed the ACTUAL port = 43223 (code 279346). Corrected and succeeded.
 
 Pairing result:
-  adb pair 192.168.137.44:43223 279346
+  adb pair <LAN_IP>:43223 279346
   -> "pairing succeeded (guid=adb-APLMUT4312005935-J4nb5z)"
 
 ## Post-pair verification

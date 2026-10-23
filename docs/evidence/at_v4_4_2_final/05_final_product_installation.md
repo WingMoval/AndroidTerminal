@@ -1,7 +1,7 @@
-AT.V4-4.2D.2 â€” Final Product Installation (Stateful)
+AT.V4-4.2D.2 â€?Final Product Installation (Stateful)
 Date: 2026-10-22
 Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
-Device IP: 192.168.137.44
+Device IP: <LAN_IP>
 
 ## Installation method
 Manual `adb install` (NOT Gradle connectedDebugAndroidTest / UTP).

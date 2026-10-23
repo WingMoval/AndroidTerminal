@@ -1,7 +1,7 @@
-AT.V4-4.2D â€” Fresh-Install Product First-Use Pairing (Controller Decision A)
+AT.V4-4.2D â€?Fresh-Install Product First-Use Pairing (Controller Decision A)
 Date: 2026-10-22
 Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
-Device IP: 192.168.137.44
+Device IP: <LAN_IP>
 
 ## Authorization
 Controller Decision = A: authorize ONE first-use pairing for the freshly-installed

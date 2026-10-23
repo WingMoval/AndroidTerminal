@@ -1,4 +1,4 @@
-// AT.CLI-0.1 â€” pure-JVM unit tests for AdbCliArgs (parser + quoting).
+// AT.CLI-0.1 â€?pure-JVM unit tests for AdbCliArgs (parser + quoting).
 //
 // These run on the host (no device) so quoting/serialization bugs are caught
 // without real-device round-trips. The real remote-shell behavior is separately
@@ -185,10 +185,10 @@ class AdbCliArgsTest {
     @Test
     fun parsePairIpv6Host() {
         // host with a colon is still parsed (last colon separates port).
-        val r = AdbCliParseResult.parse(arrayOf("pair", "192.168.137.44:38619", "738710"))
+        val r = AdbCliParseResult.parse(arrayOf("pair", "<LAN_IP>:38619", "738710"))
         assertEquals(AdbCliParseResult.Kind.PAIR, r.kind)
         assertEquals(0, r.exitCode)
-        assertEquals("192.168.137.44", r.pairHost)
+        assertEquals("<LAN_IP>", r.pairHost)
         assertEquals(38619, r.pairPort)
         assertEquals("738710", r.pairCode)
     }

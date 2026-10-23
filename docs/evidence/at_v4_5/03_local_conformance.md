@@ -1,12 +1,12 @@
-AT.V4-5 â€” Conformance Device Evidence
+AT.V4-5 â€?Conformance Device Evidence
 Date: 2026-10-22
 Device: HONOR ALI-AN00 APLMUT4312005935 (Android 15 / SDK 35)
-Device IP: 192.168.137.44
+Device IP: <LAN_IP>
 Conformance host: com.androidterminal.conformance (UID u0_a4xx)
 Identity profile: conformance-identity (self-generated, independent)
 
 ## Installation
-Manual `adb install -r` (NOT Gradle UTP â€” preserves identity/permission/trust):
+Manual `adb install -r` (NOT Gradle UTP â€?preserves identity/permission/trust):
 - at-consumer-conformance-host-debug.apk
 - at-consumer-conformance-host-debug-androidTest.apk
 
@@ -14,7 +14,7 @@ Manual `adb install -r` (NOT Gradle UTP â€” preserves identity/permission/trust)
 The conformance host owns an INDEPENDENT app-private identity
 (files/conformance-identity), distinct from Product (adb_identity) and
 ConsumerHost (at-cli-identity). Its first device trust was established via the
-canonical public composition facade (adbControl.pairDiscovered) â€” NOT by copying
+canonical public composition facade (adbControl.pairDiscovered) â€?NOT by copying
 the Product key, NOT via PC adb.
 
 ```

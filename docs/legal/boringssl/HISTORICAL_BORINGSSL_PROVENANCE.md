@@ -14,7 +14,7 @@
 | **Source** | BoringSSL from source (not from NDK sysroot) |
 | **Build method** | NDK Clang cross-compile, arm64-v8a |
 | **Compiler** | Clang 18.0.1 (NDK r27, Android 12027248, LLVM d8003a45) |
-| **Initial build** | ssl/ only (38 files) â†’ incomplete |
+| **Initial build** | ssl/ only (38 files) â†?incomplete |
 | **Rebuild** | ssl/ + crypto/ (283 files) + gen/crypto/err_data.cc |
 | **Initial size** | 33.7 MB (documented) |
 | **Final size** | 4,343,398 bytes (4.14 MB) |
@@ -23,7 +23,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Original path** | `C:\Users\Wing\AppData\Local\Temp\opencode\boringssl-android15\` |
+| **Original path** | `<USER_HOME>\AppData\Local\Temp\opencode\boringssl-android15\` |
 | **Evidence** | 255 source file paths extracted from DWARF debug info in `libboringssl.a` |
 | **Status** | DELETED (directory no longer exists) |
 | **`.git`** | UNKNOWN (cannot verify; directory removed) |
@@ -56,21 +56,21 @@ V1 (AndroidTerminal)
   libboringssl.a SHA-256: 602A6D6C...
   98 headers + 1 static lib
 
-    â†“  V2 migration (commit a96664e, AT.V2-4A)
+    â†? V2 migration (commit a96664e, AT.V2-4A)
 
 V2 (AndroidTerminal-V2)
   at-core/src/main/cpp/third_party/boringssl/
   libboringssl.a SHA-256: 602A6D6C... (identical)
   98 headers + 1 static lib
 
-    â†“  V4 migration (commit a40387e, AT.V3-1)
+    â†? V4 migration (commit a40387e, AT.V3-1)
 
 V4 (AndroidTerminal-V4)
   adb-engine/src/main/cpp/third_party/boringssl/
   libboringssl.a SHA-256: 602A6D6C... (identical)
   98 headers + 1 static lib
 
-    â†“  V4 freeze (tag AT.V4-CONSUMER-FREEZE-V1, commit 7216d0e)
+    â†? V4 freeze (tag AT.V4-CONSUMER-FREEZE-V1, commit 7216d0e)
 
 Frozen bundle
   dist/AT.V4-CONSUMER-FREEZE-V1/artifacts/adb-engine-debug.aar
@@ -97,7 +97,7 @@ The exact commit cannot be recovered because:
 3. No build log or script was preserved
 4. No version identifier exists in the headers or binary
 
-## 6. 33.7 MB â†’ 4.1 MB
+## 6. 33.7 MB â†?4.1 MB
 
 | Item | Status |
 |------|--------|
@@ -119,5 +119,5 @@ The exact `llvm-strip` or `llvm-ar` command used is **not documented**.
 | Exact upstream commit | Source dir deleted, no .git |
 | Exact build commands | Not documented |
 | Whether CMake or manual compilation | Not documented (283 files + err_data suggests manual) |
-| 33.7 MB â†’ 4.1 MB exact process | No build log |
+| 33.7 MB â†?4.1 MB exact process | No build log |
 | Whether `third_party/fiat` was compiled in | No fiat source paths in DWARF (but may have been stripped) |

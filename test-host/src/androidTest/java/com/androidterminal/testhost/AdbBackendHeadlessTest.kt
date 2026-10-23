@@ -1,7 +1,7 @@
-﻿// Test Host 鈥?ADB Backend headless vertical slice (AT.V3-2, Gates A/B/C).
+// Test Host �?ADB Backend headless vertical slice (AT.V3-2, Gates A/B/C).
 //
-// Independent consumer (no UI). Consumes AT Engine 鈫?ADB Backend 鈫?ADB Engine
-// 鈫?wireless adbd. Uses explicit endpoint + trusted identity (keyDir seeded
+// Independent consumer (no UI). Consumes AT Engine �?ADB Backend �?ADB Engine
+// �?wireless adbd. Uses explicit endpoint + trusted identity (keyDir seeded
 // with the PC adbkey that the device already trusts).
 //
 // This is the HEADLESS verification; the ADBTerminal Dev UI APK is verified
@@ -36,7 +36,7 @@ class AdbBackendHeadlessTest {
 
     // Explicit endpoint: device wireless connect port (find from adbd).
     // Identity: trusted PC adbkey copied into this app's files dir by the
-    // test setup (device already trusts Wing@DESKTOP-PG78M2N).
+    // test setup (device already trusts developer@HOST).
     private val host get() = "127.0.0.1"
     private val port get() = (InstrumentationRegistry.getArguments().getString("port") ?: "38793").toInt()
     private val keyDir get() = InstrumentationRegistry.getArguments().getString("keyDir")
@@ -77,7 +77,7 @@ class AdbBackendHeadlessTest {
     private fun write(s: ATTerminalSession, text: String) { s.write((text + "\n").toByteArray()) }
 
     // ------------------------------------------------------------------
-    // Gate A 鈥?one-shot
+    // Gate A �?one-shot
     // ------------------------------------------------------------------
 
     @Test
@@ -125,7 +125,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Gate B 鈥?persistent remote PTY
+    // Gate B �?persistent remote PTY
     // ------------------------------------------------------------------
 
     @Test
@@ -228,7 +228,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Reader cleanup (AT.V3-2.1 搂11 / 搂24)
+    // Reader cleanup (AT.V3-2.1 §11 / §24)
     // ------------------------------------------------------------------
 
     @Test
@@ -293,7 +293,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Gate C 鈥?concurrent multi-session (AT.V3-2.1)
+    // Gate C �?concurrent multi-session (AT.V3-2.1)
     // ------------------------------------------------------------------
 
     @Test
@@ -493,7 +493,7 @@ class AdbBackendHeadlessTest {
     }
 
     // ------------------------------------------------------------------
-    // Stability (AT.V3-2.1 搂34)
+    // Stability (AT.V3-2.1 §34)
     // ------------------------------------------------------------------
 
     @Test
