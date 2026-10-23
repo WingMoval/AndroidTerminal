@@ -128,10 +128,11 @@ class AppCliExecution : ATCliExecution {
     override fun pair(host: String, port: Int, code: String): ATCliPairingResult {
         val result = toCliResult(AppRuntime.adbControl.pair(host, port, code))
         if (result.success) {
-            // AT.APP-RELEASE-2: CLI pairing also triggers first-use bootstrap
-            // (WRITE_SECURE_SETTINGS self-grant for post-bootstrap Auto-WD).
-            // Previously only PairActivity UI pairing triggered this.
-            AppRuntime.adbControl.completeFirstUseBootstrap()
+            // AT.APP-RELEASE-2.1: CLI pairing triggers first-use bootstrap,
+            // but ONLY after ADB transport is READY (same orchestration as
+            // PairActivity: pair → ensureReady → completeFirstUseBootstrap).
+            // PAIR_SUCCESS does NOT imply TRANSPORT_READY.
+            triggerFirstUseBootstrapAfterReady()
         }
         return result
     }
@@ -139,9 +140,39 @@ class AppCliExecution : ATCliExecution {
     override fun pairDiscovered(code: String): ATCliPairingResult {
         val result = toCliResult(AppRuntime.adbControl.pairDiscovered(code))
         if (result.success) {
-            AppRuntime.adbControl.completeFirstUseBootstrap()
+            triggerFirstUseBootstrapAfterReady()
         }
         return result
+    }
+
+    /**
+     * AT.APP-RELEASE-2.1: Wait for ADB transport READY, then execute first-use
+     * bootstrap (WRITE_SECURE_SETTINGS self-grant) exactly once.
+     *
+     * Mirrors PairActivity's verified V4-4.3 flow:
+     *   pair → ensureReady (blocking) → if READY → completeFirstUseBootstrap
+     *
+     * This is NOT called on every ensureReady — only after a successful pair.
+     * completeFirstUseBootstrap() is idempotent (skips if already granted).
+     */
+    private fun triggerFirstUseBootstrapAfterReady() {
+        try {
+            // Block until ADB transport is READY (mDNS → TLS → ONLINE).
+            // Status lines are discarded here; the CLI bridge's own
+            // ensureReady (on the next command) will handle user-facing status.
+            val ready = AppRuntime.adbControl.ensureReady { /* status consumed by CLI bridge */ }
+            if (ready) {
+                val bootstrap = AppRuntime.adbControl.completeFirstUseBootstrap()
+                android.util.Log.i("AppCliExecution",
+                    "first-use bootstrap after pair: $bootstrap")
+            } else {
+                android.util.Log.w("AppCliExecution",
+                    "first-use bootstrap skipped: ADB not READY after pair")
+            }
+        } catch (t: Throwable) {
+            android.util.Log.w("AppCliExecution",
+                "first-use bootstrap after pair threw", t)
+        }
     }
 
     /** Host mapping: composition semantic result -> CLI semantic result. */
