@@ -193,6 +193,12 @@ class AdbConsumerBootstrap(private val identityDir: String) {
                 state == AdbRuntimeState.ENDPOINT_NOT_FOUND ->
                     AdbBootstrapState.ENDPOINT_NOT_FOUND
                 !hasIdentityForDir(identityDir) -> AdbBootstrapState.PAIRING_REQUIRED
+                // AT.REPAIRING-UX-1: identity exists but pairing metadata is
+                // absent or bound to a different key (fresh install rotated the
+                // key). This is evidence-backed PAIRING_REQUIRED, not the
+                // conservative CONNECT_FAILED.
+                !AdbPairingMetadata(identityDir).isCurrentKeyPaired() ->
+                    AdbBootstrapState.PAIRING_REQUIRED
                 else -> AdbBootstrapState.CONNECT_FAILED
             }
         }
@@ -258,6 +264,11 @@ class AdbConsumerBootstrap(private val identityDir: String) {
             state == AdbRuntimeState.ENDPOINT_NOT_FOUND ->
                 AdbBootstrapState.ENDPOINT_NOT_FOUND
             !hasIdentity() -> AdbBootstrapState.PAIRING_REQUIRED
+            // AT.REPAIRING-UX-1: identity exists but pairing metadata is
+            // absent or bound to a different key (fresh install rotated the
+            // key). Evidence-backed PAIRING_REQUIRED.
+            !AdbPairingMetadata(identityDir).isCurrentKeyPaired() ->
+                AdbBootstrapState.PAIRING_REQUIRED
             else -> AdbBootstrapState.CONNECT_FAILED
         }
     }
@@ -278,12 +289,22 @@ class AdbConsumerBootstrap(private val identityDir: String) {
      */
     fun pair(host: String, port: Int, code: String): AdbPairingResultV2 {
         val r = AdbEngine.pair(host, port, code, identityDir)
-        return AdbPairingResultV2(
+        val result = AdbPairingResultV2(
             success = r.success,
             outcome = if (r.success) AdbPairingResultV2.Outcome.SUCCESS else AdbPairingResultV2.Outcome.REJECTED,
             deviceGuid = r.deviceGuid,
             error = r.error,
         )
+        // AT.REPAIRING-UX-1: on success, persist pairing metadata bound to
+        // the current key fingerprint. This is what makes the NEXT launch
+        // skip pairing (PAIRED_KNOWN) instead of showing PAIRING_REQUIRED.
+        if (r.success) {
+            val fp = AdbPairingMetadata.computeFingerprint(identityDir)
+            if (fp != null) {
+                AdbPairingMetadata(identityDir).markPaired(fp, r.deviceGuid)
+            }
+        }
+        return result
     }
 
     /**

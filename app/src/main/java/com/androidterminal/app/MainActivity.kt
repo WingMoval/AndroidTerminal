@@ -27,6 +27,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
+import com.at.composition.android.ATAdbBootstrapState
 import com.at.composition.android.ATAdbReadinessState
 import com.at.engine.ATSessionEvent
 import com.at.engine.ATSessionState
@@ -299,6 +300,15 @@ class MainActivity : Activity() {
     }
 
     private fun retryAdb() {
+        // AT.REPAIRING-UX-1: if the identity needs pairing (fresh install
+        // generated a new key that was never paired), do NOT blindly
+        // connectAuto. Instead, guide the user to the pairing screen.
+        val bootstrap = AppRuntime.adbControl.bootstrapState()
+        if (bootstrap == ATAdbBootstrapState.PAIRING_REQUIRED) {
+            stateLabel.text = "State: NEEDS PAIRING — 点「配对」按钮"
+            updateAdbStatus()
+            return
+        }
         stateLabel.text = "State: connecting ADB..."
         Thread {
             AppRuntime.adbControl.ensureReady { }
@@ -311,21 +321,33 @@ class MainActivity : Activity() {
 
     private fun updateAdbStatus() {
         val s = AppRuntime.adbState()
-        adbStateLabel.text = when (s) {
-            ATAdbReadinessState.DISCONNECTED -> "ADB: DISCONNECTED"
-            ATAdbReadinessState.CONNECTING -> "ADB: CONNECTING"
-            ATAdbReadinessState.READY -> "ADB: READY"
-            ATAdbReadinessState.CONNECT_FAILED -> "ADB: CONNECT_FAILED"
-            ATAdbReadinessState.ENDPOINT_NOT_FOUND -> "ADB: CONNECT_FAILED"
-            ATAdbReadinessState.USER_ACTION_REQUIRED -> "ADB: USER_ACTION_REQUIRED"
-            ATAdbReadinessState.TRANSPORT_LOST -> "ADB: TRANSPORT_LOST"
-            ATAdbReadinessState.RECOVERING -> "ADB: RECOVERING"
-            ATAdbReadinessState.RECOVERY_FAILED -> "ADB: RECOVERY_FAILED"
+        // AT.REPAIRING-UX-1: use the bootstrap state (which includes
+        // pairing-metadata trust) for the status label. A freshly-generated
+        // key that was never paired now shows "NEEDS PAIRING" instead of
+        // the misleading "CONNECT_FAILED".
+        val bootstrap = AppRuntime.adbControl.bootstrapState()
+        adbStateLabel.text = when {
+            s == ATAdbReadinessState.READY -> "ADB: READY"
+            s == ATAdbReadinessState.CONNECTING -> "ADB: CONNECTING"
+            s == ATAdbReadinessState.RECOVERING -> "ADB: RECONNECTING"
+            s == ATAdbReadinessState.TRANSPORT_LOST -> "ADB: DISCONNECTED"
+            s == ATAdbReadinessState.RECOVERY_FAILED -> "ADB: FAILED"
+            bootstrap == ATAdbBootstrapState.PAIRING_REQUIRED ->
+                "ADB: NEEDS PAIRING"
+            bootstrap == ATAdbBootstrapState.USER_ACTION_REQUIRED_WD ->
+                "ADB: WIRELESS DEBUGGING OFF"
+            bootstrap == ATAdbBootstrapState.ENDPOINT_NOT_FOUND ->
+                "ADB: NO ENDPOINT"
+            else -> "ADB: ${s.name}"
         }
-        // Guidance only while not READY (Wireless Debugging is the user's own
-        // device setting; we never open it).
+        // Guidance only while not READY.
         adbHint.visibility =
             if (s == ATAdbReadinessState.READY) View.GONE else View.VISIBLE
+        // AT.REPAIRING-UX-1: when pairing is needed, make the hint specific.
+        if (bootstrap == ATAdbBootstrapState.PAIRING_REQUIRED &&
+            s != ATAdbReadinessState.READY) {
+            adbHint.text = "此安装需要与无线调试配对。点「配对」按钮，按提示输入 6 位配对码。"
+        }
     }
 
     /** Debug-only (tests): refresh the ADB status label from AdbRuntime. */
