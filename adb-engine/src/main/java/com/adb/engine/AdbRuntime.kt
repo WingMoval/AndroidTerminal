@@ -83,6 +83,23 @@ object AdbRuntime {
     var connectionIntent: AdbConnectionIntent = AdbConnectionIntent.None
         private set
 
+    // AT.TRUST-LOSS-RECOVERY-1: the Runtime (lifecycle owner) observes a
+    // device-side certificate rejection during a Wireless connect and records
+    // it here. This is the client-observable trust-revocation signal — set by
+    // the Runtime, NOT by the UI. Cleared on the next successful connect.
+    @Volatile
+    var lastWirelessConnectTrustRejected: Boolean = false
+        private set
+
+    /**
+     * AT.TRUST-LOSS-RECOVERY-1: test-only setter to simulate a device-side
+     * trust rejection WITHOUT a real device. Product code never calls this;
+     * only unit tests drive the bootstrap projection deterministically.
+     */
+    internal var lastWirelessConnectTrustRejectedForTest: Boolean
+        get() = lastWirelessConnectTrustRejected
+        set(value) { lastWirelessConnectTrustRejected = value }
+
     /** Test-only: override the recovery policy (bounded) for deterministic tests. */
     @Volatile
     var policyOverride: AdbRecoveryPolicy? = null
@@ -718,7 +735,16 @@ object AdbRuntime {
     }
 
     private fun connectOne(host: String, port: Int, keyDir: String): Boolean = try {
-        AdbEngine.connect(host, port, keyDir)
+        val ok = AdbEngine.connect(host, port, keyDir)
+        // AT.TRUST-LOSS-RECOVERY-1: Runtime observes the device-side trust
+        // rejection (client-observable TLS cert rejection). Record it so the
+        // consumer bootstrap can project PAIRING_REQUIRED. Cleared on success.
+        lastWirelessConnectTrustRejected =
+            if (ok) false else AdbEngine.lastConnectTrustRejected()
+        if (lastWirelessConnectTrustRejected) {
+            Log.w(TAG, "connectOne: device rejected our key (trust revocation) $host:$port")
+        }
+        ok
     } catch (t: Throwable) {
         Log.e(TAG, "connect $host:$port threw", t)
         false

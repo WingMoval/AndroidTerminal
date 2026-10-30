@@ -59,6 +59,12 @@ class ATAndroidAdbControl internal constructor(
         ATAdbBootstrapState.from(bootstrap.bootstrapState())
 
     /**
+     * AT.TRUST-LOSS-RECOVERY-1: read-only projection of the Runtime's
+     * trust-rejection observation (device revoked trust for our key).
+     */
+    fun trustRejectedObserved(): Boolean = bootstrap.trustRejectedObserved()
+
+    /**
      * Whether the consumer has usable identity material.
      * First-use pairing is required when this is false.
      */

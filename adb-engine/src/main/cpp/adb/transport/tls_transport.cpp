@@ -63,6 +63,7 @@ bool TlsTransport::startTls(const std::string& cert_pem,
     });
 
     tls::TlsConnection::TlsError err = tls_->DoHandshake();
+    last_tls_error_ = err;
     if (err != tls::TlsConnection::TlsError::Success) {
         LOGE("TlsTransport::startTls: TLS handshake failed (err=%d)",
              static_cast<int>(err));

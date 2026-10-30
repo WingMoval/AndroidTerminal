@@ -127,6 +127,14 @@ bool AdbConnection::waitPostTlsCnxn(std::string* error) {
         if (!readPacket(&rx, &err)) {
             if (error) *error = "post-TLS read failed: " + err;
             LOGE("[C09] RX_CNXN_POST_TLS read failed: %s", err.c_str());
+            // AT.TRUST-LOSS-RECOVERY-1: TLS handshake SUCCEEDED (past TLS_OK) but
+            // the device closed the connection before the post-TLS CNXN. adbd
+            // rejects our certificate (CERTIFICATE_VERIFY_FAILED) after our
+            // handshake completes, then closes the socket — client sees TLS_OK +
+            // post-TLS EOF. This is the trust-revocation signature.
+            last_connect_trust_rejected_ = true;
+            LOGE("[C09] TRUST_REJECTION: TLS OK but device closed before CNXN "
+                 "(device-side certificate rejection / trust revocation)");
             return false;
         }
 
@@ -165,6 +173,9 @@ bool AdbConnection::waitPostTlsCnxn(std::string* error) {
         if (rx.msg.command == static_cast<uint32_t>(AdbCommand::kAuth)) {
             if (error) *error = "NEGOTIATION_ERROR: AUTH received (key not authorized?)";
             LOGE("[C09] NEGOTIATION_ERROR: post-TLS AUTH (arg0=%u)", rx.msg.arg0);
+            // AT.TRUST-LOSS-RECOVERY-1: post-TLS AUTH after a successful TLS
+            // handshake also indicates the device does not accept our key.
+            last_connect_trust_rejected_ = true;
             return false;
         }
 
@@ -188,6 +199,9 @@ bool AdbConnection::connect(const std::string& host, int port,
                             std::string* error) {
     LOGI("[C01] CONNECT_START %s:%d", host.c_str(), port);
     state_ = ConnectionState::Connecting;
+    // AT.TRUST-LOSS-RECOVERY-1: reset the trust-rejection observation for this
+    // attempt (set only by the post-TLS failure paths below).
+    last_connect_trust_rejected_ = false;
 
     // 1. TCP connect.
     if (!transport_->connect(host, port)) {

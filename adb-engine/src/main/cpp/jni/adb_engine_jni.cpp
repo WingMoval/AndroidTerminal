@@ -145,6 +145,16 @@ JNIEXPORT jint JNICALL Java_com_adb_engine_internal_AdbNative_connectionState(
     return ConnectionStateOrdinal(client.connection_state());
 }
 
+// com.adb.engine.internal.AdbNative.lastConnectTrustRejected():boolean
+// AT.TRUST-LOSS-RECOVERY-1: true if the last connect() was rejected by the
+// device at the TLS layer (device no longer trusts our key).
+JNIEXPORT jboolean JNICALL
+Java_com_adb_engine_internal_AdbNative_lastConnectTrustRejected(
+    JNIEnv* /* env */, jobject /* thiz */) {
+    adb::AdbClient& client = ClientExisting();
+    return static_cast<jboolean>(client.last_connect_trust_rejected());
+}
+
 // com.adb.engine.internal.AdbNative.executeShell(String, int):AdbShellResult
 JNIEXPORT jobject JNICALL Java_com_adb_engine_internal_AdbNative_executeShell(
     JNIEnv* env, jobject /* thiz */, jstring j_command, jint j_timeout_ms) {

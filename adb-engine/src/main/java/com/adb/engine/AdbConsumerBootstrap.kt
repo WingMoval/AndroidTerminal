@@ -193,6 +193,9 @@ class AdbConsumerBootstrap(private val identityDir: String) {
                 state == AdbRuntimeState.ENDPOINT_NOT_FOUND ->
                     AdbBootstrapState.ENDPOINT_NOT_FOUND
                 !hasIdentityForDir(identityDir) -> AdbBootstrapState.PAIRING_REQUIRED
+                // AT.TRUST-LOSS-RECOVERY-1: device revoked trust for our key.
+                AdbRuntime.lastWirelessConnectTrustRejected ->
+                    AdbBootstrapState.PAIRING_REQUIRED
                 // AT.REPAIRING-UX-1: identity exists but pairing metadata is
                 // absent or bound to a different key (fresh install rotated the
                 // key). This is evidence-backed PAIRING_REQUIRED, not the
@@ -241,6 +244,14 @@ class AdbConsumerBootstrap(private val identityDir: String) {
         File(identityDir, "adbkey").exists() || File(identityDir, "adbkey.pub").exists()
 
     /**
+     * AT.TRUST-LOSS-RECOVERY-1: read-only projection of the Runtime's
+     * trust-rejection observation. Lets the UI render an honest
+     * "device revoked trust" hint (vs a fresh install) without owning trust
+     * truth — the Runtime is still the lifecycle owner.
+     */
+    fun trustRejectedObserved(): Boolean = AdbRuntime.lastWirelessConnectTrustRejected
+
+    /**
      * Consumer-facing readiness PROJECTION (read-only). Projects AdbRuntime
      * state + identity presence. Does NOT drive the AdbRuntime lifecycle.
      *
@@ -264,6 +275,14 @@ class AdbConsumerBootstrap(private val identityDir: String) {
             state == AdbRuntimeState.ENDPOINT_NOT_FOUND ->
                 AdbBootstrapState.ENDPOINT_NOT_FOUND
             !hasIdentity() -> AdbBootstrapState.PAIRING_REQUIRED
+            // AT.TRUST-LOSS-RECOVERY-1: the Runtime observed a device-side
+            // certificate rejection — the device no longer trusts our key
+            // (user "forgot" the paired client). Local identity + metadata are
+            // still present, but device trust was revoked. Evidence-backed
+            // PAIRING_REQUIRED (re-pair with the SAME key), not a generic
+            // CONNECT_FAILED.
+            AdbRuntime.lastWirelessConnectTrustRejected ->
+                AdbBootstrapState.PAIRING_REQUIRED
             // AT.REPAIRING-UX-1: identity exists but pairing metadata is
             // absent or bound to a different key (fresh install rotated the
             // key). Evidence-backed PAIRING_REQUIRED.

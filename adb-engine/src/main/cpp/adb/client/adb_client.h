@@ -70,6 +70,14 @@ public:
     // AT Core) can project a real state instead of guessing from a bool.
     ConnectionState connection_state() const;
 
+    // AT.TRUST-LOSS-RECOVERY-1: true if the last connect() failed at the TLS
+    // handshake with a device-side certificate rejection (CERTIFICATE_VERIFY_FAILED).
+    // This is the client-observable signal that the device no longer trusts our
+    // key (device-side trust revocation / "forget paired device"). Distinct from
+    // generic network / TLS failures. Valid only immediately after a failed
+    // connect(); cleared on a successful connect.
+    bool last_connect_trust_rejected() const;
+
     // Access the underlying AdbConnection (for state projection).
     // ADB Engine internal use only. May be null when never connected.
     AdbConnection* connection();

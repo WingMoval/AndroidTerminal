@@ -67,6 +67,12 @@ public:
     ConnectionState state() const { return state_; }
     bool isOnline() const { return state_ == ConnectionState::Online; }
 
+    // AT.TRUST-LOSS-RECOVERY-1: true if the last connect() reached a SUCCESSFUL
+    // TLS handshake but then the device closed the connection before sending the
+    // post-TLS CNXN (or sent an AUTH rejection). Client-observable signature of
+    // device-side trust revocation (TLS_OK + post-TLS EOF, NOT a TLS failure).
+    bool last_connect_trust_rejected() const { return last_connect_trust_rejected_; }
+
     // Generic packet I/O (24B header + payload).
     // readPacket: ONE reader at a time. Before ONLINE this is the connect
     // thread; after ONLINE only the AdbStreamHub RX thread may call it.
@@ -121,6 +127,9 @@ private:
 
     // Diagnostic: log full packet trace.
     void tracePacket(const char* dir, const AdbPacket& pkt) const;
+
+    // AT.TRUST-LOSS-RECOVERY-1: trust-rejection observation (see above).
+    bool last_connect_trust_rejected_ = false;
 };
 
 }  // namespace adb

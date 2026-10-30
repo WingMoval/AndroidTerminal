@@ -61,6 +61,12 @@ public:
     bool is_tls() const { return tls_ != nullptr; }
     const std::string& last_error() const { return tcp_.last_error(); }
 
+    // AT.TRUST-LOSS-RECOVERY-1: the TLS handshake result of the last startTls()
+    // call. Lets the caller distinguish a device-side CERTIFICATE_VERIFY_FAILED
+    // (device no longer trusts our key = trust revocation) from a generic
+    // network / TLS failure. Only meaningful after a failed startTls().
+    tls::TlsConnection::TlsError last_tls_error() const { return last_tls_error_; }
+
     // Access the underlying TCP fd (for TlsConnection).
     int tcp_fd() const { return tcp_fd_; }
 
@@ -68,6 +74,7 @@ private:
     int tcp_fd_ = -1;
     TcpTransport tcp_;
     std::unique_ptr<tls::TlsConnection> tls_;
+    tls::TlsConnection::TlsError last_tls_error_ = tls::TlsConnection::TlsError::Success;
 };
 
 }  // namespace adb

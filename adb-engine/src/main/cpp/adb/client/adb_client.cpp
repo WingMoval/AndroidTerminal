@@ -60,6 +60,15 @@ bool AdbClient::connect(const std::string& host, int port) {
     std::string error;
     if (!impl_->connection.connect(host, port, &error)) {
         LOGE("AdbClient::connect: AdbConnection failed: %s", error.c_str());
+        // AT.TRUST-LOSS-RECOVERY-1: surface a device-side certificate rejection
+        // (device no longer trusts our key) as a distinct, client-observable
+        // signal. Do NOT depend on adbd logcat — this comes from our own
+        // BoringSSL handshake result (SSL_R_CERTIFICATE_VERIFY_FAILED).
+        if (impl_->transport.last_tls_error() ==
+            adb::tls::TlsConnection::TlsError::CertificateRejected) {
+            LOGE("AdbClient::connect: device rejected our certificate "
+                 "(trust revocation) — key still valid, device trust removed");
+        }
         return false;
     }
 
@@ -86,6 +95,17 @@ bool AdbClient::is_connected() const {
 
 adb::ConnectionState AdbClient::connection_state() const {
     return impl_->connection.state();
+}
+
+bool AdbClient::last_connect_trust_rejected() const {
+    // AT.TRUST-LOSS-RECOVERY-1: the real trust-rejection signature is
+    // TLS-success + device-closes-before-post-TLS-CNXN, observed by
+    // AdbConnection (the device rejects our cert AFTER our handshake completes,
+    // then closes the socket). A client-side CertificateRejected is a secondary
+    // signal (kept for completeness).
+    return impl_->connection.last_connect_trust_rejected() ||
+           impl_->transport.last_tls_error() ==
+               adb::tls::TlsConnection::TlsError::CertificateRejected;
 }
 
 adb::AdbConnection* AdbClient::connection() {

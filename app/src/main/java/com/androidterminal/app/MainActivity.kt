@@ -346,7 +346,16 @@ class MainActivity : Activity() {
         // AT.REPAIRING-UX-1: when pairing is needed, make the hint specific.
         if (bootstrap == ATAdbBootstrapState.PAIRING_REQUIRED &&
             s != ATAdbReadinessState.READY) {
-            adbHint.text = "此安装需要与无线调试配对。点「配对」按钮，按提示输入 6 位配对码。"
+            // AT.TRUST-LOSS-RECOVERY-1: distinguish "device revoked trust"
+            // (identity still exists, device no longer trusts it) from a
+            // fresh install (no prior pairing). Same remediation — re-pair —
+            // but honest about WHY.
+            adbHint.text = if (AppRuntime.adbControl.trustRejectedObserved()) {
+                "ADB 身份仍在，但设备端信任已被移除（无线调试中已忘记此设备）。" +
+                    "点「配对」按钮，用当前 6 位配对码重新配对（不会重新生成密钥）。"
+            } else {
+                "此安装需要与无线调试配对。点「配对」按钮，按提示输入 6 位配对码。"
+            }
         }
     }
 

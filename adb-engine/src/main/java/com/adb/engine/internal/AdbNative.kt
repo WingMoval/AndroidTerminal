@@ -29,6 +29,9 @@ internal object AdbNative {
     external fun disconnect()
     external fun connectionState(): Int
     external fun executeShell(command: String, timeoutMs: Int): AdbShellResult
+    /** AT.TRUST-LOSS-RECOVERY-1: true if the last connect() was rejected by the
+     *  device at the TLS layer (device no longer trusts our key). */
+    external fun lastConnectTrustRejected(): Boolean
 
     // --- Interactive stream primitive (ADB Engine) ---
     /** Open a service stream on the current connection; returns native handle (>0) or 0. */
@@ -47,4 +50,37 @@ internal object AdbNative {
     // --- Pairing primitive (ADB Engine) ---
     /** One-shot `pair(host, port, code)`; returns structured result string. */
     external fun pair(host: String, port: Int, code: String, keyDir: String): String
+
+    // --- AT.LOCAL-TCP-1A: plain TCP localhost ADB (product core) ---
+    /** Connect to legacy adbd on 127.0.0.1 (no TLS). Idempotent. */
+    external fun connectLocalhost(port: Int, keyDir: String): Boolean
+    /** Run a shell command on the Local TCP connection (hub one-shot). */
+    external fun executeShellLocalhost(command: String): AdbShellResult
+    /** Open an interactive service on the Local TCP connection; returns handle (>0) or 0. */
+    external fun interactiveOpenLocalhost(service: String): Long
+    /** Disconnect the Local TCP connection. */
+    external fun disconnectLocalhost()
+    /** True if the Local TCP transport is ONLINE. */
+    external fun localhostConnected(): Boolean
+    /** Internal diagnostic counters (NOT public product API). */
+    external fun localTcpDebugCounters(): String
+
+    // --- AT.LOCAL-TCP-1C/1D: narrow adbd mode-switch capability ---
+    /**
+     * Request the adbd `tcpip:<port>` DAEMON SERVICE (an ADB OPEN, NOT an
+     * Android shell command) over the current Wireless connection, re-arming
+     * adbd in legacy TCP mode on `port`. Returns "accepted" / "rejected:<reason>".
+     * The Wireless transport dropping right after is EXPECTED (daemon restarts).
+     */
+    external fun requestTcpip(port: Int): String
+
+    // --- AT.LOCAL-TCP-1D (Gate D): symmetric narrow adbd mode-switch ---
+    /**
+     * Request the adbd `usb:` DAEMON SERVICE (an ADB OPEN, NOT an Android shell
+     * command) over the active ADB connection, re-arming adbd in USB mode. This
+     * REMOVES the legacy TCP listener (e.g. :38800) and closes the Local TCP
+     * transport. Returns "accepted" / "rejected:<reason>". The Local transport
+     * dropping right after is EXPECTED (adbd switches to USB mode).
+     */
+    external fun requestUsb(): String
 }
