@@ -59,6 +59,9 @@ add_library(
     # --- AT.V3-2.1: post-ONLINE stream multiplexer (single RX owner) ---
     adb/connection/adb_stream_hub.cpp
 
+    # --- AT.LOCAL-TCP-1A: plain TCP localhost ADB transport ---
+    adb/connection/plain_tcp_connection.cpp
+
     # --- Batch E: Pairing ---
     adb/pairing/pairing_aes_gcm.cpp
     adb/pairing/pairing_auth.cpp

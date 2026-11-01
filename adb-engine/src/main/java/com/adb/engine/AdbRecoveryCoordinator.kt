@@ -58,6 +58,14 @@ class AdbRecoveryCoordinator(
         val keyDir = when (intent) {
             is AdbConnectionIntent.Auto -> intent.keyDir
             is AdbConnectionIntent.Explicit -> intent.keyDir
+            is AdbConnectionIntent.Local -> {
+                // AT.LOCAL-TCP-1B Gate F: a Local intent is NEVER recovered via the
+                // Wireless rediscovery flow (that would create a Local<->Wireless
+                // loop). The Runtime clears the Local active transport and the next
+                // ensureReady re-probes Local, then falls back to Wireless.
+                Log.i(TAG, "recovery: Local intent -> no Wireless recovery (Gate F)")
+                return false
+            }
             is AdbConnectionIntent.None -> {
                 Log.w(TAG, "recovery: no connection intent -> RECOVERY_FAILED")
                 return false

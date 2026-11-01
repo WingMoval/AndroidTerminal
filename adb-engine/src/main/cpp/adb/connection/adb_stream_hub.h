@@ -41,19 +41,24 @@
 #include <unordered_map>
 #include <vector>
 
+#include "adb/connection/adb_packet_transport.h"
 #include "adb_protocol/adb_message.h"
 
 namespace adb {
 
-class AdbConnection;
+class AdbPacketTransport;
 class AdbStreamHub;
 class AdbStream;
 
 // Shared lifetime guard: lets stream handles fail TX safely after the hub /
 // connection has been torn down (alive=false is set during shutdown, before
 // the owning AdbClient may be replaced).
+//
+// AT.LOCAL-TCP-1A: `conn` is the abstract AdbPacketTransport so the same
+// hub/guard works over the Wireless AdbConnection AND the Local TCP
+// PlainTcpAdbConnection (both implement AdbPacketTransport).
 struct AdbConnGuard {
-    AdbConnection* conn = nullptr;
+    AdbPacketTransport* conn = nullptr;
     AdbStreamHub* hub = nullptr;
     std::atomic<bool> alive{true};
 };
@@ -118,10 +123,16 @@ private:
 };
 
 // Owns the single RX owner thread + the stream registry for one ONLINE
-// AdbConnection. Created (and started) by AdbClient right after ONLINE.
+// AdbPacketTransport. Created (and started) by the owner (AdbClient for
+// Wireless, the JNI Local TCP context) right after ONLINE.
+//
+// AT.LOCAL-TCP-1A: the hub is transport-agnostic — it holds an
+// AdbPacketTransport* (implemented by BOTH AdbConnection and
+// PlainTcpAdbConnection), so the Local TCP path reuses this exact stream
+// engine instead of a second, single-stream-only implementation.
 class AdbStreamHub {
 public:
-    explicit AdbStreamHub(AdbConnection* conn);
+    explicit AdbStreamHub(AdbPacketTransport* conn);
     ~AdbStreamHub();
 
     AdbStreamHub(const AdbStreamHub&) = delete;
@@ -143,7 +154,7 @@ public:
                                           bool ack_writes, int timeout_ms,
                                           std::string* error);
 
-    AdbConnection* connection() const { return conn_; }
+    AdbPacketTransport* connection() const { return conn_; }
 
     // Diagnostic: number of live registry entries (Opening/Active).
     size_t registeredStreamCount() const;
@@ -156,7 +167,7 @@ private:
     void failAll(const std::string& reason);
     void unregister(uint32_t local_id);
 
-    AdbConnection* conn_ = nullptr;
+    AdbPacketTransport* conn_ = nullptr;
     std::shared_ptr<AdbConnGuard> guard_;
 
     mutable std::mutex mu_;  // protects slots_ (registry)

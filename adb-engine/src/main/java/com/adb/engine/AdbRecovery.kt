@@ -22,6 +22,14 @@ sealed class AdbConnectionIntent {
         val port: Int,
         val keyDir: String,
     ) : AdbConnectionIntent()
+
+    /**
+     * AT.LOCAL-TCP-1B: Local TCP localhost connection (legacy adbd on the
+     * canonical port). Recovery is NOT the Wireless rediscovery flow — a Local
+     * loss clears the Local active transport and the next ensureReady re-probes
+     * Local, then falls back to Wireless (Gate F).
+     */
+    data class Local(val keyDir: String) : AdbConnectionIntent()
 }
 
 /** Bounded recovery policy. No infinite retry. */

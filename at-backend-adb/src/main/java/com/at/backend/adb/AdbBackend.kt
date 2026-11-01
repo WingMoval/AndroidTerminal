@@ -16,6 +16,7 @@ import com.adb.engine.AdbInteractiveStream
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbShellResult
 import com.adb.engine.AdbShellStatus
+import com.adb.engine.AdbTransportMode
 import com.at.engine.ATExecutionOutcome
 import com.at.engine.ATExecutionRequest
 import com.at.engine.ATExecutionResult
@@ -56,6 +57,13 @@ class AdbOneShotBackend(
      * In the EXPLICIT path (real port > 0) the backend still connects itself.
      */
     private fun ensureConnected(): Boolean {
+        // AT.LOCAL-TCP-1B Gate E: recognize a LOCAL-active connection (the
+        // Local TCP core's ONLINE state is separate from the Wireless
+        // connectionState). The Runtime is the transport selector owner; the
+        // Backend only consumes the decided active transport.
+        if (AdbRuntime.activeTransport == AdbTransportMode.LOCAL && AdbEngine.localhostConnected()) {
+            return true
+        }
         if (AdbEngine.connectionState().isOnline) return true
         if (connection.port > 0) {
             return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
@@ -113,6 +121,10 @@ class AdbPersistentBackend(
 ) : ATPersistentBackend {
 
     private fun ensureConnected(): Boolean {
+        // AT.LOCAL-TCP-1B Gate E: recognize a LOCAL-active connection.
+        if (AdbRuntime.activeTransport == AdbTransportMode.LOCAL && AdbEngine.localhostConnected()) {
+            return true
+        }
         if (AdbEngine.connectionState().isOnline) return true
         if (connection.port > 0) {
             return AdbEngine.connect(connection.host, connection.port, connection.keyDir)
@@ -126,13 +138,19 @@ class AdbPersistentBackend(
             return ATOpenSessionResult.Failure("ADB connect failed for ${connection.host}:${connection.port}")
         }
         // Real remote PTY: empty command after "pty:" (AOSP services.cpp).
-        val stream = AdbEngine.openInteractive("shell,v2,pty:")
+        // AT.LOCAL-TCP-1B Gate E: route by the Runtime's active transport.
+        // LOCAL uses openInteractiveLocalhost, which returns the SAME
+        // AdbInteractiveStream type, so AdbTerminalSession is unchanged (§11).
+        val local = AdbRuntime.activeTransport == AdbTransportMode.LOCAL
+        val stream = if (local) AdbEngine.openInteractiveLocalhost("shell,v2,pty:")
+                     else AdbEngine.openInteractive("shell,v2,pty:")
         if (stream == null) {
-            // OPEN failed. If the transport was previously ONLINE and is now
-            // not, this is a transport loss -> signal AdbRuntime for bounded
-            // connection recovery. The Failure below is returned unchanged
-            // (no session is created; no replay).
-            if (!AdbEngine.connectionState().isOnline) {
+            // OPEN failed. If the active transport was previously ONLINE and is
+            // now not, this is a transport loss -> signal AdbRuntime. The Failure
+            // below is returned unchanged (no session is created; no replay).
+            val activeOnline = if (local) AdbEngine.localhostConnected()
+                               else AdbEngine.connectionState().isOnline
+            if (!activeOnline) {
                 AdbRuntime.onOperationResult(transportLost = true)
             }
             return ATOpenSessionResult.Failure("ADB interactive open failed")

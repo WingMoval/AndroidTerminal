@@ -16,7 +16,10 @@
 #include <chrono>
 #include <cstring>
 
-#include "adb/connection/adb_connection.h"
+// The hub is transport-agnostic: it drives the single RX owner over any
+// AdbPacketTransport. AdbConnection is no longer required here (it is one
+// concrete implementation); the interface header is included by the .h.
+#include "adb/connection/adb_packet_transport.h"
 
 #define LOG_TAG "AndroidTerminalADB"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -24,7 +27,7 @@
 
 namespace adb {
 
-AdbStreamHub::AdbStreamHub(AdbConnection* conn) : conn_(conn) {
+AdbStreamHub::AdbStreamHub(AdbPacketTransport* conn) : conn_(conn) {
     guard_ = std::make_shared<AdbConnGuard>();
     guard_->conn = conn;
     guard_->hub = this;
@@ -69,6 +72,33 @@ void AdbStreamHub::rxLoop() {
         std::string err;
         if (!conn_->readPacket(&pkt, &err)) {
             if (stopping_.load()) break;  // normal teardown (our shutdown)
+            // AT.LOCAL-TCP-1A (idle-survival fix, verified in
+            // AT.RESEARCH-LOCAL-TCP-1.7 on-device): distinguish an idle
+            // receive timeout (no data on the socket within the I/O timeout)
+            // from a REAL transport failure (EOF / ECONNRESET / protocol
+            // error). A PTY terminal can be idle for many seconds; the socket
+            // is still alive. Treating an idle timeout as transport failure
+            // kills the hub (markTransportLost + failAll + break) and breaks
+            // all concurrent streams. On an idle timeout, continue the loop.
+            //
+            // TcpTransport::readExact() uses SO_RCVTIMEO on a (potentially
+            // non-blocking) socket. On a receive timeout the kernel returns
+            // -1 with EITHER errno=ETIMEDOUT ("110: Operation timed out") or
+            // errno=EAGAIN/EWOULDBLOCK ("11: Try again") depending on the fd
+            // flags. BOTH are idle-timeout conditions, NOT transport death.
+            // AT.LOCAL-TCP-1B device finding: the Local TCP path surfaced
+            // "11: Try again" on the idle PTY window, which the 1A
+            // "Operation timed out" check missed -> the hub was wrongly torn
+            // down. Match both.
+            const bool idleTimeout =
+                err.find("Operation timed out") != std::string::npos ||
+                err.find("Try again") != std::string::npos ||
+                err.find("Resource temporarily unavailable") != std::string::npos;
+            if (idleTimeout) {
+                LOGI("[HUB08] RX_IDLE_TIMEOUT: continuing (no data, "
+                     "transport still alive)");
+                continue;
+            }
             LOGE("[HUB02] RX_OWNER_READ_FAIL: %s", err.c_str());
             // AT.V3-2.3: a real transport failure must update the connection's
             // liveness truth so connectionState() no longer reports a stale

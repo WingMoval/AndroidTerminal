@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "adb/connection/adb_packet_transport.h"
 #include "adb/connection/feature_set.h"
 #include "adb/transport/tls_transport.h"
 #include "adb_protocol/adb_message.h"
@@ -36,7 +37,10 @@ enum class ConnectionState {
     Offline,
 };
 
-class AdbConnection {
+// AT.LOCAL-TCP-1A: implements the abstract AdbPacketTransport seam so the
+// shared AdbStreamHub can multiplex streams over this Wireless transport.
+// The 6 interface methods below are marked `override`; behavior is UNCHANGED.
+class AdbConnection : public AdbPacketTransport {
 public:
     explicit AdbConnection(TlsTransport* transport, AdbKeyStore* keys);
     ~AdbConnection();
@@ -57,29 +61,33 @@ public:
     // reconnect and let recovery misjudge readiness. Idempotent; only takes
     // effect when currently Online. (Distinct from disconnect(), which also
     // closes the transport.)
-    void markTransportLost();
+    void markTransportLost() override;
 
     // fd-level shutdown that wakes a thread blocked in readPacket() without
     // closing the socket. Used by the stream hub to stop the single RX owner
     // before disconnect() tears the transport down (AT.V3-2.1).
-    void shutdownSocket();
+    void shutdownSocket() override;
 
     ConnectionState state() const { return state_; }
-    bool isOnline() const { return state_ == ConnectionState::Online; }
+    bool isOnline() const override { return state_ == ConnectionState::Online; }
 
     // AT.TRUST-LOSS-RECOVERY-1: true if the last connect() reached a SUCCESSFUL
     // TLS handshake but then the device closed the connection before sending the
-    // post-TLS CNXN (or sent an AUTH rejection). Client-observable signature of
-    // device-side trust revocation (TLS_OK + post-TLS EOF, NOT a TLS failure).
+    // post-TLS CNXN (or sent an AUTH rejection). This is the client-observable
+    // signature of device-side trust revocation: adbd rejects our certificate
+    // (CERTIFICATE_VERIFY_FAILED) AFTER our TLS handshake completes, then closes
+    // the socket — so the client sees TLS_OK + post-TLS read EOF, NOT a TLS
+    // handshake failure. Distinct from generic network/TLS failures.
     bool last_connect_trust_rejected() const { return last_connect_trust_rejected_; }
+
 
     // Generic packet I/O (24B header + payload).
     // readPacket: ONE reader at a time. Before ONLINE this is the connect
     // thread; after ONLINE only the AdbStreamHub RX thread may call it.
     // writePacket: connection-wide serialized (TX mutex) — multiple logical
     // streams may write full ADB packets concurrently.
-    bool readPacket(AdbPacket* packet, std::string* error);
-    bool writePacket(const AdbPacket& packet, std::string* error);
+    bool readPacket(AdbPacket* packet, std::string* error) override;
+    bool writePacket(const AdbPacket& packet, std::string* error) override;
 
     // Negotiated values.
     uint32_t protocolVersion() const { return protocol_version_; }
@@ -91,7 +99,7 @@ public:
     const FeatureSet& localFeatures() const { return local_features_; }
 
     // Local ID allocation (starts at 1, never 0).
-    uint32_t allocateLocalId();
+    uint32_t allocateLocalId() override;
 
 private:
     bool sendCnxn();

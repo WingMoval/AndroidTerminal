@@ -59,6 +59,40 @@ object AdbRuntime {
     /** WRITE_SECURE_SETTINGS: product capability for post-bootstrap Auto-WD. */
     const val WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS"
 
+    /**
+     * SSOT (AT.LOCAL-TCP-1B Gate C/§6): the single canonical port of the
+     * legacy-mode localhost adbd that the Local TCP transport reaches.
+     *
+     * This is the ONLY place `38800` may be defined. Runtime / JNI / UI /
+     * Backend / tests must reference this constant — never a literal `38800`.
+     * (The 1A JNI `connectLocalhost(port, keyDir)` takes the port as a
+     * parameter; the Runtime feeds it this value.)
+     */
+    const val DEFAULT_LOCAL_ADB_PORT = 38800
+
+    // ---- AT.LOCAL-TCP-1B: active transport selection (Gate B) --------------
+
+    /**
+     * Which ADB transport the Runtime currently routes execution through.
+     * The Runtime is the SINGLE owner of this value (Gate B): neither the
+     * Backend nor the JNI decides it. Default [AdbTransportMode.WIRELESS]
+     * (the v0.4.0 behavior). Invariant: at most ONE of {Wireless, Local} is
+     * active at any time (MAX_ACTIVE_ADB_TRANSPORTS = 1) — enforced by the
+     * connect/switch ordering in [enableLocalTcp] / [disableLocalTcp].
+     */
+    @Volatile
+    var activeTransport: AdbTransportMode = AdbTransportMode.WIRELESS
+        private set
+
+    /**
+     * Test-only: override the Local TCP connect (probe/switch) for deterministic
+     * transport-selection tests without a real device / listener. Production
+     * code must leave this null (the real [AdbEngine.connectLocalhost] is used).
+     * Signature mirrors `AdbEngine.connectLocalhost(port, keyDir)`.
+     */
+    @Volatile
+    var localConnectForTest: ((Int, String) -> Boolean)? = null
+
     @Volatile
     private var appContext: Context? = null
 
@@ -204,15 +238,16 @@ object AdbRuntime {
      */
     fun startTransportObserver() {
         if (!transportObserverRunning.compareAndSet(false, true)) return
-        lastTransportOnline = transportState().isOnline
+        lastTransportOnline = activeTransportOnline()
         val t = Thread({
             while (transportObserverRunning.get()) {
                 try {
-                    val online = transportState().isOnline
+                    val online = activeTransportOnline()
                     if (lastTransportOnline && !online) {
-                        // Edge-triggered: exactly one transition ONLINE -> !ONLINE.
+                        // Edge-triggered: exactly one transition ONLINE -> !ONLINE
+                        // on the ACTIVE transport (Wireless OR Local).
                         if (readinessState() == AdbRuntimeState.READY) {
-                            Log.i(TAG, "transport observer: ONLINE->!ONLINE edge; projecting loss")
+                            Log.i(TAG, "transport observer: active transport ONLINE->!ONLINE edge; projecting loss")
                             onObservedTransportLost()
                         }
                     }
@@ -266,6 +301,18 @@ object AdbRuntime {
     ): AdbRuntimeState {
         // Fast path: already READY.
         if (state == AdbRuntimeState.READY) return AdbRuntimeState.READY
+
+        // AT.LOCAL-TCP-1B Gate C (Local-first probe): try the legacy localhost
+        // adbd ONCE at the canonical port. This is the formal v0.4.1 behavior
+        // for "app restart while a Local listener still exists": connect Local
+        // WITHOUT any Wireless bootstrap. On failure it is NOT fatal and does NOT
+        // block — we fall through to the existing Wireless bootstrap (Gate C /
+        // §15: fresh first-use keeps the v0.4.0 Wireless flow).
+        if (probeLocalFirst(keyDir)) {
+            statusListener("connected (local)")
+            return AdbRuntimeState.READY
+        }
+
         statusListener("checking connection...")
 
         // WD readiness.
@@ -319,6 +366,44 @@ object AdbRuntime {
             Thread.sleep(2_000L)
         }
         if (finalState == AdbRuntimeState.READY) {
+            // AT.LOCAL-TCP-1C (PRECHECK-A fix): after a SUCCESSFUL Wireless
+            // bootstrap, the normal product path attempts ONE automatic
+            // promotion to the preferred steady-state transport (Local TCP).
+            // This is the missing NORMAL-PRODUCT caller for enableLocalTcp
+            // (previously only a test invoked it). Local promotion failure is
+            // NOT a product failure: it leaves the already-usable Wireless
+            // connection intact (no recursion — promotion runs at most once
+            // per ensureReady call).
+            if (activeTransport != AdbTransportMode.LOCAL) {
+                statusListener("switching to local transport...")
+                try {
+                    if (enableLocalTcp(keyDir) { }) {
+                        Log.i(TAG, "ensureReady: automatic promotion WIRELESS -> LOCAL complete")
+                    } else {
+                        // Promotion failed. The `tcpip:` daemon service may have
+                        // torn down the Wireless connection (adbd restart) but
+                        // the Local listener did not come up in time. The app is
+                        // now in TRANSPORT_LOST with NO usable transport.
+                        // Recovery: re-run connectAuto ONCE to re-establish the
+                        // Wireless connection. This is NOT a recursion loop —
+                        // connectAuto does NOT call enableLocalTcp; it only
+                        // does mDNS discovery + TLS connect. If this second
+                        // attempt also fails, we stay in the failed state and
+                        // the next ensureReady (user retry) will re-evaluate.
+                        Log.w(TAG, "ensureReady: local promotion failed; re-establishing Wireless")
+                        statusListener("re-establishing wireless connection...")
+                        val recovery = connectAuto(keyDir)
+                        finalState = readinessState()
+                        if (finalState == AdbRuntimeState.READY) {
+                            Log.i(TAG, "ensureReady: Wireless recovery successful after failed promotion")
+                        } else {
+                            Log.w(TAG, "ensureReady: Wireless recovery also failed: ${recovery.message}")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "ensureReady: local promotion threw (ignored, keeping Wireless)", t)
+                }
+            }
             statusListener("connected")
         } else if (finalState == AdbRuntimeState.USER_ACTION_REQUIRED) {
             statusListener("user action required: enable Wireless Debugging")
@@ -608,13 +693,21 @@ object AdbRuntime {
      * This is NOT a transport loss: no auto-recovery is triggered.
      */
     fun disconnect(): AdbRuntimeDiagnostic = lock.withLock {
+        // Disconnect BOTH transports (whichever is active / stale) so there is
+        // never a leftover active transport after a manual disconnect.
         try {
             AdbEngine.disconnect()
         } catch (t: Throwable) {
             Log.w(TAG, "disconnect threw (ignored)", t)
         }
+        try {
+            AdbEngine.disconnectLocalhost()
+        } catch (t: Throwable) {
+            Log.w(TAG, "disconnectLocalhost threw (ignored)", t)
+        }
         endpointStore?.invalidate()
         connectionIntent = AdbConnectionIntent.None
+        activeTransport = AdbTransportMode.WIRELESS
         setState(AdbRuntimeState.DISCONNECTED)
         // Explicit manual disconnect is NOT a transport loss; stop the observer so
         // it doesn't re-project a loss from a now-disconnected transport.
@@ -648,10 +741,26 @@ object AdbRuntime {
         val intent = connectionIntent
         if (!wasReady || intent is AdbConnectionIntent.None) {
             // Not a "previously READY connection lost" situation; just reflect.
+            if (activeTransport == AdbTransportMode.LOCAL) {
+                // Local was active but is no longer usable: stop claiming it.
+                // (Gate F) The next ensureReady re-probes Local, then falls back
+                // to Wireless. No Local<->Wireless auto loop.
+                activeTransport = AdbTransportMode.WIRELESS
+            }
             setState(AdbRuntimeState.TRANSPORT_LOST)
             return
         }
         setState(AdbRuntimeState.TRANSPORT_LOST)
+        if (intent is AdbConnectionIntent.Local) {
+            // AT.LOCAL-TCP-1B Gate F: a Local transport loss does NOT run the
+            // Wireless recovery coordinator (that would loop Wireless<->Local).
+            // Just stop claiming Local; the next ensureReady re-probes Local and,
+            // if it is gone, falls back to the existing Wireless bootstrap.
+            activeTransport = AdbTransportMode.WIRELESS
+            connectionIntent = AdbConnectionIntent.None
+            Log.i(TAG, "local transport loss; activeTransport -> WIRELESS (fallback on next ensureReady)")
+            return
+        }
         Log.i(TAG, "transport loss detected; starting bounded recovery")
         recover(intent)
     }
@@ -663,6 +772,19 @@ object AdbRuntime {
         setState(AdbRuntimeState.TRANSPORT_LOST)
         recover(intent)
     }
+
+    /**
+     * Test-only: directly set the lifecycle state (model a "Wireless already
+     * READY" precondition without a real device). Production code must NOT call
+     * this; the only production state writer is [setState].
+     */
+    fun setStateForTest(s: AdbRuntimeState) { state = s }
+
+    /**
+     * Test-only: directly set the connection intent (model a precondition).
+     * Production code must NOT call this.
+     */
+    fun setConnectionIntentForTest(i: AdbConnectionIntent) { connectionIntent = i }
 
     private fun recover(intent: AdbConnectionIntent) {
         val coordinator = recoveryCoordinator ?: run {
@@ -685,18 +807,49 @@ object AdbRuntime {
 
     // ---- execution passthrough (ADB-domain; the AT execution path uses these) --
 
-    /** ADB-domain one-shot shell. The AT execution path (ATEngine -> AdbBackend)
-     *  reuses the same ONLINE connection established by this lifecycle. */
+    /**
+     * ADB-domain one-shot shell. The AT execution path (ATEngine -> AdbBackend)
+     * reuses the same ONLINE connection established by this lifecycle.
+     *
+     * AT.LOCAL-TCP-1B Gate E: routed by [activeTransport] — LOCAL goes to the
+     * 1A Local TCP core (`executeShellLocalhost`), WIRELESS to the existing
+     * `executeShell`. The result type (`AdbShellResult`) and semantics are
+     * identical either way; the consumer does not know the difference (§10).
+     */
     fun executeShell(command: String, timeoutMs: Int = 0): AdbShellResult =
-        AdbEngine.executeShell(command, timeoutMs)
+        if (activeTransport == AdbTransportMode.LOCAL) {
+            AdbEngine.executeShellLocalhost(command)
+        } else {
+            AdbEngine.executeShell(command, timeoutMs)
+        }
 
-    /** ADB-domain interactive stream open (remote PTY). */
-    fun openInteractive(service: String): AdbInteractiveStream? = AdbEngine.openInteractive(service)
+    /**
+     * ADB-domain interactive stream open (remote PTY).
+     *
+     * AT.LOCAL-TCP-1B Gate E: routed by [activeTransport] — LOCAL goes to
+     * `openInteractiveLocalhost` (which reuses the SAME [AdbInteractiveStream]
+     * type as Wireless, so the upper `AdbTerminalSession` is unchanged — §11).
+     */
+    fun openInteractive(service: String): AdbInteractiveStream? =
+        if (activeTransport == AdbTransportMode.LOCAL) {
+            AdbEngine.openInteractiveLocalhost(service)
+        } else {
+            AdbEngine.openInteractive(service)
+        }
 
     // ---- diagnostics -------------------------------------------------------
 
     /** Factual transport projection (AdbConnectionState), for diagnostics. */
     fun transportState(): AdbConnectionState = AdbEngine.connectionState()
+
+    /**
+     * AT.LOCAL-TCP-1B: whether the ACTIVE transport (Wireless OR Local) is
+     * currently ONLINE. Used by the transport-loss observer so a Local loss is
+     * detected the same way a Wireless loss is (Gate F).
+     */
+    fun activeTransportOnline(): Boolean =
+        if (activeTransport == AdbTransportMode.LOCAL) AdbEngine.localhostConnected()
+        else AdbEngine.connectionState().isOnline
 
     /** Current lifecycle state (read-only). */
     fun readinessState(): AdbRuntimeState = state
@@ -707,8 +860,11 @@ object AdbRuntime {
     fun resetForTest() = lock.withLock {
         stopTransportObserver()
         try { AdbEngine.disconnect() } catch (_: Throwable) {}
+        try { AdbEngine.disconnectLocalhost() } catch (_: Throwable) {}
         endpointStore?.invalidate()
         connectionIntent = AdbConnectionIntent.None
+        activeTransport = AdbTransportMode.WIRELESS
+        localConnectForTest = null
         state = AdbRuntimeState.DISCONNECTED
     }
 
@@ -748,6 +904,196 @@ object AdbRuntime {
     } catch (t: Throwable) {
         Log.e(TAG, "connect $host:$port threw", t)
         false
+    }
+
+    // ---- AT.LOCAL-TCP-1B: Local TCP transport selection -------------------
+
+    /**
+     * The real Local TCP connect (the 1A core). Routed through
+     * [localConnectForTest] when set (deterministic tests), else the product
+     * [AdbEngine.connectLocalhost] at the canonical [DEFAULT_LOCAL_ADB_PORT].
+     */
+    private fun connectLocal(keyDir: String): Boolean = try {
+        localConnectForTest?.invoke(DEFAULT_LOCAL_ADB_PORT, keyDir)
+            ?: AdbEngine.connectLocalhost(DEFAULT_LOCAL_ADB_PORT, keyDir)
+    } catch (t: Throwable) {
+        Log.e(TAG, "connectLocalhost threw", t)
+        false
+    }
+
+    /**
+     * Gate C — Local-first probe. Attempts ONE Local TCP connect at the canonical
+     * port. On success: [activeTransport]=LOCAL, state=READY, and a [Local]
+     * connection intent is recorded. On failure: returns false WITHOUT touching
+     * the Wireless state (so the caller proceeds to the existing Wireless
+     * bootstrap). No port scan, no random probing, no system-setting change.
+     */
+    private fun probeLocalFirst(keyDir: String): Boolean {
+        val ok = connectLocal(keyDir)
+        if (!ok) return false
+        // A successful probe means the Local listener is alive; activate it.
+        connectionIntent = AdbConnectionIntent.Local(keyDir)
+        activeTransport = AdbTransportMode.LOCAL
+        setState(AdbRuntimeState.READY)
+        Log.i(TAG, "local-first probe: LOCAL active on :$DEFAULT_LOCAL_ADB_PORT")
+        return true
+    }
+
+    /**
+     * Gate D — Wireless -> Local switch. Runtime-orchestrated (NOT inside the
+     * `connectLocalhost` JNI). When Wireless is already READY and a Local
+     * connection is requested:
+     *
+     *   1. request `tcpip:<port>` over the existing Wireless connection (drops
+     *      the Wireless transport / re-arms adbd in legacy TCP mode);
+     *   2. cleanly disconnect the old Wireless client;
+     *   3. connectLocalhost(port); on success activeTransport = LOCAL, READY.
+     *
+     * If the Local connect fails after the switch, the state is left
+     * TRANSPORT_LOST and the NEXT [ensureReady] falls back to the existing
+     * Wireless bootstrap (no Local<->Wireless recovery loop — Gate F).
+     *
+     * @return true when the Local transport is ONLINE and active.
+     */
+    fun enableLocalTcp(keyDir: String, statusListener: (String) -> Unit): Boolean = lock.withLock {
+        if (activeTransport == AdbTransportMode.LOCAL && AdbEngine.localhostConnected()) {
+            // Already Local and ONLINE: idempotent, no re-bootstrap (Gate §8).
+            Log.i(TAG, "enableLocalTcp: already LOCAL and ONLINE (reuse)")
+            setState(AdbRuntimeState.READY)
+            return true
+        }
+        // Step 1: Normalize adbd to a known clean state (USB mode).
+        // Before requesting `tcpip:<port>`, we first request `usb:` to ensure
+        // adbd is in a deterministic non-legacy-TCP state. This handles the
+        // case where `service.adb.tcp.port` is stale (e.g. 38800 from a
+        // previous session) but no actual listener exists — without
+        // normalization, `requestTcpip` may be accepted by adbd but the
+        // listener may not be created because adbd is in an indeterminate
+        // state. `usb:` forces adbd to re-arm in USB mode (KNOWN CLEAN STATE),
+        // so the subsequent `tcpip:<port>` starts from a clean slate.
+        // The Wireless transport dropping due to the `usb:` adbd restart is
+        // EXPECTED and handled by the Wireless recovery in ensureReady.
+        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
+            statusListener("normalizing adbd to USB mode...")
+            try {
+                val usbRes = AdbEngine.requestUsb()
+                Log.i(TAG, "enableLocalTcp: usb normalization -> $usbRes")
+            } catch (t: Throwable) {
+                Log.w(TAG, "enableLocalTcp: usb normalization threw (ignored)", t)
+            }
+            // Clean Wireless teardown after usb: (MAX_ACTIVE_ADB_TRANSPORTS = 1).
+            try { AdbEngine.disconnect() } catch (t: Throwable) {
+                Log.w(TAG, "enableLocalTcp: wireless disconnect after usb threw (ignored)", t)
+            }
+            endpointStore?.invalidate()
+            setState(AdbRuntimeState.CONNECTING)
+            // Re-establish Wireless from the clean USB state so we have a live
+            // connection to send the tcpip: daemon service.
+            statusListener("re-establishing wireless connection...")
+            val recovery = connectAuto(keyDir)
+            if (readinessState() != AdbRuntimeState.READY) {
+                Log.w(TAG, "enableLocalTcp: wireless recovery after usb failed: ${recovery.message}")
+                activeTransport = AdbTransportMode.WIRELESS
+                connectionIntent = AdbConnectionIntent.None
+                setState(AdbRuntimeState.TRANSPORT_LOST)
+                return false
+            }
+        }
+        // Step 2: Request `tcpip:<port>` over the (re-)established Wireless
+        // connection. This is an ADB daemon-service OPEN (NOT a shell command —
+        // AT.LOCAL-TCP-1C PRECHECK-B fix) that re-arms adbd in legacy TCP mode.
+        // Starting from the normalized USB state, adbd reliably binds the
+        // listener on the tcpip: request.
+        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
+            statusListener("switching to local transport...")
+            try {
+                val res = AdbEngine.requestTcpip(DEFAULT_LOCAL_ADB_PORT)
+                Log.i(TAG, "enableLocalTcp: tcpip daemon service request -> $res")
+            } catch (t: Throwable) {
+                Log.w(TAG, "enableLocalTcp: tcpip request threw (ignored)", t)
+            }
+        }
+        // Clean Wireless teardown (MAX_ACTIVE_ADB_TRANSPORTS = 1).
+        try { AdbEngine.disconnect() } catch (t: Throwable) {
+            Log.w(TAG, "enableLocalTcp: wireless disconnect threw (ignored)", t)
+        }
+        endpointStore?.invalidate()
+        setState(AdbRuntimeState.CONNECTING)
+        // Step 3: connect Local. The `tcpip:` daemon service was accepted from
+        // a clean USB state, so adbd should bind the listener quickly.
+        // Bounded retry (6×500ms = ~3s) covers the normal bind window.
+        var ok = false
+        for (attempt in 1..6) {
+            if (connectLocal(keyDir)) { ok = true; break }
+            if (attempt < 6) {
+                try { Thread.sleep(500L) } catch (_: InterruptedException) { break }
+            }
+        }
+        if (ok) {
+            connectionIntent = AdbConnectionIntent.Local(keyDir)
+            activeTransport = AdbTransportMode.LOCAL
+            setState(AdbRuntimeState.READY)
+            Log.i(TAG, "enableLocalTcp: switched WIRELESS -> LOCAL")
+            return true
+        }
+        activeTransport = AdbTransportMode.WIRELESS
+        connectionIntent = AdbConnectionIntent.None
+        setState(AdbRuntimeState.TRANSPORT_LOST)
+        Log.w(TAG, "enableLocalTcp: local connect failed; will fall back to Wireless on next ensureReady")
+        return false
+    }
+
+    /**
+     * Gate G / AT.LOCAL-TCP-1D (Gate E) — disable Local / teardown.
+     *
+     * Formal semantics (1D): when LOCAL is active, request the adbd `usb:`
+     * DAEMON SERVICE (via [AdbEngine.requestUsb] — an ADB OPEN, NOT a shell
+     * command) to re-arm adbd in USB mode. This REMOVES the legacy TCP listener
+     * (e.g. :38800); the Local transport dropping right after is EXPECTED. We
+     * then clean the Local client state and restore [activeTransport] to
+     * WIRELESS. The next [ensureReady] re-enters the normal Wireless flow.
+     *
+     * KEY DISTINCTION: a Terminal Session CLOSE (stream CLSE) must NOT call
+     * [requestUsb] — only this explicit disable path does. Stream close !=
+     * disableLocalTcp.
+     *
+     * It does NOT re-establish Wireless here (that is the existing Wireless
+     * bootstrap flow, driven by the next [ensureReady]).
+     *
+     * NOTE (process lifecycle): if the app is FORCE-STOPPED while Local is
+     * active, the OS kills the process before [disableLocalTcp] can run, so the
+     * listener MAY remain. Only an explicit disable (or device reboot) removes
+     * it. See release notes.
+     */
+    fun disableLocalTcp(): AdbRuntimeDiagnostic = lock.withLock {
+        // Step 1: if LOCAL is active, request adbd `usb:` to remove the legacy
+        // TCP listener (the Local transport drop is expected — adbd -> USB mode).
+        if (activeTransport == AdbTransportMode.LOCAL) {
+            try {
+                val res = AdbEngine.requestUsb()
+                Log.i(TAG, "disableLocalTcp: requestUsb daemon service -> $res")
+            } catch (t: Throwable) {
+                Log.w(TAG, "disableLocalTcp: requestUsb threw (ignored)", t)
+            }
+        }
+        // Step 2: clean the Local client state (expected to already be dropped
+        // after the `usb:` switch; disconnectLocalhost is a safe no-op if so).
+        try { AdbEngine.disconnectLocalhost() } catch (t: Throwable) {
+            Log.w(TAG, "disableLocalTcp: disconnectLocalhost threw (ignored)", t)
+        }
+        endpointStore?.invalidate()
+        activeTransport = AdbTransportMode.WIRELESS
+        if (connectionIntent is AdbConnectionIntent.Local) {
+            connectionIntent = AdbConnectionIntent.None
+        }
+        setState(AdbRuntimeState.DISCONNECTED)
+        Log.i(TAG, "disableLocalTcp: Local transport disabled (listener removed via usb:); activeTransport=WIRELESS")
+        AdbRuntimeDiagnostic(
+            code = "LOCAL_DISABLED",
+            message = "Local TCP transport disabled; adbd re-armed to USB mode",
+            readiness = readiness(),
+            transport = transportState(),
+        )
     }
 
     private fun setState(s: AdbRuntimeState) {

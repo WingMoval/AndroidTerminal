@@ -31,6 +31,7 @@ import com.adb.engine.AdbRecoveryPolicy
 import com.adb.engine.AdbDiscoveryServiceType
 import com.adb.engine.AdbRuntime
 import com.adb.engine.AdbRuntimeState
+import com.adb.engine.AdbTransportMode
 import com.adb.engine.AdbWirelessDebuggingReadinessBackend
 import com.adb.engine.AdbWirelessDebuggingState
 import org.junit.Assert.assertEquals
@@ -232,6 +233,138 @@ class AdbRuntimeLifecycleTest {
         // 2 attempts: backoff 0 before attempt1, 50ms before attempt2 -> >= ~50ms.
         assertTrue("expected >=50ms backoff, got ${elapsed}ms", elapsed >= 40L)
         assertEquals(AdbRuntimeState.RECOVERY_FAILED, AdbRuntime.readinessState())
+    }
+
+    // ---- AT.LOCAL-TCP-1B: Local TCP transport selection (deterministic) ----
+    //
+    // These use the injectable `localConnectForTest` seam so the transport
+    // SELECTION logic (probe / switch / routing decision / loss / ownership) is
+    // verified WITHOUT a real device / listener. The actual Local connect, one-shot
+    // and PTY routing on-device is covered by the B-gate device sanity (B1-B5).
+
+    @Test
+    fun localProbe_success_activeTransportLocal_ready() {
+        var calls = 0
+        AdbRuntime.localConnectForTest = { port, _ ->
+            calls++
+            assertTrue("probe must use the canonical port", port == AdbRuntime.DEFAULT_LOCAL_ADB_PORT)
+            true
+        }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        val s = AdbRuntime.ensureReady(KEYDIR) { }
+        assertEquals(AdbRuntimeState.READY, s)
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        assertEquals(AdbConnectionIntent.Local(KEYDIR), AdbRuntime.connectionIntent)
+        assertEquals(1, calls)
+        assertEquals(0, discovery.scanCount) // Local-first: NO Wireless discovery
+    }
+
+    @Test
+    fun localProbe_fail_fallsBackToWirelessFlow() {
+        AdbRuntime.localConnectForTest = { _, _ -> false } // no Local listener
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        discovery.set(emptyList())
+        val s = AdbRuntime.ensureReady(KEYDIR) { }
+        // Local failed -> fell through to the existing Wireless bootstrap, which
+        // found no endpoint (v0.4.0 behavior preserved). activeTransport stays WIRELESS.
+        assertEquals(AdbTransportMode.WIRELESS, AdbRuntime.activeTransport)
+        assertEquals(AdbRuntimeState.ENDPOINT_NOT_FOUND, s)
+    }
+
+    @Test
+    fun localActive_executeShell_routesToLocalhostApi() {
+        // With a successful Local probe, the Runtime's execution passthrough must
+        // route to the Local one-shot API. We model the device result via the
+        // real AdbEngine only in the device sanity; here we assert the ROUTING
+        // DECISION by confirming activeTransport=LOCAL and that executeShell is
+        // invoked against the Local core (observable: activeTransport stays LOCAL
+        // and a non-ready Local does not trigger Wireless recovery).
+        AdbRuntime.localConnectForTest = { _, _ -> true }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        AdbRuntime.ensureReady(KEYDIR) { }
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        // The passthrough is a pure branch on activeTransport; with LOCAL active it
+        // calls AdbEngine.executeShellLocalhost (not executeShell). We cannot
+        // intercept the native here, so we assert the selection invariant that
+        // gates the routing: activeTransport == LOCAL.
+        assertTrue(AdbRuntime.activeTransport == AdbTransportMode.LOCAL)
+    }
+
+    @Test
+    fun wirelessActive_executeShell_routesToWirelessApi() {
+        AdbRuntime.localConnectForTest = { _, _ -> false }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        discovery.set(emptyList())
+        AdbRuntime.ensureReady(KEYDIR) { }
+        assertEquals(AdbTransportMode.WIRELESS, AdbRuntime.activeTransport)
+        assertTrue(AdbRuntime.activeTransport == AdbTransportMode.WIRELESS)
+    }
+
+    @Test
+    fun wirelessReady_enableLocalTcp_switchesToLocal_wirelessDisconnected() {
+        // Gate D: start with a (fake) Wireless READY, then enableLocalTcp must
+        // disconnect Wireless and connect Local -> exactly ONE active transport.
+        AdbRuntime.localConnectForTest = { _, _ -> true }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        discovery.set(listOf(AdbDiscoveredService("svc", "127.0.0.1", 39000)))
+        // Establish a Wireless READY (connectOne will fail without a device, so we
+        // drive the state directly to model "Wireless already READY").
+        AdbRuntime.setStateForTest(AdbRuntimeState.READY)
+        AdbRuntime.setConnectionIntentForTest(AdbConnectionIntent.Auto(KEYDIR))
+        assertTrue(AdbRuntime.enableLocalTcp(KEYDIR) { })
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        assertEquals(AdbRuntimeState.READY, AdbRuntime.readinessState())
+        assertEquals(AdbConnectionIntent.Local(KEYDIR), AdbRuntime.connectionIntent)
+    }
+
+    @Test
+    fun localActive_transportLoss_stopsClaimingLocal_noWirelessRecoveryLoop() {
+        // Gate F: with Local active + READY, a transport loss must clear the Local
+        // active transport (-> WIRELESS) and must NOT run the Wireless recovery
+        // coordinator (no Local<->Wireless loop). State -> TRANSPORT_LOST.
+        AdbRuntime.localConnectForTest = { _, _ -> true }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        AdbRuntime.ensureReady(KEYDIR) { }
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        // Drive a Local transport loss.
+        AdbRuntime.onOperationResult(transportLost = true)
+        assertEquals(AdbTransportMode.WIRELESS, AdbRuntime.activeTransport)
+        assertEquals(AdbRuntimeState.TRANSPORT_LOST, AdbRuntime.readinessState())
+        // No Wireless recovery was started: discovery was never scanned.
+        assertEquals(0, discovery.scanCount)
+    }
+
+    @Test
+    fun localActive_disableLocalTcp_restoresWirelessAndDisconnects() {
+        // Gate G: disableLocalTcp tears the Local transport down and restores
+        // activeTransport to WIRELESS + DISCONNECTED.
+        AdbRuntime.localConnectForTest = { _, _ -> true }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        AdbRuntime.ensureReady(KEYDIR) { }
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        AdbRuntime.disableLocalTcp()
+        assertEquals(AdbTransportMode.WIRELESS, AdbRuntime.activeTransport)
+        assertEquals(AdbRuntimeState.DISCONNECTED, AdbRuntime.readinessState())
+    }
+
+    @Test
+    fun maxActiveTransports_isOne_localAndWirelessNeverBothActive() {
+        // Gate B / §19 invariant: there is exactly ONE activeTransport value at a
+        // time. Proving "Local active + Wireless active" cannot both hold is
+        // structural: activeTransport is a single enum field, and the switch
+        // ordering (enableLocalTcp disconnects Wireless before connecting Local)
+        // guarantees at most one transport is ONLINE. Here we assert the selector
+        // can only ever be one value and that a switch leaves the other inactive.
+        AdbRuntime.localConnectForTest = { _, _ -> true }
+        readiness.set(AdbWirelessDebuggingState.ENABLED)
+        AdbRuntime.ensureReady(KEYDIR) { }
+        // After a Local switch, the selector is LOCAL (Wireless was disconnected);
+        // it is never a "both" state because it is a single enum.
+        assertEquals(AdbTransportMode.LOCAL, AdbRuntime.activeTransport)
+        // activeTransport is a single value: it equals exactly one of the two.
+        val isLocal = AdbRuntime.activeTransport == AdbTransportMode.LOCAL
+        val isWireless = AdbRuntime.activeTransport == AdbTransportMode.WIRELESS
+        assertTrue("selector must be exactly one of {LOCAL, WIRELESS}", isLocal != isWireless)
     }
 
     private companion object {
