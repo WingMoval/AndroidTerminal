@@ -205,9 +205,10 @@ POST_PAIR_NOTES =
 NEW_ADB_SESSION = PASS
   (User tapped +, selected ADB, session became ACTIVE)
 
-ON_DEMAND_CONNECT_TRIGGERED = PASS
-  (The ADB button tap triggered ensureReady → READY; session creation
-   completed without re-pairing)
+ON_DEMAND_CONNECT_TRIGGERED = PASS  [trigger = ADB button, NOT session creation]
+  (The ADB button tap [btnRetryAdb] triggered ensureReady → READY.
+   The session was then created from the ALREADY-READY state — the session
+   creation itself did NOT trigger the connect from DISCONNECTED.)
 
 MANUAL_RETRY_USED = YES
   (The user tapped the ADB button [btnRetryAdb] to trigger the on-demand
@@ -215,6 +216,16 @@ MANUAL_RETRY_USED = YES
    the user was not "retrying a failure" — they were following the natural
    flow: pair → (not READY) → tap ADB → READY → create session. The ADB
    button is the standard on-demand connect trigger, not a recovery action.)
+
+EVIDENCE_BOUNDARY (corrected by AT.v0.4.1-FRESH-INSTALL-FINDINGS-REVIEW):
+  THIS_ROUND_ADB_BUTTON_CONNECT = DEVICE_VERIFIED
+  THIS_ROUND_SESSION_FROM_READY = DEVICE_VERIFIED
+  THIS_ROUND_SESSION_TRIGGERED_CONNECT_FROM_DISCONNECTED = NOT_TESTED
+  (The canonical capability "New Session → ADB from DISCONNECTED →
+   ensureReady → READY" was VERIFIED ELSEWHERE in
+   AT.ON-DEMAND-ADB-READINESS-VERIFY-1 (SESSION_TRIGGERED_ENSURE_READY =
+   PASS, SESSION_TRIGGERED_CONNECT = PASS). It was NOT re-tested in this
+   black-box round because the user tapped the ADB button first.)
 ```
 
 ### Terminal IO
@@ -288,8 +299,9 @@ APP_RESTART_PAIRING_PROMPT = NO
   (Hint says "未连接 ADB...点 ADB 重试" — NOT "NEEDS PAIRING".
    Identity + pairing metadata preserved.)
 
-RESTART_ON_DEMAND_CONNECT = PASS
-  (User tapped ADB button → READY)
+RESTART_ON_DEMAND_CONNECT = PASS  [trigger = ADB button, NOT session creation]
+  (User tapped ADB button → READY. Session was then created from the
+   ALREADY-READY state.)
 
 RESTART_SESSION_IO = PASS
   (User confirmed: "看到 uid=2000(shell)" after creating new ADB session
@@ -299,6 +311,11 @@ RESTART_MANUAL_RETRY_USED = YES
   (Same as first-use: user tapped ADB button to trigger on-demand connect.
    This is the standard lazy-readiness flow, not a "retry" in the recovery
    sense.)
+
+EVIDENCE_BOUNDARY (corrected by AT.v0.4.1-FRESH-INSTALL-FINDINGS-REVIEW):
+  THIS_ROUND_RESTART_ADB_BUTTON_CONNECT = DEVICE_VERIFIED
+  THIS_ROUND_RESTART_SESSION_FROM_READY = DEVICE_VERIFIED
+  THIS_ROUND_RESTART_SESSION_TRIGGERED_CONNECT_FROM_DISCONNECTED = NOT_TESTED
 ```
 
 ---
@@ -403,7 +420,7 @@ POST_PAIR_STATE = CONNECT_FAILED (Model B: bounded attempt, not READY)
 POST_PAIR_STATUS_CLEAR = YES
 
 NEW_ADB_SESSION = PASS
-ON_DEMAND_CONNECT_TRIGGERED = PASS
+ON_DEMAND_CONNECT_TRIGGERED = PASS  [trigger = ADB button]
 SESSION_IO = PASS
 SHELL_UID = 2000(shell)
 SHELL_CONTEXT = u:r:shell:s0
@@ -412,9 +429,17 @@ MANUAL_RETRY_REQUIRED_FOR_FIRST_USE = YES (user tapped ADB button post-pair;
   low friction, natural action)
 
 POST_RELAUNCH_STATE = ADB: DISCONNECTED
-RESTART_ON_DEMAND_CONNECT = PASS
+RESTART_ON_DEMAND_CONNECT = PASS  [trigger = ADB button]
 RESTART_SESSION_IO = PASS
 RESTART_MANUAL_RETRY_USED = YES (standard lazy-readiness flow)
+
+EVIDENCE_BOUNDARY (AT.v0.4.1-FRESH-INSTALL-FINDINGS-REVIEW):
+THIS_ROUND_ADB_BUTTON_CONNECT = DEVICE_VERIFIED
+THIS_ROUND_SESSION_FROM_READY = DEVICE_VERIFIED
+THIS_ROUND_SESSION_TRIGGERED_CONNECT_FROM_DISCONNECTED = NOT_TESTED
+CANONICAL_SESSION_TRIGGERED_READINESS = VERIFIED_ELSEWHERE
+  (AT.ON-DEMAND-ADB-READINESS-VERIFY-1: SESSION_TRIGGERED_ENSURE_READY = PASS,
+   SESSION_TRIGGERED_CONNECT = PASS)
 
 FIRST_LAUNCH_CONFUSION = LOW
 POST_PAIR_CONFUSION = LOW
