@@ -93,6 +93,47 @@ object AdbRuntime {
     @Volatile
     var localConnectForTest: ((Int, String) -> Boolean)? = null
 
+    /**
+     * Test-only: override the stale adbd state detection for deterministic
+     * stale-guard tests. Production code must leave this null (the real
+     * [detectStaleAdbdState] is used). Returns true to simulate the exact
+     * stale signature (property=38800 AND listener absent).
+     */
+    @Volatile
+    var detectStaleForTest: (() -> Boolean)? = null
+
+    /**
+     * Test-only: count requestUsb calls for one-cycle gate verification.
+     * Production code must leave this null.
+     */
+    @Volatile
+    var requestUsbCallCounterForTest: java.util.concurrent.atomic.AtomicInteger? = null
+
+    /**
+     * Test-only: override the normalization (requestUsb + disconnect +
+     * connectAuto) for deterministic tests. Production code must leave this
+     * null (the real [normalizeAndReconnect] is used).
+     * Returns true if Wireless is READY after normalization.
+     */
+    @Volatile
+    var normalizeForTest: ((String, (String) -> Unit) -> Boolean)? = null
+
+    /**
+     * Test-only: override the transport state check in enableLocalTcp.
+     * Production code must leave this null (the real
+     * `AdbEngine.connectionState().isOnline` is used).
+     */
+    @Volatile
+    var transportOnlineForTest: (() -> Boolean)? = null
+
+    /**
+     * Test-only: override the Local connect (retry loop) for deterministic
+     * stale-guard tests. Production code must leave this null (the real
+     * 6×500ms [connectLocal] retry is used).
+     */
+    @Volatile
+    var localConnectResultForTest: Boolean? = null
+
     @Volatile
     private var appContext: Context? = null
 
@@ -865,6 +906,11 @@ object AdbRuntime {
         connectionIntent = AdbConnectionIntent.None
         activeTransport = AdbTransportMode.WIRELESS
         localConnectForTest = null
+        detectStaleForTest = null
+        normalizeForTest = null
+        requestUsbCallCounterForTest = null
+        transportOnlineForTest = null
+        localConnectResultForTest = null
         state = AdbRuntimeState.DISCONNECTED
     }
 
@@ -955,6 +1001,9 @@ object AdbRuntime {
      *   - property != 38800 + no listener  → unrelated, proceed directly
      */
     private fun detectStaleAdbdState(): Boolean {
+        // Test hook: deterministic override for stale-guard tests.
+        detectStaleForTest?.let { return it() }
+
         // Check 1: read the property via the live Wireless ADB connection.
         var portValue = ""
         try {
@@ -1017,7 +1066,11 @@ object AdbRuntime {
         keyDir: String,
         statusListener: (String) -> Unit
     ): Boolean {
+        // Test hook: deterministic override for normalization tests.
+        normalizeForTest?.let { return it(keyDir, statusListener) }
+
         // Step 1: requestUsb — re-arm adbd in USB mode.
+        requestUsbCallCounterForTest?.incrementAndGet()
         try {
             val usbRes = AdbEngine.requestUsb()
             Log.i(TAG, "normalizeAndReconnect: requestUsb -> $usbRes")
@@ -1064,7 +1117,11 @@ object AdbRuntime {
      * @return true when the Local transport is ONLINE and active.
      */
     fun enableLocalTcp(keyDir: String, statusListener: (String) -> Unit): Boolean = lock.withLock {
-        if (activeTransport == AdbTransportMode.LOCAL && AdbEngine.localhostConnected()) {
+        // Test hook: override the LOCAL+connected check to avoid JNI calls.
+        val isLocalAndOnline = transportOnlineForTest?.let {
+            activeTransport == AdbTransportMode.LOCAL && it()
+        } ?: (activeTransport == AdbTransportMode.LOCAL && AdbEngine.localhostConnected())
+        if (isLocalAndOnline) {
             // Already Local and ONLINE: idempotent, no re-bootstrap (Gate §8).
             Log.i(TAG, "enableLocalTcp: already LOCAL and ONLINE (reuse)")
             setState(AdbRuntimeState.READY)
@@ -1086,7 +1143,9 @@ object AdbRuntime {
         //
         // The normalization is bounded: at most ONE requestUsb + reconnect
         // cycle. If the reconnection fails, we settle to TRANSPORT_LOST.
-        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
+        val isOnline = transportOnlineForTest?.let { it() }
+            ?: AdbEngine.connectionState().isOnline
+        if (state == AdbRuntimeState.READY && isOnline) {
             val stale = detectStaleAdbdState()
             if (stale) {
                 Log.w(TAG, "enableLocalTcp: stale adbd state detected (port=38800, no listener); normalizing")
@@ -1109,7 +1168,7 @@ object AdbRuntime {
         // Direct promotion (no requestUsb in normal path): verified 4/4 on
         // HONOR ALI-AN00 / Android 15. The tcpip: request from a clean adbd
         // state reliably creates the listener.
-        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
+        if (state == AdbRuntimeState.READY && isOnline) {
             statusListener("switching to local transport...")
             try {
                 val res = AdbEngine.requestTcpip(DEFAULT_LOCAL_ADB_PORT)
@@ -1119,20 +1178,29 @@ object AdbRuntime {
             }
         }
         // Clean Wireless/USB teardown (MAX_ACTIVE_ADB_TRANSPORTS = 1).
-        try { AdbEngine.disconnect() } catch (t: Throwable) {
-            Log.w(TAG, "enableLocalTcp: old transport disconnect threw (ignored)", t)
+        val localResult = localConnectResultForTest
+        if (localResult != null) {
+            // Test path: deterministic, no JNI calls.
+            setState(AdbRuntimeState.CONNECTING)
+        } else {
+            try { AdbEngine.disconnect() } catch (t: Throwable) {
+                Log.w(TAG, "enableLocalTcp: old transport disconnect threw (ignored)", t)
+            }
+            endpointStore?.invalidate()
+            setState(AdbRuntimeState.CONNECTING)
         }
-        endpointStore?.invalidate()
-        setState(AdbRuntimeState.CONNECTING)
         // Step 2: connect Local. The `tcpip:` daemon service was accepted, so
         // adbd should bind the listener quickly. Bounded retry (6×500ms = ~3s)
         // covers the normal bind window.
-        var ok = false
-        for (attempt in 1..6) {
-            if (connectLocal(keyDir)) { ok = true; break }
-            if (attempt < 6) {
-                try { Thread.sleep(500L) } catch (_: InterruptedException) { break }
+        val ok = if (localResult != null) localResult else {
+            var result = false
+            for (attempt in 1..6) {
+                if (connectLocal(keyDir)) { result = true; break }
+                if (attempt < 6) {
+                    try { Thread.sleep(500L) } catch (_: InterruptedException) { break }
+                }
             }
+            result
         }
         if (ok) {
             connectionIntent = AdbConnectionIntent.Local(keyDir)

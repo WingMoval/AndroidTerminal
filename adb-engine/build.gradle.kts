@@ -44,6 +44,10 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
