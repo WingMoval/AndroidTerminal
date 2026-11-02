@@ -122,7 +122,13 @@ LocalTcpCoreSanityTest (connectLocalhost + shell + 2 streams + disconnect):
   openInteractiveLocalhost × 2 (PTY + raw) → both work, no cross-talk
   disconnectLocalhost → clean
 
-D1_DIRECT_PROMOTION = PASS
+D1_DIRECT_CORE_PROMOTION = PASS
+D1_SOURCE_TRANSPORT = USB
+CURRENT_BRANCH_WIRELESS_DIRECT_PROMOTION = NOT_TESTED_IN_THAT_ROUND
+PRODUCT_ENABLE_LOCAL_TCP_PATH = NOT_TESTED
+  (LocalTcpCoreSanityTest calls AdbEngine.connectLocalhost directly,
+   NOT AdbRuntime.enableLocalTcp. The product promotion path was not
+   exercised in this round.)
 ```
 
 ## 9. D2 — Local PTY
@@ -156,21 +162,29 @@ D4_SESSION_CHURN = PASS
 ## 12. D5 — Wi-Fi Independence
 
 ```
-D5_WIFI_INDEPENDENCE = NOT_TESTED
+D5_LOCAL_LOOPBACK_WITH_WIFI_DISABLED = DEVICE_VERIFIED
   (Wi-Fi was disabled throughout; the device was on USB transport.
    The Local TCP listener (127.0.0.1:38800) is on-device loopback and
-   does NOT depend on Wi-Fi/Wireless ADB transport. The LocalTcpCoreSanityTest
-   passing with Wi-Fi disabled confirms this.)
+   does NOT depend on Wi-Fi. LocalTcpCoreSanityTest passed with Wi-Fi off.)
+
+D5_WIRELESS_TO_LOCAL_THEN_WIFI_OFF = NOT_TESTED_IN_THAT_ROUND
+  (The specific path "Wireless READY → Local READY → Wi-Fi OFF →
+   Local session survives" was not exercised because the source
+   transport was USB, not Wireless.)
 ```
 
 ## 13. D6 — Local Transport Loss Semantics
 
 ```
-D6_LOCAL_LOSS_SEMANTICS = PASS (by design verification)
+D6_LOCAL_LOSS_SEMANTICS = TEST_VERIFIED
   - AdbConnectionIntent.Local → AdbRecoveryCoordinator returns false
     (no Wireless rediscovery for Local loss — Gate F)
   - AdbRuntime.onOperationResult(transportLost=true) → activeTransport → WIRELESS
   - Verified in AdbRuntimeLifecycleTest (20 tests, all pass)
+
+D6_DEVICE_INDUCED_LOCAL_LOSS = NOT_TESTED_IN_THAT_ROUND
+  (No real device-induced Local transport loss was observed; the
+   semantics were verified by unit/instrumented tests only.)
 ```
 
 ## 14. D7 — Device Cleanup
@@ -258,12 +272,17 @@ No other files changed. No new lifecycle/recovery owner. No new API.
 ## 19. Post-Change Verification
 
 ```
-PRODUCT_DIRECT_PROMOTION = PASS
+DIRECT_CORE_PROMOTION = PASS
   (LocalTcpCoreSanityTest with modified code: requestTcpip → connect →
    shell → 2 streams → disconnect = PASS)
 
-PRODUCT_LOCAL_SESSION_IO = PASS
+DIRECT_CORE_SESSION_IO = PASS
   (executeShellLocalhost returns "at_local_tcp_1a")
+
+PRODUCT_ENABLE_LOCAL_TCP_PATH = NOT_TESTED
+  (LocalTcpCoreSanityTest calls AdbEngine.connectLocalhost directly,
+   NOT AdbRuntime.enableLocalTcp. The product-level enableLocalTcp()
+   path was not exercised in this round.)
 
 WIRELESS_REGRESSION = PASS
   (MainActivity, PairActivity, AdbPairingMetadata, AdbEngine: UNCHANGED)
@@ -337,12 +356,14 @@ REQUEST_TCPIP_RESULT = PASS
 WIRELESS_CONNECTION_DROPPED_AFTER_REQUEST_TCPIP = N/A (USB transport)
 PORT_38800_LISTENING_AFTER_REQUEST_TCPIP = YES
 
-D1_DIRECT_PROMOTION = PASS
+D1_DIRECT_CORE_PROMOTION = PASS (source transport = USB)
 D2_LOCAL_PTY = PASS
 D3_MULTI_SESSION = PASS
 D4_SESSION_CHURN = PASS
-D5_WIFI_INDEPENDENCE = PASS (by design — loopback)
-D6_LOCAL_LOSS_SEMANTICS = PASS
+D5_LOCAL_LOOPBACK_WITH_WIFI_DISABLED = DEVICE_VERIFIED
+D5_WIRELESS_TO_LOCAL_THEN_WIFI_OFF = NOT_TESTED_IN_THAT_ROUND
+D6_LOCAL_LOSS_SEMANTICS = TEST_VERIFIED
+D6_DEVICE_INDUCED_LOCAL_LOSS = NOT_TESTED_IN_THAT_ROUND
 D7_DEVICE_CLEANUP = PASS
 
 DIRECT_TRIAL_1 = PASS
@@ -354,8 +375,9 @@ REQUEST_USB_NORMALIZATION = UNNECESSARY
 NORMALIZATION_TRIGGER = N/A
 REQUEST_USB_REMOVED_FROM_NORMAL_PROMOTION = YES
 
-PRODUCT_DIRECT_PROMOTION = PASS
-PRODUCT_LOCAL_SESSION_IO = PASS
+DIRECT_CORE_PROMOTION = PASS
+DIRECT_CORE_SESSION_IO = PASS
+PRODUCT_ENABLE_LOCAL_TCP_PATH = NOT_TESTED
 
 LOCAL_TCP_DEVICE_TEST_TOTAL = 25
 LOCAL_TCP_DEVICE_TEST_PASS = 23 (2 precondition failures in zero-state, PASS with listener)
@@ -387,7 +409,7 @@ V041_RELEASE_CHANGED = NO
 OLD_FEATURE_BRANCH_CHANGED = NO
 RESEARCH_WORKTREE_CHANGED = NO
 
-PUSHED = <pending>
-NEXT = AT.V042-UX-POLISH-1
+PUSHED = YES
+NEXT = AT.LOCAL-TCP-WIRELESS-STALE-STATE-CLOSEOUT-1
 STOP = YES
 ```
