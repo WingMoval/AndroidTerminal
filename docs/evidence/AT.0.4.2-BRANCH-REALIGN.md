@@ -203,11 +203,13 @@ V041_WIRELESS_REGRESSION = PASS
 ## 13. Local TCP Regression
 
 ```
-EXISTING_LOCAL_TCP_TESTS = PASS (compiled, device-only)
+EXISTING_LOCAL_TCP_TESTS = COMPILED_NOT_RUN
+LOCAL_TCP_DEVICE_TESTS_EXECUTED = NO
 ```
 
-The Local TCP androidTest files compile successfully. They require a device
-(AT.LOCAL-TCP-DIRECT-PROMOTION-1 will execute them).
+The Local TCP androidTest files compile successfully. They have NOT been
+executed on device (AT.LOCAL-TCP-DIRECT-PROMOTION-1 will execute them).
+Compile success ≠ device execution pass.
 
 ## 14. Old vs New Semantic Comparison
 
@@ -316,7 +318,8 @@ TEST_PASS = 143
 TEST_FAIL = 0
 
 V041_WIRELESS_REGRESSION = PASS
-EXISTING_LOCAL_TCP_TESTS = PASS (compiled, device-only)
+EXISTING_LOCAL_TCP_TESTS = COMPILED_NOT_RUN
+LOCAL_TCP_DEVICE_TESTS_EXECUTED = NO
 ARCHITECTURE_GATE = PASS
 
 BUILD_ADB_ENGINE = PASS
@@ -341,7 +344,7 @@ OLD_FEATURE_DELETED = NO
 V041_TAG_CHANGED = NO
 V041_RELEASE_CHANGED = NO
 
-NEW_BRANCH_PUSHED = <pending>
+NEW_BRANCH_PUSHED = YES (github/feature/local-tcp-v0.4.2 @ 2a64acd)
 FINAL_HEAD = <this commit>
 
 NEXT = AT.LOCAL-TCP-DIRECT-PROMOTION-1
