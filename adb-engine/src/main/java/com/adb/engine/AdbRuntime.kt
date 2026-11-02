@@ -940,6 +940,105 @@ object AdbRuntime {
     }
 
     /**
+     * AT.LOCAL-TCP-CONDITIONAL-NORMALIZATION-1: detect the historical stale
+     * adbd state. This is the EXACT signature from the reboot-recovery
+     * anomaly: `service.adb.tcp.port` indicates TCP mode (38800) but the
+     * actual listener is absent.
+     *
+     * Returns true ONLY when both conditions hold simultaneously:
+     *   1. getprop service.adb.tcp.port == "38800"
+     *   2. 127.0.0.1:38800 is NOT listening (probe fails)
+     *
+     * All other states return false (no normalization):
+     *   - property empty/0 + no listener  → clean state, proceed directly
+     *   - property 38800 + listener present → normal, local-first handles it
+     *   - property != 38800 + no listener  → unrelated, proceed directly
+     */
+    private fun detectStaleAdbdState(): Boolean {
+        // Check 1: read the property via the live Wireless ADB connection.
+        var portValue = ""
+        try {
+            val r = AdbEngine.executeShell("getprop service.adb.tcp.port", 3000)
+            if (!r.hasError) portValue = r.stdout.trim()
+        } catch (t: Throwable) {
+            Log.w(TAG, "detectStaleAdbdState: getprop failed (proceeding directly)", t)
+            return false
+        }
+        if (portValue != DEFAULT_LOCAL_ADB_PORT.toString()) return false
+
+        // Check 2: probe the actual listener.
+        // A successful probe means the listener IS present → NOT stale.
+        // A failed probe means the listener is ABSENT → potentially stale.
+        val listenerAlive = connectLocalProbeOnly()
+        if (listenerAlive) return false
+
+        Log.i(TAG, "detectStaleAdbdState: port=$portValue, listener=ABSENT → STALE")
+        return true
+    }
+
+    /**
+     * Non-destructive probe: attempts a raw TCP connect to 127.0.0.1:38800
+     * WITHOUT registering the connection as the active transport. Used by
+     * [detectStaleAdbdState] to check if the listener exists.
+     *
+     * This is different from [probeLocalFirst] which activates the Local
+     * transport on success. Here we only want to know if the port is open.
+     * A raw socket connect is sufficient — we don't need the ADB protocol.
+     */
+    private fun connectLocalProbeOnly(): Boolean {
+        return try {
+            val socket = java.net.Socket()
+            socket.connect(
+                java.net.InetSocketAddress(
+                    java.net.InetAddress.getLoopbackAddress(), DEFAULT_LOCAL_ADB_PORT
+                ),
+                2000
+            )
+            socket.close()
+            true
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * AT.LOCAL-TCP-CONDITIONAL-NORMALIZATION-1: bounded normalization when
+     * a stale adbd state is detected. This is the RECOVERY path only — it
+     * does NOT run on the normal fast path.
+     *
+     * Steps:
+     *   1. requestUsb (re-arm adbd in USB mode — KNOWN CLEAN STATE)
+     *   2. disconnect (clean teardown of the old Wireless connection)
+     *   3. connectAuto (re-establish Wireless)
+     *
+     * Returns true if Wireless is READY after normalization.
+     */
+    private fun normalizeAndReconnect(
+        keyDir: String,
+        statusListener: (String) -> Unit
+    ): Boolean {
+        // Step 1: requestUsb — re-arm adbd in USB mode.
+        try {
+            val usbRes = AdbEngine.requestUsb()
+            Log.i(TAG, "normalizeAndReconnect: requestUsb -> $usbRes")
+        } catch (t: Throwable) {
+            Log.w(TAG, "normalizeAndReconnect: requestUsb threw (ignored)", t)
+        }
+        // Step 2: clean Wireless teardown.
+        try { AdbEngine.disconnect() } catch (t: Throwable) {
+            Log.w(TAG, "normalizeAndReconnect: disconnect threw (ignored)", t)
+        }
+        endpointStore?.invalidate()
+        setState(AdbRuntimeState.CONNECTING)
+        // Step 3: re-establish Wireless.
+        statusListener("re-establishing wireless...")
+        connectAuto(keyDir)
+        val ready = readinessState() == AdbRuntimeState.READY
+        Log.i(TAG, "normalizeAndReconnect: wireless re-established = $ready")
+        return ready
+    }
+
+    /**
      * Gate D — Direct promotion: current transport -> Local. Runtime-orchestrated
      * (NOT inside the `connectLocalhost` JNI). When a Local connection is
      * requested:
@@ -971,12 +1070,43 @@ object AdbRuntime {
             setState(AdbRuntimeState.READY)
             return true
         }
+        // Step 0: Pre-request stale guard (AT.LOCAL-TCP-CONDITIONAL-NORMALIZATION-1).
+        //
+        // Historical anomaly: after a device reboot, `service.adb.tcp.port`
+        // may retain the value 38800 while the actual TCP listener is absent
+        // (adbd did not restore the listener from the property). In that state,
+        // `requestTcpip(38800)` may be accepted by adbd but the listener may
+        // not be created because adbd is in an indeterminate state.
+        //
+        // This guard runs BEFORE `requestTcpip` while the Wireless transport
+        // is still alive. It reads the property and probes the listener. Only
+        // the EXACT stale signature (property == 38800 AND listener absent)
+        // triggers normalization. All other states (clean, listener present,
+        // property empty) proceed directly to the fast path.
+        //
+        // The normalization is bounded: at most ONE requestUsb + reconnect
+        // cycle. If the reconnection fails, we settle to TRANSPORT_LOST.
+        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
+            val stale = detectStaleAdbdState()
+            if (stale) {
+                Log.w(TAG, "enableLocalTcp: stale adbd state detected (port=38800, no listener); normalizing")
+                statusListener("normalizing adbd state...")
+                val normalized = normalizeAndReconnect(keyDir, statusListener)
+                if (!normalized) {
+                    Log.w(TAG, "enableLocalTcp: normalization failed; settling to TRANSPORT_LOST")
+                    activeTransport = AdbTransportMode.WIRELESS
+                    connectionIntent = AdbConnectionIntent.None
+                    setState(AdbRuntimeState.TRANSPORT_LOST)
+                    return false
+                }
+            }
+        }
         // Step 1: Request `tcpip:<port>` over the existing ADB connection
         // (USB or Wireless). This is an ADB daemon-service OPEN (NOT a shell
         // command — AT.LOCAL-TCP-1C PRECHECK-B fix) that re-arms adbd in
         // legacy TCP mode and binds the listener on the given port.
         //
-        // Direct promotion (no requestUsb normalization): verified 3/3 on
+        // Direct promotion (no requestUsb in normal path): verified 4/4 on
         // HONOR ALI-AN00 / Android 15. The tcpip: request from a clean adbd
         // state reliably creates the listener.
         if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
