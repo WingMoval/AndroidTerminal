@@ -940,14 +940,23 @@ object AdbRuntime {
     }
 
     /**
-     * Gate D — Wireless -> Local switch. Runtime-orchestrated (NOT inside the
-     * `connectLocalhost` JNI). When Wireless is already READY and a Local
-     * connection is requested:
+     * Gate D — Direct promotion: current transport -> Local. Runtime-orchestrated
+     * (NOT inside the `connectLocalhost` JNI). When a Local connection is
+     * requested:
      *
-     *   1. request `tcpip:<port>` over the existing Wireless connection (drops
-     *      the Wireless transport / re-arms adbd in legacy TCP mode);
-     *   2. cleanly disconnect the old Wireless client;
+     *   1. request `tcpip:<port>` over the existing ADB connection (USB or
+     *      Wireless). This is an ADB daemon-service OPEN (NOT a shell command)
+     *      that re-arms adbd in legacy TCP mode and binds the listener.
+     *   2. cleanly disconnect the old ADB client (MAX_ACTIVE_ADB_TRANSPORTS = 1);
      *   3. connectLocalhost(port); on success activeTransport = LOCAL, READY.
+     *
+     * AT.LOCAL-TCP-DIRECT-PROMOTION-1: the previous `requestUsb` normalization
+     * step was removed. Device verification (HONOR ALI-AN00, Android 15, 3/3
+     * clean trials) proved that `requestTcpip` directly from a clean adbd state
+     * reliably binds the 38800 listener without the USB round-trip. The
+     * normalization was a conservative workaround for stale `service.adb.tcp.port`
+     * after reboot; in the clean-state promotion path (the normal product flow)
+     * it is unnecessary.
      *
      * If the Local connect fails after the switch, the state is left
      * TRANSPORT_LOST and the NEXT [ensureReady] falls back to the existing
@@ -962,48 +971,14 @@ object AdbRuntime {
             setState(AdbRuntimeState.READY)
             return true
         }
-        // Step 1: Normalize adbd to a known clean state (USB mode).
-        // Before requesting `tcpip:<port>`, we first request `usb:` to ensure
-        // adbd is in a deterministic non-legacy-TCP state. This handles the
-        // case where `service.adb.tcp.port` is stale (e.g. 38800 from a
-        // previous session) but no actual listener exists — without
-        // normalization, `requestTcpip` may be accepted by adbd but the
-        // listener may not be created because adbd is in an indeterminate
-        // state. `usb:` forces adbd to re-arm in USB mode (KNOWN CLEAN STATE),
-        // so the subsequent `tcpip:<port>` starts from a clean slate.
-        // The Wireless transport dropping due to the `usb:` adbd restart is
-        // EXPECTED and handled by the Wireless recovery in ensureReady.
-        if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
-            statusListener("normalizing adbd to USB mode...")
-            try {
-                val usbRes = AdbEngine.requestUsb()
-                Log.i(TAG, "enableLocalTcp: usb normalization -> $usbRes")
-            } catch (t: Throwable) {
-                Log.w(TAG, "enableLocalTcp: usb normalization threw (ignored)", t)
-            }
-            // Clean Wireless teardown after usb: (MAX_ACTIVE_ADB_TRANSPORTS = 1).
-            try { AdbEngine.disconnect() } catch (t: Throwable) {
-                Log.w(TAG, "enableLocalTcp: wireless disconnect after usb threw (ignored)", t)
-            }
-            endpointStore?.invalidate()
-            setState(AdbRuntimeState.CONNECTING)
-            // Re-establish Wireless from the clean USB state so we have a live
-            // connection to send the tcpip: daemon service.
-            statusListener("re-establishing wireless connection...")
-            val recovery = connectAuto(keyDir)
-            if (readinessState() != AdbRuntimeState.READY) {
-                Log.w(TAG, "enableLocalTcp: wireless recovery after usb failed: ${recovery.message}")
-                activeTransport = AdbTransportMode.WIRELESS
-                connectionIntent = AdbConnectionIntent.None
-                setState(AdbRuntimeState.TRANSPORT_LOST)
-                return false
-            }
-        }
-        // Step 2: Request `tcpip:<port>` over the (re-)established Wireless
-        // connection. This is an ADB daemon-service OPEN (NOT a shell command —
-        // AT.LOCAL-TCP-1C PRECHECK-B fix) that re-arms adbd in legacy TCP mode.
-        // Starting from the normalized USB state, adbd reliably binds the
-        // listener on the tcpip: request.
+        // Step 1: Request `tcpip:<port>` over the existing ADB connection
+        // (USB or Wireless). This is an ADB daemon-service OPEN (NOT a shell
+        // command — AT.LOCAL-TCP-1C PRECHECK-B fix) that re-arms adbd in
+        // legacy TCP mode and binds the listener on the given port.
+        //
+        // Direct promotion (no requestUsb normalization): verified 3/3 on
+        // HONOR ALI-AN00 / Android 15. The tcpip: request from a clean adbd
+        // state reliably creates the listener.
         if (state == AdbRuntimeState.READY && AdbEngine.connectionState().isOnline) {
             statusListener("switching to local transport...")
             try {
@@ -1013,15 +988,15 @@ object AdbRuntime {
                 Log.w(TAG, "enableLocalTcp: tcpip request threw (ignored)", t)
             }
         }
-        // Clean Wireless teardown (MAX_ACTIVE_ADB_TRANSPORTS = 1).
+        // Clean Wireless/USB teardown (MAX_ACTIVE_ADB_TRANSPORTS = 1).
         try { AdbEngine.disconnect() } catch (t: Throwable) {
-            Log.w(TAG, "enableLocalTcp: wireless disconnect threw (ignored)", t)
+            Log.w(TAG, "enableLocalTcp: old transport disconnect threw (ignored)", t)
         }
         endpointStore?.invalidate()
         setState(AdbRuntimeState.CONNECTING)
-        // Step 3: connect Local. The `tcpip:` daemon service was accepted from
-        // a clean USB state, so adbd should bind the listener quickly.
-        // Bounded retry (6×500ms = ~3s) covers the normal bind window.
+        // Step 2: connect Local. The `tcpip:` daemon service was accepted, so
+        // adbd should bind the listener quickly. Bounded retry (6×500ms = ~3s)
+        // covers the normal bind window.
         var ok = false
         for (attempt in 1..6) {
             if (connectLocal(keyDir)) { ok = true; break }
@@ -1033,7 +1008,7 @@ object AdbRuntime {
             connectionIntent = AdbConnectionIntent.Local(keyDir)
             activeTransport = AdbTransportMode.LOCAL
             setState(AdbRuntimeState.READY)
-            Log.i(TAG, "enableLocalTcp: switched WIRELESS -> LOCAL")
+            Log.i(TAG, "enableLocalTcp: direct promotion to LOCAL complete")
             return true
         }
         activeTransport = AdbTransportMode.WIRELESS
