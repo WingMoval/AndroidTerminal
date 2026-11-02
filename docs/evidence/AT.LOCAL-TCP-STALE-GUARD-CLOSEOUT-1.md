@@ -143,10 +143,14 @@ Pre-condition: Local READY (38800 LISTENING)
 Action: svc wifi disable → Wi-Fi IP GONE
 Result: App still shows ADB: READY (Local uses 127.0.0.1:38800, no Wi-Fi)
 Cleanup: svc wifi enable → Wi-Fi restored
+NOTE: Verified that the EXISTING Local session survives Wi-Fi OFF.
+      Did NOT create a NEW ADB session via UI or execute a new `id` command.
+      "ADB: READY" alone does not prove a new session was established.
 ```
 
 ```
-NEW_LOCAL_SESSION_AFTER_WIFI_OFF = PASS
+NEW_LOCAL_SESSION_AFTER_WIFI_OFF = NOT_TESTED
+  (Existing session survival verified; new session creation not performed)
 ```
 
 ## 7. Automated Regression
@@ -260,7 +264,8 @@ NORMAL_DIRECT_REQUEST_USB_CALLS = 0
 NORMAL_FAST_PATH_OVERHEAD = NEGLIGIBLE (~750ms total, no measurable guard delay)
 
 NORMAL_DIRECT_DEVICE_SMOKE = PASS
-NEW_LOCAL_SESSION_AFTER_WIFI_OFF = PASS
+NEW_LOCAL_SESSION_AFTER_WIFI_OFF = NOT_TESTED
+  (Existing session survival verified; new session creation not performed)
 
 TEST_TOTAL = 163
 TEST_PASS = 163

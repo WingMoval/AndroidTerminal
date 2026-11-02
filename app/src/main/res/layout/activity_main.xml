@@ -17,7 +17,7 @@
         android:id="@+id/tvAdbHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="未连接 ADB — 请在 设置→开发者选项→无线调试 开启并配对，然后点 ADB 重试"
+        android:text="ADB 当前未连接。可直接新建 ADB Session，或点「ADB」连接。"
         android:textColor="#808080"
         android:textSize="10sp" />
 

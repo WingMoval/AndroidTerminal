@@ -351,12 +351,18 @@ class MainActivity : Activity() {
             // fresh install (no prior pairing). Same remediation — re-pair —
             // but honest about WHY.
             adbHint.text = if (AppRuntime.adbControl.trustRejectedObserved()) {
-                "ADB 身份仍在，但设备端信任已被移除（无线调试中已忘记此设备）。" +
+                "需要重新配对：设备端信任已被移除（无线调试中已忘记此设备）。" +
                     "点「配对」按钮，用当前 6 位配对码重新配对（不会重新生成密钥）。"
             } else {
-                "此安装需要与无线调试配对。点「配对」按钮，按提示输入 6 位配对码。"
+                "需要与无线调试配对。请先在「开发者选项 → 无线调试」中选择" +
+                    "「使用配对码配对设备」，再点「配对」输入 6 位码。"
             }
+            return
         }
+        // AT.V042-UX-POLISH-1: unified non-READY hint.
+        // DISCONNECTED is a normal lazy state (ADB is on-demand), not an error.
+        // The user does NOT need to pre-connect — New Session triggers ensureReady.
+        adbHint.text = "ADB 当前未连接。可直接新建 ADB Session，或点「ADB」连接。"
     }
 
     /** Debug-only (tests): refresh the ADB status label from AdbRuntime. */
