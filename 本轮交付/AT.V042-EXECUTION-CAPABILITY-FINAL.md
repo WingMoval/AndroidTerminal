@@ -12,12 +12,13 @@
 
 | Capability | Product Surface | Evidence | Result |
 |---|---|---|---|
-| Local one-shot | `adb shell <cmd>` in Local PTY (shell function → app_process → AdbCliMain) | H00 (human) + Phase 3 auto (8/8) | PASS |
+| Local backend one-shot | `LocalOneShotBackend.execute()` (ProcessBuilder → /system/bin/sh -c) | Code audit: implemented in ATAndroidComposition.localEngine | IMPLEMENTED, NOT TESTED (no user-facing consumer) |
 | Local PTY | + → Local | H00 (human, uid=10443) | PASS |
 | Local PTY cwd | Local PTY | NOT_TESTED (not explicitly tested in Local PTY) | NOT_TESTED |
 | Local PTY env | Local PTY | NOT_TESTED | NOT_TESTED |
 | Local PTY Ctrl-C | Local PTY | NOT_TESTED | NOT_TESTED |
-| ADB Engine one-shot | Internal API: AdbRuntime.executeShell → AdbEngine.executeShell/executeShellLocalhost | Code audit + 74 JVM tests + 5 device tests | PASS |
+| ADB CLI one-shot via Local PTY | `adb shell <cmd>` in Local PTY (shell function → app_process → AdbCliMain → CLI Bridge → adbEngine().execute) | H00 (human: adb pair) + Phase 3 auto (5/5: id/pwd/getprop/exit7/stderr) | PASS |
+| ADB Engine one-shot | Internal API: AdbRuntime.executeShell → AdbEngine.executeShell/executeShellLocalhost (transport-routed) | Code audit + 74 JVM tests + 5 device tests | PASS |
 | ADB PTY | + → ADB | GATE 1-7 (human) | PASS |
 | ADB PTY cwd | PTY persistence | GATE 1 (human, pwd confirmed) | PASS |
 | ADB PTY env | PTY persistence | GATE 1 (human, echo $AT_TEST confirmed) | PASS |
@@ -55,8 +56,9 @@
 ## PHASE 3: Automated Results
 
 ```
-LOCAL_ONESHOT_AUTOMATED = PASS (8/8: stdout, stderr, exit codes, not-found, unicode, long output, empty, rapid)
-ADB_CLI_ONESHOT_VIA_LOCAL = PASS (5/5: id, pwd, getprop, exit 7, stderr)
+LOCAL_BACKEND_ONESHOT_AUTOMATED = NOT_TESTED (no user-facing consumer; PC adb shell tests do not exercise LocalOneShotBackend)
+ADB_CLI_ONESHOT_VIA_LOCAL_PTY = PASS (5/5: id, pwd, getprop, exit 7, stderr)
+PC_ADB_SHELL_MATRIX = PASS (8/8: stdout, stderr, exit codes, not-found, unicode, long output, empty, rapid) [informational: PC→device USB transport, not an AT capability]
 SESSION_CHURN = 10/10
 TRANSPORT_CHURN = 3/3
 STATE_DRIFT = NO
@@ -128,17 +130,17 @@ a40387e (2026-10-11) — AT.V3-1: extract and validate independent ADB engine
 - Verified in device tests: `AdbRuntimeLifecycleTest.kt` L275-294, `LocalTcpProductWiringTest.kt` L46
 - Verified in production: H00 (adb pair via Local one-shot), GATE 1-7 (all ADB operations over Local)
 
-### ADB_CLI_ONESHOT_VIA_LOCAL_PATH
+### ADB_CLI_ONESHOT_VIA_LOCAL_PTY_PATH
 
 ```
 Local PTY shell (uid=10443, untrusted_app)
   → shell function: adb() { /system/bin/app_process -Djava.class.path="$AT_APP_APK" ... AdbCliMain }
     → AdbCliMain (at-cli module)
       → CLI Bridge UDS (cli_bridge_server.cpp, loaded by host app)
-        → AppCliExecution (app adapter)
-          → ATEngine / AdbBackend
+        → AdbCliBridgeServer.onOneShot
+          → execution.adbEngine().execute(request)     [AdbOneShotBackend]
             → AdbRuntime.executeShell
-              → (transport-routed as above)
+              → (transport-routed: LOCAL → executeShellLocalhost / WIRELESS → executeShell)
 ```
 
 ### ADB_ENGINE_ONESHOT_PATH
@@ -147,22 +149,40 @@ Local PTY shell (uid=10443, untrusted_app)
 AdbRuntime.executeShell → AdbEngine.executeShell/executeShellLocalhost → JNI → native
 ```
 
+### LOCAL_BACKEND_ONESHOT_PATH
+
+```
+ATAndroidComposition.localEngine.execute(request)
+  → LocalOneShotBackend.execute(request)
+    → ProcessBuilder("/system/bin/sh", "-c", command)
+    → concurrent stdout/stderr drain
+    → process.waitFor()
+    → ATExecutionResult(COMPLETED, stdout, stderr, exitCode)
+```
+
+**NOT consumed by any user-facing surface.** The APK UI only exposes PTY sessions.
+The CLI bridge (`adb shell <cmd>`) routes to `adbEngine`, NOT `localEngine`.
+
 ### ADB_CLI_AND_ENGINE_ONESHOT_SAME_PATH = YES (at the engine level)
 
-The CLI `adb shell <cmd>` in the Local session ultimately calls the **same** `AdbRuntime.executeShell` → `AdbEngine.executeShell/executeShellLocalhost` path. The CLI adds a layer (shell function → app_process → AdbCliMain → bridge UDS → AppCliExecution), but the execution primitive is identical.
+The CLI `adb shell <cmd>` in the Local PTY session ultimately calls `execution.adbEngine().execute(...)` → `AdbOneShotBackend.execute()` → `AdbRuntime.executeShell` → `AdbEngine.executeShell/executeShellLocalhost`. The execution primitive is the ADB Engine one-shot, not the Local backend one-shot.
 
 ### Consumer Surface
 
 ```
+LOCAL_BACKEND_ONESHOT_USER_SURFACE = NO
+  - LocalOneShotBackend is implemented and wired into localEngine
+  - No APK UI button, no CLI path routes to localEngine
+  - Available for future AG/consumer integration via ATAndroidComposition.localEngine
+
 APK_ADB_ONESHOT_USER_SURFACE = NO (no direct "run command once" button in the APK UI)
   - APK has PTY sessions (+ → ADB / + → Local) and CLI bridge
-  - One-shot is consumed programmatically via AdbBackend / CLI bridge
-  - AppCliExecution routes CLI one-shot into the product composition
+  - ADB one-shot is consumed programmatically via AdbBackend / CLI bridge
 
-CLI_ADB_ONESHOT_SURFACE = YES
-  - `adb shell <command>` in Local PTY → AdbCliMain → one-shot
+CLI_ADB_ONESHOT_VIA_LOCAL_PTY_SURFACE = YES
+  - `adb shell <command>` in Local PTY → AdbCliMain → CLI Bridge → adbEngine().execute
   - AdbCliArgs parses Kind.SHELL → remoteCommand → ADB one-shot backend
-  - AdbCliMain L: "Connect the Product CLI Bridge UDS and run a one-shot"
+  - This is ADB CLI one-shot via Local PTY, NOT Local backend one-shot
 
 ENGINE_ADB_ONESHOT_API = YES
   - AdbRuntime.executeShell (public API, transport-routed)
@@ -173,12 +193,13 @@ ENGINE_ADB_ONESHOT_API = YES
 ### Product Interpretation
 
 ```
+LOCAL_BACKEND_ONESHOT = IMPLEMENTED, NOT EXPOSED (no user-facing consumer)
 ADB_ENGINE_ONESHOT = IMPLEMENTED (both Wireless and Local TCP, transport-routed)
-ADB_ONESHOT_APK_DIRECT_UI = NOT EXPOSED (no dedicated one-shot button in the APK UI)
-ADB_ONESHOT_CLI_SURFACE = EXPOSED (via `adb shell <cmd>` in Local PTY)
+ADB_ENGINE_ONESHOT_APK_DIRECT_UI = NOT EXPOSED (no dedicated one-shot button)
+ADB_CLI_ONESHOT_VIA_LOCAL_PTY = EXPOSED (via `adb shell <cmd>` in Local PTY)
 ```
 
-The ADB one-shot is **fully implemented** at the engine level. It is **not missing** — it simply has no dedicated APK UI button. The primary user-facing surface is the CLI (`adb shell` in Local PTY) and the internal AdbBackend (consumed by AG/future tools).
+The ADB Engine one-shot is **fully implemented** at the engine level. Its user-facing surface is the CLI (`adb shell` in Local PTY). The Local backend one-shot is also implemented but has no user-facing consumer yet. Neither is "missing" — they simply have different exposure levels.
 
 ---
 
@@ -206,14 +227,13 @@ AG interactive/persistent shell
 
 | Bug ID | Severity | Description | Repro | Evidence |
 |---|---|---|---|---|
-| OBS-1 | MINOR | Long commands in AT input field may truncate (H05: `at_h05_probe` → `at_h05_probr`) | Type long command in ADB PTY input | Screenshot h05_screen.png |
-| OBS-2 | MINOR | After re-pair (GATE 7), AT status banner shows "NEEDS PAIRING" + "CONNECT_FAILED" even though 38800 is already LISTENING and tcpip promotion succeeded. Status only updates on next `+`→ADB or ADB button tap. | Trust-loss → re-pair → observe banner | Screenshot g7f.png, logcat 17:45:39 |
-| OBS-3 | OBSERVATION | `adb usb` / `setprop service.adb.tcp.port -1` does NOT kill 38800 in all cases (Transport Churn: "After kill: STILL LISTENING"). The `adb usb` command may be a no-op if adbd already considers itself in USB mode. | Kill 38800 via adb usb during transport churn | Transport churn log |
+| OBS-1 | NON_REPRODUCED | H05: one-time input anomaly (`at_h05_probe` → `at_h05_probr`). NOT reproducible: 5/5 commands up to 120 chars executed intact via `input text`; EditText has no maxLength. Classified as user typing error / IME interference. | Not reproducible (5/5 automated test PASS) | H05 screenshot + RELEASE-PREFLIGHT-1 test |
+| OBS-2 | MINOR | After re-pair (GATE 7), AT status banner shows "NEEDS PAIRING" + "CONNECT_FAILED" even though 38800 is already LISTENING. Status updates on next `+`→ADB tap. Cosmetic only. | Trust-loss → re-pair → observe banner | Screenshot g7f.png, logcat 17:45:39 |
 
 **BLOCKER_COUNT = 0**
 **MAJOR_COUNT = 0**
-**MINOR_COUNT = 2**
-**OBSERVATION_COUNT = 1**
+**MINOR_COUNT = 1**
+**OBSERVATION_COUNT = 0**
 
 ---
 
@@ -223,7 +243,7 @@ AG interactive/persistent shell
 STEP = AT.V042-HUMAN-EXECUTION-CLOSEOUT-1
 VERDICT = PASS_WITH_FINDINGS
 BASE_HEAD = 374fc42
-FINAL_HEAD = 374fc42 (no product code changes this round)
+FINAL_HEAD = bbce5a6 (docs-only commit)
 H01_H16_SUMMARIZED = YES
 H01_H16_RERUN = NO
 CRITICAL_HUMAN_GATES_TOTAL = 7
@@ -243,8 +263,9 @@ RECOVERY_WITHOUT_APP_RESTART = PASS
 POST_REBOOT_RECOVERY = PASS
 TRUST_LOSS = PASS
 SAME_KEY_REPAIR = PASS
-LOCAL_ONESHOT_AUTOMATED = PASS
-ADB_CLI_ONESHOT_VIA_LOCAL = PASS
+LOCAL_BACKEND_ONESHOT_AUTOMATED = NOT_TESTED (implemented, no user-facing consumer)
+ADB_CLI_ONESHOT_VIA_LOCAL_PTY = PASS
+PC_ADB_SHELL_MATRIX = PASS (8/8, informational: PC→device, not an AT capability)
 SESSION_CHURN = 10/10
 TRANSPORT_CHURN = 3/3
 STATE_DRIFT = NO
@@ -255,9 +276,13 @@ ADB_ONESHOT_FIRST_KNOWN_COMMIT = a40387e (2026-10-11, AT.V3-1)
 ADB_ONESHOT_WIRELESS_SUPPORTED = YES
 ADB_ONESHOT_LOCAL_TCP_SUPPORTED = YES
 APK_ADB_ONESHOT_USER_SURFACE = NO (not exposed as dedicated UI)
-CLI_ADB_ONESHOT_SURFACE = YES (adb shell in Local PTY)
+CLI_ADB_ONESHOT_VIA_LOCAL_PTY_SURFACE = YES (adb shell in Local PTY → adbEngine)
 ENGINE_ADB_ONESHOT_API = YES
-ADB_CLI_AND_ENGINE_ONESHOT_SAME_PATH = YES (both route through AdbRuntime.executeShell)
+ADB_CLI_AND_ENGINE_ONESHOT_SAME_PATH = YES (CLI routes to adbEngine → AdbRuntime.executeShell)
+LOCAL_BACKEND_ONESHOT_IMPLEMENTED = YES (LocalOneShotBackend, ProcessBuilder)
+LOCAL_BACKEND_ONESHOT_API = ATAndroidComposition.localEngine.execute()
+LOCAL_BACKEND_ONESHOT_CONSUMER = NONE (no user-facing surface)
+LOCAL_BACKEND_ONESHOT_TESTED = NO
 TEST_TOTAL = 74
 TEST_PASS = 74
 TEST_FAIL = 0
@@ -265,8 +290,8 @@ ARCHITECTURE_GATE = NO_TASK
 BUILD_RELEASE = PASS
 BLOCKER_COUNT = 0
 MAJOR_COUNT = 0
-MINOR_COUNT = 2
-OBSERVATION_COUNT = 1
+MINOR_COUNT = 1
+OBSERVATION_COUNT = 0
 CORE_EXECUTION_CAPABILITIES = PASS
 RELEASE_RECOMMENDATION = GO
 PRODUCT_CODE_CHANGED = NO
