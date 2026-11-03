@@ -175,7 +175,8 @@ Impact: Cosmetic only. Functionality is fully restored; banner is stale.
 STEP = AT.V042-RELEASE-PREFLIGHT-1
 VERDICT = PASS
 BASE_HEAD = bbce5a6
-FINAL_HEAD = (docs-only commit)
+PREFLIGHT_COMMIT = 04f9c30
+REMOTE_PUSH = github/feature/local-tcp-v0.4.2 @ 04f9c30
 
 TERMINOLOGY_NORMALIZED = YES
 
