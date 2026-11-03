@@ -16,8 +16,8 @@ PACKAGE = com.androidterminal.app
 
 ```
 PREFLIGHT_COMMIT = 04f9c30
-RELEASE_COMMIT = (this commit)
-TAG_TARGET = RELEASE_COMMIT
+RELEASE_COMMIT = 925e7ac
+TAG_TARGET = 925e7ac
 ```
 
 ## Branch
@@ -25,7 +25,32 @@ TAG_TARGET = RELEASE_COMMIT
 ```
 BRANCH = feature/local-tcp-v0.4.2
 REMOTE = github (https://github.com/WingMoval/AndroidTerminal.git)
-REMOTE_BRANCH_HEAD = 04f9c30 (before release commit)
+REMOTE_BRANCH_HEAD = 925e7ac
+BRANCH_PUSHED = YES
+```
+
+## Tag
+
+```
+TAG = v0.4.2
+TAG_TYPE = annotated
+TAG_CREATED = YES
+TAG_PUSHED = YES
+REMOTE_TAG_OBJECT = fd8fb7c1b472f9bd4e04f207d520c030a15e5d8d
+REMOTE_TAG_TARGET_COMMIT = 925e7ac
+```
+
+## GitHub Release
+
+```
+GITHUB_RELEASE_CREATED = YES
+GITHUB_RELEASE_PUBLISHED = YES
+URL = https://github.com/WingMoval/AndroidTerminal/releases/tag/v0.4.2
+ASSET = AndroidTerminal-v0.4.2-arm64-v8a.apk
+ASSET_SIZE = 4465528
+ASSET_SHA256 = 90cd5e5b37186dc971126698a895f86a4f2992a38952c64b38b8919ebe019b2c
+DOWNLOADED_ASSET_SHA256 = 90CD5E5B37186DC971126698A895F86A4F2992A38952C64B38B8919EBE019B2C
+RELEASE_ASSET_VERIFIED = YES
 ```
 
 ## Product Source Guard
