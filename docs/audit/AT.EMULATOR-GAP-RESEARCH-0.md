@@ -574,7 +574,8 @@ VERDICT = PASS
 PRODUCT_REPO = D:\codebank\AndCode\AndroidTerminal-V4-LOCAL-TCP-042
 BRANCH = feature/local-tcp-v0.4.2
 HEAD = 37b33e3
-WORKTREE = CLEAN (only new docs/audit/ file)
+WORKTREE = DOCS_ONLY_DIRTY
+UNTRACKED = docs/audit/AT.EMULATOR-GAP-RESEARCH-0.md, 本轮交付/AT.EMULATOR-GAP-RESEARCH-0.md
 
 RESEARCH_ROOT = D:\codebank\AndCode\AndroidTerminal\research
 SUBAGENT_USED = NO
