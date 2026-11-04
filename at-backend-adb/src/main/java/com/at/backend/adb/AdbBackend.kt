@@ -102,7 +102,11 @@ class AdbOneShotBackend(
         // dead connection executeShell returns TRANSPORT_ERROR, after which we
         // signal AdbRuntime for bounded connection recovery. The ORIGINAL
         // failure below is returned unchanged 鈥?no transparent command replay.
-        val r = AdbEngine.executeShell(request.command, request.timeoutMs)
+        // AT.LOCAL-TCP-ROUTING-FIX: route through the canonical AdbRuntime
+        // transport selector (LOCAL → executeShellLocalhost, WIRELESS → executeShell).
+        // Previously called AdbEngine.executeShell() directly (Wireless-only JNI),
+        // bypassing the LOCAL/WIRELESS routing.
+        val r = AdbRuntime.executeShell(request.command, request.timeoutMs)
         if (r.status != AdbShellStatus.COMPLETED) {
             AdbRuntime.onOperationResult(transportLost = true)
         }
