@@ -13,7 +13,8 @@
 PRODUCT_REPO = D:\codebank\AndCode\AndroidTerminal-V4-LOCAL-TCP-042
 BRANCH = feature/local-tcp-v0.4.2
 HEAD = 37b33e3
-WORKTREE = CLEAN (only new docs/audit/ file)
+WORKTREE = DOCS_ONLY_DIRTY
+UNTRACKED = docs/audit/AT.EMULATOR-GAP-RESEARCH-0.md, 本轮交付/AT.EMULATOR-GAP-RESEARCH-0.md
 RESEARCH_ROOT = D:\codebank\AndCode\AndroidTerminal\research
 ```
 
@@ -140,7 +141,7 @@ CONFIDENCE = HIGH
 3. Potentially patching for Android-specific issues (no verified Android target exists)
 4. API may break between versions (explicitly unstable)
 
-### Candidate B: Termux terminal-emulator (adapted)
+### Candidate B: Termux-derived terminal-emulator (adapted)
 
 | Aspect | Finding |
 |---|---|
@@ -183,10 +184,11 @@ CONFIDENCE = HIGH
 |---|---|---|---|
 | Protocol correctness | HIGH (mature) | HIGH (mature, production) | MEDIUM (risk) |
 | v0.5 scope coverage | FULL (superset) | FULL (superset) | MUST DESIGN |
-| Android compatibility | UNVERIFIED (Zig build) | **PROVEN** (runs on Android) | **PROVEN** (Java) |
-| Build integration | COMPLEX (Zig + CMake + NDK) | **TRIVIAL** (Java source in module) | **TRIVIAL** (Kotlin source) |
+| Android compatibility | UNVERIFIED (Zig build) | **PROVEN** (runs on Android in production, source-audit evidence) | **PROVEN** (Java) |
+| Build integration | COMPLEX (Zig + CMake + NDK) | HIGHLY_FEASIBLE_FROM_SOURCE_AUDIT (build-unverified in :at-engine) | **TRIVIAL** (Kotlin source) |
 | Runtime dependencies | Zig toolchain (build) | **NONE** | **NONE** |
-| Binary size impact | 1-3 MB .so | **0** (Java) | **0** (Kotlin) |
+| Native binary impact | 1-3 MB .so | **ZERO** | **ZERO** |
+| APK/DEX impact | +.so size | NONZERO, expected modest, not measured | NONZERO, expected modest, not measured |
 | JNI/FFI cost | JNI bridge + C ABI | **NONE** | **NONE** |
 | ScreenState accessibility | Via grid_ref C API | **Direct Java fields** | **Direct Kotlin fields** |
 | Test corpus | Zig tests (not portable) | **20+ Java test classes** | Must write |
@@ -203,13 +205,13 @@ CONFIDENCE = HIGH
 ```
 OQ_EM_02_VERDICT = RESOLVED
 CANDIDATE_A = libghostty-vt (MIT, C-ABI, Zig build, UNSTABLE API, unverified Android)
-CANDIDATE_B = Termux terminal-emulator adapted (Apache 2.0, pure Java, proven, stable)
+CANDIDATE_B = Termux-derived terminal-emulator (Apache 2.0, pure Java, proven in production, stable)
 CANDIDATE_C = Self-written minimal (full control, high cost, high risk)
-RECOMMENDED_APPROACH = B (Termux adapted) with internal interface for future swap
+RECOMMENDED_APPROACH = B (Termux-derived) with internal interface for future swap
 WHY = 
   1. PROVEN on Android (Termux runs it in production)
-  2. ZERO build complexity (Java/Kotlin, no NDK, no Zig)
-  3. ZERO binary size impact
+  2. ZERO native build complexity (Java/Kotlin, no NDK, no Zig)
+  3. ZERO native binary impact (APK/DEX impact: nonzero, modest, not measured)
   4. Direct ScreenState access (Java objects, no JNI)
   5. 20+ test classes for regression
   6. Apache 2.0 = permissive, no copyleft
@@ -370,7 +372,7 @@ CANDIDATES =
   A: Adapt Termux row-based model (char[]+long[] per row, circular buffer)
   B: Ghostty C-native state + JNI adapter
   C: Row-based with style runs (compressed)
-RECOMMENDED_INTERNAL_MODEL = A (Termux adapted: char[] + long[] style per row, circular buffer)
+RECOMMENDED_INTERNAL_MODEL = A (Termux-derived: char[] + long[] style per row, circular buffer)
   Rationale: proven, simple, fast, directly accessible from Java/Kotlin,
   no JNI, no native build, 20+ test classes for validation
 PUBLIC_API_IMPLICATION = NOT_DECIDED (internal model ≠ public API; Contract-1 after implementation)
@@ -404,7 +406,7 @@ CONFIDENCE = HIGH
 |---|---|
 | Dependency direction | :at-engine already has Kotlin. Adding Java/Kotlin emulator source = NO new deps |
 | Build impact | ZERO (no new plugin, no NDK, no CMake) |
-| Android plugin | :at-engine is currently a JVM module (no Android). Emulator must be JVM-compatible (Termux IS, minus Base64) |
+| Android plugin | :at-engine is a JVM module (no Android). JVM_COMPATIBILITY = HIGHLY_FEASIBLE_FROM_SOURCE_AUDIT. BUILD_VERIFIED_IN_CURRENT_AT_ENGINE = NO. EXPECTED_ADAPTATION = remove/replace android.util.Base64 or exclude SIXEL path |
 | NDK requirement | NONE |
 | Architecture gate | NO change needed (no new module, no new dependency) |
 | API leak risk | LOW (emulator is internal impl, not exposed via :at-engine-api) |
@@ -455,7 +457,7 @@ PLACEMENT_CANDIDATES =
   C: Native module (only if Ghostty chosen)
 RECOMMENDED_PLACEMENT = A (inside :at-engine) for v0.5.0
   Rationale:
-  1. Termux emulator is pure Java — fits naturally in :at-engine (JVM module)
+  1. Termux-derived emulator is pure Java — fits naturally in :at-engine (JVM module)
   2. ZERO build system change
   3. ZERO architecture gate change
   4. Emulator is an INTERNAL implementation detail of AT Engine
@@ -477,7 +479,7 @@ CONFIDENCE = HIGH
 ```
 VT scope (OQ-01): xterm-256color minus mouse/graphics
       ↓
-Implementation (OQ-02): Termux adapted (covers full xterm-256color)
+Implementation (OQ-02): Termux-derived (covers full xterm-256color)
       ↓
 Screen model (OQ-03): Termux row-based model (naturally produced by Termux parser)
       ↓
@@ -499,10 +501,23 @@ Placement (OQ-04): Inside :at-engine (Java, no NDK, no gate change)
 
 | Source | LICENSE | USAGE_MODE | OBLIGATIONS | COMPATIBILITY_RISK |
 |---|---|---|---|---|
-| Termux terminal-emulator | **Apache 2.0** | Adapt/fork internal | Preserve copyright + license notice | **NONE** (permissive, no copyleft) |
+| Termux terminal-emulator | **Apache 2.0** | Adapt/derive selected emulator core | See below | **NONE** (permissive, no copyleft) |
 | Ghostty libghostty-vt | **MIT** | Link (if chosen) | Preserve copyright + license notice | **NONE** (permissive) |
 
+**Apache 2.0 REQUIRED_ACTIONS (for Termux-derived use):**
+- Preserve applicable copyright notices in all derived files
+- Include Apache-2.0 license text as required (§4)
+- Inspect upstream NOTICE file and propagate applicable NOTICE content
+- Identify modified/derived files (e.g., `NOTICE` or header comment)
+- Preserve source provenance (origin repo, commit, date)
+
 Both are permissive. Apache 2.0 is preferred for Android (patent grant). No copyleft risk.
+
+```
+LICENSE_AUDIT = PASS
+  PASS means: no licensing blocker found
+  PASS does NOT mean: no compliance work required (REQUIRED_ACTIONS above apply)
+```
 
 ---
 
@@ -516,8 +531,21 @@ HISTORICAL_CORRECTION =
      at that time. This does NOT invalidate the recommendation as historical
      context, but the current evidence shows Termux is the lower-risk path.
   2. 4A.7 "keep an internal TerminalEmulator interface so the lib is swappable"
-     — this principle is PRESERVED. The recommended approach (Termux adapted)
+     — this principle is PRESERVED. The recommended approach (Termux-adapted)
      still uses an internal interface, allowing future swap.
+
+POST_RESEARCH_NOTE:
+
+This research establishes Termux-derived terminal-emulator
+as the preferred mature third-party implementation and
+validated fallback candidate.
+
+It does NOT freeze the final AT.EMULATOR-0 implementation.
+
+A separate follow-up stage (AT.EMULATOR-NATIVE-FEASIBILITY-0) may evaluate
+an AT-native implementation while retaining Termux-derived as fallback.
+
+RECOMMENDED_APPROACH != FINAL_IMPLEMENTATION_DECISION.
 ```
 
 ---
@@ -528,11 +556,11 @@ HISTORICAL_CORRECTION =
 BUILD_SPIKES_RUN = 0 (not needed)
 ```
 
-Static analysis was sufficient:
-- Termux: Pure Java, only `android.util.Base64` import. Can be compiled in any JVM/Android module.
+Source audit was sufficient for scheme selection (not build acceptance):
+- Termux: Pure Java, only `android.util.Base64` import (SIXEL path). JVM_COMPATIBILITY = HIGHLY_FEASIBLE_FROM_SOURCE_AUDIT. BUILD_VERIFIED_IN_CURRENT_AT_ENGINE = NO. EXPECTED_ADAPTATION = remove/replace Base64 path or exclude SIXEL feature.
 - Ghostty: Requires Zig 0.17.0. No verified Android target. CMake cross-compile uses `zig cc`.
 
-No build spike was necessary to determine feasibility.
+No build spike was run. This stage resolves implementation scheme and architecture feasibility, NOT build acceptance.
 
 ---
 
@@ -560,7 +588,7 @@ OQ_EM_01_CONFIDENCE = HIGH
 
 OQ_EM_02_STATUS = RESOLVED
 IMPLEMENTATION_CANDIDATES = Ghostty(C) / Termux-adapted(Java) / Self-written
-RECOMMENDED_IMPLEMENTATION = Termux terminal-emulator adapted (Apache 2.0, pure Java)
+RECOMMENDED_IMPLEMENTATION = Termux-derived terminal-emulator (Apache 2.0, pure Java, source-audit evidence, build-unverified in :at-engine)
 OQ_EM_02_CONFIDENCE = HIGH
 
 OQ_EM_03_STATUS = RESOLVED
@@ -593,6 +621,13 @@ TAG = NO
 RELEASE = NO
 
 IMPLEMENTATION_DECISION_READY = YES
+
+TERMUX_DERIVED =
+PREFERRED_MATURE_THIRD_PARTY_IMPLEMENTATION
++ VALIDATED_FALLBACK
+
+FINAL_IMPLEMENTATION_CHOICE =
+NOT_FROZEN
 
 NEXT = AT.EMULATOR-0-IMPLEMENTATION-DECISION
 STOP = YES
