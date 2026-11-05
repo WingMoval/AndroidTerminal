@@ -1,0 +1,12 @@
+AT.V043-GITHUB-PUBLISH-0 — Local Tag Identity (pre-push)
+===========================================================
+
+TAG_NAME = v0.4.3
+TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362
+TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+TAG_TYPE = tag (annotated)
+
+EXPECTED_TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362
+EXPECTED_TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+
+LOCAL_TAG_IDENTITY_MATCH = YES

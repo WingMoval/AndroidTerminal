@@ -1,0 +1,33 @@
+AT.V043-GITHUB-PUBLISH-0 — Final Verdict
+===========================================
+
+VERDICT = PASS
+
+ALL ACCEPTANCE CRITERIA MET:
+  ✓ release-note provenance typo corrected (commit 08a9bc0)
+  ✓ production code untouched
+  ✓ v0.4.3 local tag unchanged (9c5543a → 2e1cdd5)
+  ✓ audited APK hash unchanged (ECCD59F7...)
+  ✓ 6/6 consumer artifact hashes unchanged
+  ✓ consumer ZIP generated from exact audited bundle
+  ✓ publication SHA256SUMS generated
+  ✓ branch push PASS (08a9bc0)
+  ✓ remote tag object matches local (9c5543a)
+  ✓ remote peeled target matches 2e1cdd5
+  ✓ GitHub Release created from existing remote v0.4.3 tag (--verify-tag)
+  ✓ Release Notes use audited file
+  ✓ all 4 expected assets uploaded
+  ✓ no asset overwritten after publication
+  ✓ no AG sync started
+  ✓ no v0.5 work started
+  ✓ manual distribution acceptance remains PENDING
+
+CURRENT_FORMAL_AT_RELEASE = v0.4.3
+V043_PUBLICATION_STATE = PUBLISHED_PENDING_MANUAL_DISTRIBUTION_ACCEPTANCE
+
+GITHUB_RELEASE_PUBLISHED = YES
+GITHUB_DISTRIBUTION_MANUAL_ACCEPTANCE = PENDING
+GITHUB_PUBLICATION_VERIFIED = NO (awaiting user manual download + smoke)
+
+NEXT = USER_GITHUB_DOWNLOAD_MANUAL_SMOKE
+STOP = YES

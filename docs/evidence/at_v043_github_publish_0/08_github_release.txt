@@ -1,0 +1,18 @@
+AT.V043-GITHUB-PUBLISH-0 — GitHub Release
+============================================
+
+COMMAND:
+  gh release create v0.4.3 \
+    AndroidTerminal-v0.4.3.apk \
+    AndroidTerminal-v0.4.3-consumer-freeze-v1.zip \
+    AT.V043-CONSUMER-FREEZE-V1-MANIFEST.md \
+    SHA256SUMS-v0.4.3.txt \
+    --verify-tag \
+    --title "AndroidTerminal v0.4.3" \
+    --notes-file docs/releases/AT.v0.4.3-RELEASE.md
+
+RESULT: https://github.com/WingMoval/AndroidTerminal/releases/tag/v0.4.3
+EXIT_CODE = 0
+
+GITHUB_RELEASE_CREATE = PASS
+--verify-tag = PASS (tag existed on remote, not auto-created)

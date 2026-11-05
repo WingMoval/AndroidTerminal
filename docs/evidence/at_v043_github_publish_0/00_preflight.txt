@@ -1,0 +1,12 @@
+AT.V043-GITHUB-PUBLISH-0 — Preflight
+======================================
+
+REPO = D:\codebank\AndCode\AndroidTerminal-V4-LOCAL-TCP-042
+BRANCH = feature/local-tcp-v0.4.2
+START_HEAD = da1d414 (audit commit)
+WORKTREE = CLEAN (after 本轮交付 refresh commit 0dce94b)
+GH_AUTH = READY (WingMoval, token scopes: gist, read:org, repo)
+
+PRE-PUBLICATION COMMITS:
+  0dce94b — docs: refresh 本轮交付 for AT.V043-PUBLICATION-AUDIT-0
+  08a9bc0 — AT.V043-GITHUB-PUBLISH-0: correct public release provenance

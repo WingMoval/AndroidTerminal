@@ -1,0 +1,22 @@
+AT.V043-GITHUB-PUBLISH-0 — Release Notes Correction
+=====================================================
+
+FILE: docs/releases/AT.v0.4.3-RELEASE.md
+COMMIT: 08a9bc0
+
+BEFORE:
+  BASE_RELEASE = v0.4.2 (tag fd8fb7c, release commit 04f9c30)
+
+AFTER:
+  BASE_RELEASE = v0.4.2
+    TAG_OBJECT = fd8fb7c
+    TAG_TARGET = 925e7ac
+    PRODUCTION_RELEASE_COMMIT = 6ed902a
+
+REASON: 04f9c30 is NOT the v0.4.2 tag target. The actual peeled tag target
+is 925e7ac. 04f9c30 is the commit immediately before. Corrected for
+public-facing provenance accuracy.
+
+DOC_ONLY_CHANGE = YES
+PRODUCT_CHANGE = NO
+TAG_MOVED = NO

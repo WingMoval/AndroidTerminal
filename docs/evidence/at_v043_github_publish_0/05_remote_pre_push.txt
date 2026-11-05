@@ -1,0 +1,9 @@
+AT.V043-GITHUB-PUBLISH-0 — Remote Pre-Push State
+===================================================
+
+REMOTE = github (https://github.com/WingMoval/AndroidTerminal.git)
+
+REMOTE_V043_TAG = ABSENT (confirmed via git ls-remote)
+REMOTE_V043_RELEASE = ABSENT (confirmed via gh release view → "release not found")
+
+CLEAR TO PROCEED

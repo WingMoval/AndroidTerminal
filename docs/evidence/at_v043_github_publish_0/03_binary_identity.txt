@@ -1,0 +1,18 @@
+AT.V043-GITHUB-PUBLISH-0 — Binary Identity (pre-push)
+========================================================
+
+APK:
+  FILE = app/build/outputs/apk/release/app-release.apk
+  SIZE = 4465528
+  SHA256 = ECCD59F7BA6CE8C00E87C820384E14B238B24C1CD9F09BDFA130EACF595C1CFC
+  MATCH = PASS
+
+CONSUMER ARTIFACTS (6/6):
+  adb-engine-4.0.0.aar          MATCH
+  at-backend-adb-4.0.0.aar      MATCH
+  at-backend-local-4.0.0.aar    MATCH
+  at-cli-4.0.0.aar              MATCH
+  at-composition-android-4.0.0.aar MATCH
+  at-engine-api-4.0.0.jar       MATCH
+
+ALL BINARY IDENTITIES CONFIRMED BEFORE PUBLICATION

@@ -1,0 +1,23 @@
+AT.V043-GITHUB-PUBLISH-0 — Tag Push
+=====================================
+
+COMMAND: git push github v0.4.3
+RESULT: * [new tag] v0.4.3 -> v0.4.3
+
+TAG_PUSH = PASS
+
+REMOTE VERIFICATION:
+  git ls-remote github refs/tags/v0.4.3
+    → 9c5543a52dbed44031fd6d29f6a9ee9417e47362	refs/tags/v0.4.3
+  git ls-remote github "refs/tags/v0.4.3^{}"
+    → 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2	refs/tags/v0.4.3^{}
+
+REMOTE_TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362
+REMOTE_TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+
+EXPECTED_TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362
+EXPECTED_TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+
+REMOTE_TAG_IDENTITY_MATCH = YES
+
+NO FORCE. NO DELETE. NO RECREATE. NO MOVE.

@@ -1,0 +1,25 @@
+AT.V043-GITHUB-PUBLISH-0 — Remote Release Identity
+=====================================================
+
+Verified via: gh release view v0.4.3
+
+GITHUB_RELEASE_TAG = v0.4.3
+GITHUB_RELEASE_TITLE = AndroidTerminal v0.4.3
+GITHUB_RELEASE_URL = https://github.com/WingMoval/AndroidTerminal/releases/tag/v0.4.3
+GITHUB_RELEASE_IS_DRAFT = false
+GITHUB_RELEASE_IS_PRERELEASE = false
+GITHUB_RELEASE_IS_LATEST = true (auto-assigned by GitHub)
+GITHUB_RELEASE_PUBLISHED = 2026-11-05T03:54:37Z
+
+ASSETS (4):
+  1. AndroidTerminal-v0.4.3-consumer-freeze-v1.zip
+  2. AndroidTerminal-v0.4.3.apk
+  3. AT.V043-CONSUMER-FREEZE-V1-MANIFEST.md
+  4. SHA256SUMS-v0.4.3.txt
+
+GITHUB_ASSET_COUNT = 4
+
+RELEASE NOTES: Full audited content from docs/releases/AT.v0.4.3-RELEASE.md
+(includes corrected v0.4.2 provenance)
+
+NO ASSET OVERWRITTEN AFTER PUBLICATION.
