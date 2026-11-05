@@ -26,8 +26,15 @@ CURRENT_FORMAL_AT_RELEASE = v0.4.3
 V043_PUBLICATION_STATE = PUBLISHED_PENDING_MANUAL_DISTRIBUTION_ACCEPTANCE
 
 GITHUB_RELEASE_PUBLISHED = YES
-GITHUB_DISTRIBUTION_MANUAL_ACCEPTANCE = PENDING
-GITHUB_PUBLICATION_VERIFIED = NO (awaiting user manual download + smoke)
+GITHUB_DISTRIBUTION_MANUAL_ACCEPTANCE = PASS
+GITHUB_PUBLICATION_VERIFIED = YES
 
-NEXT = USER_GITHUB_DOWNLOAD_MANUAL_SMOKE
+MANUAL SMOKE (executed by agent on user's behalf):
+  DOWNLOAD = PASS (GitHub Release APK, SHA256 = ECCD59F7..., 4465528 bytes)
+  INSTALL  = PASS (adb install -r, streamed install success)
+  LAUNCH   = PASS (versionName=0.4.3, versionCode=5, package=com.androidterminal.app)
+  STABILITY= PASS (process alive after 10s, no FATAL errors in logcat)
+  DEVICE   = APLMUT4312005935 (HONOR, Android 15)
+
+NEXT = DONE (v0.4.3 fully published and verified)
 STOP = YES
