@@ -1,0 +1,22 @@
+AT.V043-PUBLICATION-AUDIT-0 — Remote Publication State
+========================================================
+
+REMOTE = github (https://github.com/WingMoval/AndroidTerminal.git)
+BRANCH = feature/local-tcp-v0.4.2
+
+REMOTE BRANCH HEAD: b32ef7cecb52a241573df4dcdc9ac51306741699
+  = "docs: close AT.EMULATOR-0-IMPLEMENTATION-DECISION"
+
+LOCAL COMMITS NOT ON REMOTE (3):
+  5517fc0 (v0.4.3 release commit)
+  2e1cdd5 (v0.4.3 freeze/evidence commit)
+  a0cbe63 (本轮交付 refresh)
+
+REMOTE_V043_TAG_EXISTS = NO
+REMOTE_V043_RELEASE_EXISTS = NO (gh release view v0.4.3 → "release not found")
+REMOTE_RELEASE_COMMIT_EXISTS = NO (5517fc0 not on remote)
+REMOTE_EVIDENCE_COMMIT_EXISTS = NO (2e1cdd5 not on remote)
+
+REMOTE_V042_TAG_EXISTS = YES (fd8fb7c, pushed previously)
+
+CONCLUSION: v0.4.3 is LOCAL-ONLY. Not yet published to GitHub.

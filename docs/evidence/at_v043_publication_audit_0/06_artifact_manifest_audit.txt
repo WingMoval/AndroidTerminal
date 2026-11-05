@@ -1,0 +1,25 @@
+AT.V043-PUBLICATION-AUDIT-0 — Artifact Manifest Audit
+========================================================
+
+CONSUMER_BUNDLE = third_party/at-v043-consumer-freeze-v1/
+CONSUMER_ARTIFACT_COUNT = 6 (5 AAR + 1 JAR)
+GAV_VERSION = 4.0.0 (unchanged from v0.4.2, stable API version)
+BUNDLE_SOURCE_COMMIT = 5517fc0 (per manifest)
+
+Artifacts:
+  1. adb-engine-4.0.0.aar          (1,192,391 bytes)
+  2. at-backend-adb-4.0.0.aar       (8,933 bytes)
+  3. at-backend-local-4.0.0.aar    (117,556 bytes)
+  4. at-cli-4.0.0.aar              (174,038 bytes)
+  5. at-composition-android-4.0.0.aar (30,224 bytes)
+  6. at-engine-api-4.0.0.jar       (23,079 bytes)
+
+GAV CONVENTION CONFIRMED:
+  4.0.0 = stable consumer API artifact version
+  Independent of app release version (v0.4.2 also used 4.0.0)
+  Bundle identity = directory name + SHA256 manifest, NOT GAV bump
+
+MANIFEST TAG_FIELDS (after normalization):
+  TAG = v0.4.3
+  TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362
+  TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2

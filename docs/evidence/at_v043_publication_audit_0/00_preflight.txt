@@ -1,0 +1,15 @@
+AT.V043-PUBLICATION-AUDIT-0 — Preflight
+Date: 2026-11-05
+=========================================
+
+REPO = D:\codebank\AndCode\AndroidTerminal-V4-LOCAL-TCP-042
+BRANCH = feature/local-tcp-v0.4.2
+HEAD = a0cbe63fd96305a61f4c57b5b03e57fb1470450e
+WORKTREE = CLEAN
+
+REMOTES:
+  github = https://github.com/WingMoval/AndroidTerminal.git
+  origin = D:\codebank\AndCode\AndroidTerminal-V3 (local reference)
+
+REMOTE BRANCH HEAD: b32ef7cecb52a241573df4dcdc9ac51306741699
+LOCAL COMMITS AHEAD OF REMOTE: 3 (5517fc0, 2e1cdd5, a0cbe63)

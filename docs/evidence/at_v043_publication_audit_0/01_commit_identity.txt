@@ -1,0 +1,30 @@
+AT.V043-PUBLICATION-AUDIT-0 — Commit Identity
+===============================================
+
+ROUTING_FIX_COMMIT = 4ebabe5e72465b95c066f5ecc9785732ff7f6e8d
+  "AT.LOCAL-TCP-ROUTING-FIX: route ADB one-shot through AdbRuntime transport selector"
+  1 file changed (AdbBackend.kt, +5 -1)
+
+V043_RELEASE_COMMIT = 5517fc064af9227bc2756e3108ff1fe7e65db830
+  "AT v0.4.3: release canonical ADB one-shot routing fix"
+  versionCode 4->5, versionName 0.4.2->0.4.3, release notes
+
+V043_EVIDENCE_COMMIT = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+  "AT.V043-RELEASE-FREEZE-0: freeze v0.4.3 release evidence"
+  Freeze SSOT + 16 evidence files + consumer bundle (6 artifacts)
+
+FINAL_HEAD = a0cbe63fd96305a61f4c57b5b03e57fb1470450e
+  "docs: refresh 本轮交付 for AT.V043-RELEASE-FREEZE-0"
+  (docs-only, 本轮交付 refresh)
+
+COMMIT_CHAIN:
+  4ebabe5 (routing fix)
+    → b32ef7c (v0.5 implementation decision docs)
+      → 5517fc0 (v0.4.3 release commit)
+        → 2e1cdd5 (v0.4.3 freeze/evidence, TAG TARGET)
+          → a0cbe63 (本轮交付 refresh, HEAD)
+
+COMMIT_CHAIN_VALID = YES
+NOTE: b32ef7c (v0.5 docs) is between routing fix and release commit.
+This is a docs-only commit; it does NOT affect production behavior.
+The v0.4.3 production delta is exactly: 4ebabe5 (1-line routing fix) + 5517fc0 (version bump).

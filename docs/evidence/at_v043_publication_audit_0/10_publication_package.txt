@@ -1,0 +1,27 @@
+AT.V043-PUBLICATION-AUDIT-0 — Publication Package
+===================================================
+
+TAG_TO_PUSH = v0.4.3 (9c5543a52dbed44031fd6d29f6a9ee9417e47362)
+RELEASE_TITLE = "AndroidTerminal v0.4.3"
+RELEASE_NOTES_SOURCE = docs/releases/AT.v0.4.3-RELEASE.md
+APK_ASSET = app/build/outputs/apk/release/app-release.apk
+  (4,465,528 bytes, SHA256: ECCD59F7...)
+CONSUMER_BUNDLE = third_party/at-v043-consumer-freeze-v1/
+  (6 artifacts, MANIFEST.md with SHA256)
+MANIFEST = third_party/at-v043-consumer-freeze-v1/MANIFEST.md
+SHA256_MANIFEST = (included in MANIFEST.md)
+
+COMMITS TO PUSH:
+  5517fc0 (v0.4.3 release)
+  2e1cdd5 (v0.4.3 freeze/evidence)
+  a0cbe63 (本轮交付 refresh)
+  + this audit commit (docs/evidence + manifest normalization)
+
+CONSUMER_ARTIFACTS_PUBLICATION_MODEL = GitHub release assets
+  (APK + AAR/JAR bundle as release assets, or link to repo path)
+
+NOTES:
+  - v0.4.2 was published with tag only (no GitHub Release object found)
+  - If following v0.4.2 convention: push tag only, no Release object
+  - If upgrading convention: create GitHub Release with assets
+  - DECISION LEFT TO CONTROLLER (this audit does not decide)

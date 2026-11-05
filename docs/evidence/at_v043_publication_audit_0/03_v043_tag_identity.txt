@@ -1,0 +1,23 @@
+AT.V043-PUBLICATION-AUDIT-0 — v0.4.3 Tag Identity
+===================================================
+
+V043_TAG_NAME = v0.4.3
+V043_TAG_OBJECT = 9c5543a52dbed44031fd6d29f6a9ee9417e47362 (annotated tag object)
+V043_TAG_TARGET = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2 (peeled commit)
+  = "AT.V043-RELEASE-FREEZE-0: freeze v0.4.3 release evidence"
+
+V043_PRODUCTION_RELEASE_COMMIT = 5517fc064af9227bc2756e3108ff1fe7e65db830
+  = "AT v0.4.3: release canonical ADB one-shot routing fix"
+
+V043_FREEZE_EVIDENCE_COMMIT = 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2
+  = "AT.V043-RELEASE-FREEZE-0: freeze v0.4.3 release evidence" (== TAG_TARGET)
+
+CONVENTION: annotated tag → freeze/evidence commit (CONSISTENT with v0.4.2)
+
+TAG MESSAGE:
+  "AndroidTerminal v0.4.3 - Canonical ADB one-shot routing fix"
+  PATCH_RELEASE, versionName=0.4.3, versionCode=5
+  Signer: 7bdcba7781e6fecfe078eb9741e7bfeb380f0a7aa64530007991250b07835cde
+
+REMOTE: v0.4.3 tag does NOT exist on github remote
+  git ls-remote github refs/tags/v0.4.3 → (empty)

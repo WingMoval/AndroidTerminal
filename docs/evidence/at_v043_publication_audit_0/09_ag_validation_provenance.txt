@@ -1,0 +1,26 @@
+AT.V043-PUBLICATION-AUDIT-0 — AG Validation Provenance
+========================================================
+
+AG_COMPAT_HEAD = cd5d190
+AG_FUNCTIONAL_COMPATIBILITY = PASS_LOCAL_WITH_WIRELESS_LIMITATION
+
+CLASSIFICATION:
+  FUNCTIONAL_VALIDATION_SOURCE = post-v0.4.2 routing-fixed candidate (commit 4ebabe5)
+  FUNCTIONAL_SEMANTICS = equivalent to v0.4.3 production delta (1-line routing fix)
+  FORMAL_V043_BUNDLE_PHYSICALLY_CONSUMED_BY_AG = NO
+
+EXPLANATION:
+  AG validated the routing fix BEHAVIOR using a locally-built candidate APK
+  from commit 4ebabe5 (before the formal v0.4.3 release commit 5517fc0 and
+  consumer bundle were produced). The functional semantics are identical
+  (the 1-line fix is the same in both). However, AG did not physically
+  consume the formal v0.4.3 AAR bundle (third_party/at-v043-consumer-freeze-v1/).
+
+  This is CORRECT and EXPECTED for a patch release:
+  - The fix is 1 line
+  - The formal bundle was built AFTER AG validation
+  - Re-running AG against the formal bundle would be redundant
+
+WIRELESS EVIDENCE:
+  CARRIED_FORWARD_FROM_V042_UNCHANGED_PATH
+  (v0.4.3 does not modify Wireless path; historical v0.4.2 evidence applies)

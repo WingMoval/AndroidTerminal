@@ -6,7 +6,9 @@
 |-------|-------|
 | RELEASE | v0.4.3 |
 | SOURCE_COMMIT | 5517fc0 |
-| TAG_TARGET | v0.4.3 (pending) |
+| TAG | v0.4.3 |
+| TAG_OBJECT | 9c5543a52dbed44031fd6d29f6a9ee9417e47362 |
+| TAG_TARGET | 2e1cdd518fc7d1ead2b203cb3533a9b6a4d6a3d2 |
 | BASE_RELEASE | v0.4.2 |
 | FIX_COMMIT | 4ebabe5 |
 | BUILD_VARIANT | release |

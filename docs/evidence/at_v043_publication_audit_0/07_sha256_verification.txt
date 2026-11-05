@@ -1,0 +1,19 @@
+AT.V043-PUBLICATION-AUDIT-0 — SHA256 Verification
+===================================================
+
+Method: Get-FileHash -Algorithm SHA256, compared to manifest full SHA256
+
+| Artifact | Manifest SHA256 | Actual SHA256 | Result |
+|----------|----------------|---------------|--------|
+| adb-engine-4.0.0.aar | 1787C505...6645 | 1787C505...6645 | MATCH |
+| at-backend-adb-4.0.0.aar | E50BC44B...46D | E50BC44B...46D | MATCH |
+| at-backend-local-4.0.0.aar | FCF7C0C4...7E | FCF7C0C4...7E | MATCH |
+| at-cli-4.0.0.aar | C19AB9E4...D92 | C19AB9E4...D92 | MATCH |
+| at-composition-android-4.0.0.aar | 11DED571...22D | 11DED571...22D | MATCH |
+| at-engine-api-4.0.0.jar | 9E3F26D1...EB7 | 9E3F26D1...EB7 | MATCH |
+
+HASH_CHECKED = 6
+HASH_MATCH = 6
+HASH_MISMATCH = 0
+
+RESULT: ALL ARTIFACTS VERIFIED

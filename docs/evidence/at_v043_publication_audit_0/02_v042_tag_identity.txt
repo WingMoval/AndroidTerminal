@@ -1,0 +1,23 @@
+AT.V043-PUBLICATION-AUDIT-0 — v0.4.2 Tag Identity
+===================================================
+
+V042_TAG_NAME = v0.4.2
+V042_TAG_OBJECT = fd8fb7c1b472f9bd4e04f207d520c030a15e5d8d (annotated tag object)
+V042_TAG_TARGET = 925e7ac223d19eea7ddb89bf05e55df25ca7a7f2 (peeled commit)
+  = "docs: finalize AndroidTerminal v0.4.2 release evidence"
+
+V042_PRODUCTION_RELEASE_COMMIT = 6ed902a47a7b76daf2bc292833e9f72b5db4124f
+  = "chore: bump version to 0.4.2 (versionCode 4)"
+
+V042_FREEZE_EVIDENCE_COMMIT = 925e7ac223d19eea7ddb89bf05e55df25ca7a7f2
+  = "docs: finalize AndroidTerminal v0.4.2 release evidence" (== TAG_TARGET)
+
+CONVENTION: annotated tag → freeze/evidence commit (NOT production commit)
+
+REMOTE: v0.4.2 tag EXISTS on github remote (fd8fb7c)
+  git ls-remote github refs/tags/v0.4.2 → fd8fb7c1b472f9bd4e04f207d520c030a15e5d8d
+
+NOTE: Release notes say "release commit 04f9c30" — this is the commit IMMEDIATELY
+BEFORE the tag target (04f9c30 = "docs: normalize v0.4.2 execution evidence").
+The actual tag target is 925e7ac. This is a documentation inaccuracy in the
+release notes (cosmetic; the tag itself is correct).
