@@ -15,7 +15,10 @@ package     = com.androidterminal.app
 ## Base
 
 ```
-BASE_RELEASE = v0.4.2 (tag fd8fb7c, release commit 04f9c30)
+BASE_RELEASE = v0.4.2
+  TAG_OBJECT = fd8fb7c
+  TAG_TARGET = 925e7ac
+  PRODUCTION_RELEASE_COMMIT = 6ed902a
 FIX_COMMIT   = 4ebabe5 (AT.LOCAL-TCP-ROUTING-FIX)
 ```
 
