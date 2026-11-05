@@ -1,0 +1,33 @@
+AT.V043-PUBLICATION-AUDIT-0 — Document Cross-Audit
+=====================================================
+
+Documents audited:
+  1. docs/freeze/AT.V043-RELEASE-FREEZE-V1.md
+  2. docs/releases/AT.v0.4.3-RELEASE.md
+  3. third_party/at-v043-consumer-freeze-v1/MANIFEST.md
+  4. Tag message (v0.4.3)
+
+Identity fields cross-checked:
+
+| Field | Freeze Doc | Release Notes | Manifest | Tag Message | Consistent? |
+|-------|-----------|---------------|----------|-------------|-------------|
+| versionName | 0.4.3 | 0.4.3 | 0.4.3 | 0.4.3 | YES |
+| versionCode | 5 | 5 | 5 | 5 | YES |
+| BASE_RELEASE | v0.4.2 | v0.4.2 | v0.4.2 | (implied) | YES |
+| FIX_COMMIT | 4ebabe5 | 4ebabe5 | 4ebabe5 | 4ebabe5 | YES |
+| RELEASE_COMMIT | 5517fc0 | (implied) | 5517fc0 | (implied) | YES |
+| TAG | v0.4.3 (annotated) | (not stated) | v0.4.3 | v0.4.3 | YES |
+| TAG_TARGET | freeze evidence commit | (not stated) | 2e1cdd5 (after fix) | 2e1cdd5 | YES |
+| Signer | 7bdcba77... | (not stated) | 7bdcba77... | 7bdcba77... | YES |
+| GAV | (not stated) | (not stated) | 4.0.0 | (not stated) | N/A |
+| AG compat | cd5d190 | cd5d190 | cd5d190 | cd5d190 | YES |
+
+STALE_FIELDS_FOUND = 1
+  - MANIFEST.md: TAG_TARGET was "v0.4.3 (pending)" → FIXED to actual SHA
+
+DOC_IDENTITY_CONSISTENT = YES (after manifest fix)
+
+NOTE: Release notes say "release commit 04f9c30" for v0.4.2 base.
+  Actual v0.4.2 tag target is 925e7ac. 04f9c30 is the commit before.
+  This is a cosmetic inaccuracy in the v0.4.2 reference within v0.4.3 notes.
+  Does NOT affect v0.4.3 identity. Not corrected (historical doc).
