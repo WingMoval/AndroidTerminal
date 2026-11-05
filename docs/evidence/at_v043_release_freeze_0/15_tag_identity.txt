@@ -1,0 +1,22 @@
+AT.V043-RELEASE-FREEZE-0 - 15 TAG IDENTITY
+Date: 2026-11-05
+
+TAG_CONVENTION (from v0.4.2):
+  v0.4.2 tag = annotated tag
+  v0.4.2 tag target = 925e7ac (final docs/evidence commit, NOT production commit)
+  Convention: tag points to the LAST commit (freeze evidence/docs commit)
+
+V043 TAG:
+  V043_TAG = v0.4.3
+  V043_TAG_TARGET = (this freeze evidence commit, to be determined after Commit B)
+  TAG_TYPE = annotated
+
+FREEZE IDENTITY (clear separation per §29):
+  BASE_RELEASE_COMMIT = 04f9c30 (v0.4.2 production)
+  ROUTING_FIX_COMMIT = 4ebabe5 (the actual fix)
+  V043_RELEASE_COMMIT = 5517fc0 (version bump + release notes)
+  VALIDATION_EVIDENCE_COMMIT = (this Commit B: freeze evidence + bundle + docs)
+  TAG_TARGET = VALIDATION_EVIDENCE_COMMIT (per v0.4.2 convention)
+  FINAL_HEAD = VALIDATION_EVIDENCE_COMMIT
+
+NO AMBIGUITY: fix commit ≠ release commit ≠ docs commit ≠ tag target

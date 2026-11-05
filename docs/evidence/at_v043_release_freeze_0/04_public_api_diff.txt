@@ -1,0 +1,23 @@
+AT.V043-RELEASE-FREEZE-0 - 04 PUBLIC API DIFF
+Date: 2026-11-05
+
+Comparison: v0.4.2 vs v0.4.3
+
+Modules checked:
+  at-engine-api (java-library, public contract)
+  at-cli (public CLI contract)
+  at-composition-android (composition facade)
+  at-backend-adb (backend API)
+  adb-engine (engine API)
+
+Changes in v0.4.3:
+  - AdbBackend.kt: internal implementation detail (which internal method is called)
+  - No public method signature changed
+  - No public enum changed
+  - No public constructor changed
+  - No result model changed
+  - No session model changed
+  - No new public type added
+  - No public type removed
+
+PUBLIC_API_DIFF = NONE

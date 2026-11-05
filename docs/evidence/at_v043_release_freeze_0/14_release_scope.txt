@@ -1,0 +1,25 @@
+AT.V043-RELEASE-FREEZE-0 - 14 RELEASE SCOPE
+Date: 2026-11-05
+
+V043 = v0.4.2 + routing fix + version metadata + release docs
+
+INCLUDED:
+  - AdbBackend.kt: 1-line routing fix (4ebabe5)
+  - app/build.gradle.kts: versionCode 4→5, versionName 0.4.2→0.4.3
+  - docs/releases/AT.v0.4.3-RELEASE.md: release notes
+
+NOT INCLUDED (verified absent):
+  - No new transport
+  - No new pairing semantics
+  - No new Local TCP semantics
+  - No new Wireless behavior
+  - No new CLI protocol
+  - No new PTY behavior
+  - No new recovery algorithm
+  - No new UI feature
+  - No new AG integration architecture
+  - No native change
+  - No public API change
+
+UNEXPLAINED_DIFF = NONE
+V043_SCOPE = PATCH_RELEASE

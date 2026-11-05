@@ -1,0 +1,40 @@
+AT.V043-RELEASE-FREEZE-0 - 10 ARTIFACT MANIFEST
+Date: 2026-11-05
+
+RELEASE = v0.4.3
+SOURCE_COMMIT = 5517fc0 (production release commit: version bump + release notes)
+TAG_TARGET = v0.4.3 (annotated tag, pointing to freeze evidence commit per v0.4.2 convention)
+BASE_RELEASE = v0.4.2
+FIX_COMMIT = 4ebabe5
+BUILD_VARIANT = release
+
+GAV Convention:
+  Artifact version 4.0.0 = stable API version (independent of app release)
+  GAV_CHANGED = NO
+  RATIONALE: v0.4.2 also used 4.0.0; bundle identity is by directory + SHA256 manifest
+
+CONSUMER_BUNDLE_NAME = AT.V043-CONSUMER-FREEZE-V1
+BUNDLE_PATH = third_party/at-v043-consumer-freeze-v1/
+
+ARTIFACTS (6 files):
+
+| Artifact | GAV | Size | SHA256 |
+|----------|-----|------|--------|
+| adb-engine-4.0.0.aar | com.adb.engine:adb-engine:4.0.0 | 1192391 | 1787C505CE56BB2AFF9F0E745973DFE3FF0BE552BA99EFB3C7D0783E54AC6645 |
+| at-backend-adb-4.0.0.aar | com.at.backend.adb:at-backend-adb:4.0.0 | 8933 | E50BC44BEE80668240DB1A504887E4A579D6480A6A1E3A38CA98633C5BA6846D |
+| at-backend-local-4.0.0.aar | com.at.backend.local:at-backend-local:4.0.0 | 117556 | FCF7C0C4A0EA5089F303827D26952AA5F88BE97CFAB1F230708820F1B4771A7E |
+| at-cli-4.0.0.aar | com.at.cli:at-cli:4.0.0 | 174038 | C19AB9E4FDFB7400A6587B83F26143A242DDCE5A73D114AB52391E8D2AF82D92 |
+| at-composition-android-4.0.0.aar | com.at.composition.android:at-composition-android:4.0.0 | 30224 | 11DED571BDE5415BEF56E0CFD49F61FB3871002E8DEF96F616D610083E22922D |
+| at-engine-api-4.0.0.jar | com.at.engine:at-engine-api:4.0.0 | 23079 | 9E3F26D15F2BD2D152739A7D80B8161E2E37D5D1041E006C21CD547AE50D0EB7 |
+
+RELEASE_APK:
+| app-release.apk | com.androidterminal.app | 4465528 | ECCD59F7BA6CE8C00E87C820384E14B238B24C1CD9F09BDFA130EACF595C1CFC |
+
+ARTIFACT_COUNT = 7 (6 consumer + 1 APK)
+ARTIFACT_HASH_COUNT = 7
+ARTIFACT_HASH_MATCH = PASS (all computed post-build from clean build)
+
+PUBLIC_API_DIFF = NONE
+ROUTING_FIX = AdbRuntime.executeShell (canonical)
+WIRELESS_EVIDENCE_CLASSIFICATION = CARRIED_FORWARD_FROM_V042_UNCHANGED_PATH
+AG_COMPAT_VALIDATION = PASS_LOCAL_WITH_WIRELESS_LIMITATION (AG head cd5d190)

@@ -1,0 +1,17 @@
+AT.V043-RELEASE-FREEZE-0 - 03 VERSION METADATA
+Date: 2026-11-05
+
+V042 (before bump):
+  versionName = 0.4.2
+  versionCode = 4
+
+V043 (after bump):
+  versionName = 0.4.3
+  versionCode = 5
+
+File: app/build.gradle.kts (lines 27-28)
+Commit: 5517fc0 (AT v0.4.3: release canonical ADB one-shot routing fix)
+
+APK VERIFICATION (installed on device):
+  versionCode = 5 ✓
+  versionName = 0.4.3 ✓

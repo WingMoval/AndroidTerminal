@@ -1,0 +1,25 @@
+AT.V043-RELEASE-FREEZE-0 - 12 AG COMPAT REFERENCE
+Date: 2026-11-05
+
+AG_COMPAT_VALIDATION = ACCEPTED
+AG_VALIDATION_STEP = AG.AT-V043-COMPAT-VALIDATION-0
+AG_VALIDATION_HEAD = cd5d190
+AG_VERDICT = PASS_LOCAL_WITH_WIRELESS_LIMITATION
+
+Key results from AG validation:
+  Gate A-E (Local startup/one-shot/matrix/reuse/restart): ALL PASS
+  Gate F (TRUE Local Loss via adb usb): PASS
+  Gate J (WD-off Independence): PASS
+  Identity Continuity: PASS (6b1949b4 unchanged)
+  Transport Ownership: PASS (MAX_ACTIVE=1, MAX_RX_OWNER=1)
+  Canonical Router: PRESERVED (executeShellLocalhost)
+  Artifact Provenance: PASS
+  Public API: NO BREAKING CHANGE
+
+TRUE_LOCAL_LOSS_DEVICE_VERIFIED = YES
+  Method: PC USB adb usb
+  Evidence: 38800 LISTENING→ABSENT, ESTABLISHED 1→0, clean EOF,
+    markTransportLost, RX_OWNER_EXIT, ONLINE→!ONLINE, activeTransport→WIRELESS,
+    TRANSPORT_LOST, AG PID unchanged
+
+CANDIDATE_ACCEPTABLE_AS_AG_BASELINE = YES (Controller accepted)

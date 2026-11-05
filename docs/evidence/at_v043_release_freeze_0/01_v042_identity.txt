@@ -1,0 +1,16 @@
+AT.V043-RELEASE-FREEZE-0 - 01 V042 IDENTITY
+Date: 2026-11-05
+
+V042_TAG = v0.4.2 (annotated)
+V042_TAG_OBJECT = fd8fb7c1b472f9bd4e04f207d520c030a15e5d8d
+V042_TAG_TARGET = 925e7ac223d19eea7ddb89bf05e55df25ca7a7f2
+V042_TAG_TARGET_NAME = "docs: finalize AndroidTerminal v0.4.2 release evidence"
+V042_RELEASE_COMMIT = 04f9c30193e634bfe619b4cea815962cdadd70c1
+V042_VERSION_NAME = 0.4.2
+V042_VERSION_CODE = 4
+V042_RELEASE_APK = app/build/outputs/apk/release/app-release.apk
+V042_RELEASE_SHA256 = 90CD5E5B37186DC971126698A895F86A4F2992A38952C64B38B8919EBE019B2C
+V042_SIGNER_SHA256 = 7bdcba7781e6fecfe078eb9741e7bfeb380f0a7aa64530007991250b07835cde
+V042_SIGNER_DN = CN=AndroidTerminal, OU=Mobile, O=AndroidTerminal, L=NA, ST=NA, C=US
+
+TAG_CONVENTION = annotated tag pointing to final docs/evidence commit (not production commit)

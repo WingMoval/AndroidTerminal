@@ -1,0 +1,19 @@
+AT.V043-RELEASE-FREEZE-0 - 08 BUILD
+Date: 2026-11-05
+
+BUILD_DEBUG = PASS (assembleRelease includes all modules; debug variant built in prior runs)
+BUILD_RELEASE = PASS
+
+Command: .\gradlew.bat clean assembleRelease --console=plain
+Result: BUILD SUCCESSFUL in 1m 38s (590 actionable tasks)
+
+Consumer AARs built:
+  adb-engine-release.aar
+  at-backend-adb-release.aar
+  at-backend-local-release.aar
+  at-cli-release.aar
+  at-composition-android-release.aar
+  at-engine-api.jar (java-library)
+
+No build warnings related to the routing fix.
+No deprecation warnings in changed files.

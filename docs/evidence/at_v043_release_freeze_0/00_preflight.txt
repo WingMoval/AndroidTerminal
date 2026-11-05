@@ -1,0 +1,20 @@
+AT.V043-RELEASE-FREEZE-0 - 00 PREFLIGHT
+Date: 2026-11-05
+
+AT_BRANCH = feature/local-tcp-v0.4.2
+AT_HEAD (start) = b32ef7c (docs-only: emulator implementation decision)
+AT_HEAD (fix) = 4ebabe5 (routing fix)
+WORKTREE = CLEAN
+
+BASE_TAG = v0.4.2
+BASE_TAG_TARGET = fd8fb7c1b472f9bd4e04f207d520c030a15e5d8d (annotated tag object)
+BASE_TAG_COMMIT = 925e7ac (docs: finalize AndroidTerminal v0.4.2 release evidence)
+BASE_RELEASE_COMMIT = 04f9c30 (v0.4.2 production release commit)
+
+FIX_COMMIT = 4ebabe5 (AT.LOCAL-TCP-ROUTING-FIX)
+
+diff v0.4.2..4ebabe5 (product source):
+  at-backend-adb/src/main/java/com/at/backend/adb/AdbBackend.kt | 6 +++++-
+  1 file changed, 5 insertions(+), 1 deletion(-)
+
+UNEXPLAINED_PRODUCT_DIFF = NONE

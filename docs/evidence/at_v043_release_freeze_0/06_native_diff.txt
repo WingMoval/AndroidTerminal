@@ -1,0 +1,17 @@
+AT.V043-RELEASE-FREEZE-0 - 06 NATIVE DIFF
+Date: 2026-11-05
+
+git diff v0.4.2..HEAD -- adb-engine/src/main/cpp/ *.c *.cpp *.h
+Result: EMPTY (no changes)
+
+NATIVE_SOURCE_DIFF = NONE
+NATIVE_SEMANTIC_CHANGE = NO
+
+Checked areas (all unchanged):
+  plain_tcp_connection
+  AdbStreamHub
+  CNXN/AUTH handshake
+  TLS
+  shell-v2 parser
+  requestTcpip
+  Local TCP transport

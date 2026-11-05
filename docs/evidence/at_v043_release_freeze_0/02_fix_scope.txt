@@ -1,0 +1,30 @@
+AT.V043-RELEASE-FREEZE-0 - 02 FIX SCOPE
+Date: 2026-11-05
+
+ROOT_CAUSE_CLASS = ADB_BACKEND_BYPASSES_RUNTIME_TRANSPORT_ROUTER
+
+v0.4.2 defect:
+  AdbOneShotBackend.execute() → AdbEngine.executeShell() (Wireless-only JNI primitive)
+  Bypassed canonical AdbRuntime.executeShell() LOCAL/WIRELESS router.
+
+v0.4.3 fix:
+  AdbOneShotBackend.execute() → AdbRuntime.executeShell()
+  LOCAL → AdbEngine.executeShellLocalhost()
+  WIRELESS → AdbEngine.executeShell()
+
+Fix scope (product delta):
+  File: at-backend-adb/src/main/java/com/at/backend/adb/AdbBackend.kt
+  Change: 1 line (AdbEngine.executeShell → AdbRuntime.executeShell) + 4 comment lines
+  Commit: 4ebabe5
+
+V043_SCOPE = PATCH_RELEASE
+UNEXPLAINED_DIFF = NONE
+
+RETRACTED WRONG DIAGNOSES (NOT root cause):
+  - Pairing incomplete
+  - CNXN banner length / 4096-byte requirement
+  - HONOR adbd rejects short banner
+  - activeTransport missing @Volatile (it HAS @Volatile)
+  - cross-thread stale WIRELESS read as primary cause
+  - adbd "already offline"
+  - native handshake defect

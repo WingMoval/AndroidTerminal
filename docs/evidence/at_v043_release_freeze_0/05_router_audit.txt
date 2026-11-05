@@ -1,0 +1,24 @@
+AT.V043-RELEASE-FREEZE-0 - 05 ROUTER AUDIT
+Date: 2026-11-05
+
+CANONICAL_ROUTER = AdbRuntime.executeShell
+ROUTING_OWNERSHIP = AdbRuntime (unique ADB transport lifecycle / routing owner)
+
+Static search: all "AdbEngine.executeShell(" call sites:
+
+1. AdbRuntime.kt:864 — AdbEngine.executeShell(command, timeoutMs)
+   CLASSIFICATION: LEGITIMATE (AdbRuntime internal WIRELESS branch)
+
+2. AdbRuntime.kt:1010 — AdbEngine.executeShell("getprop service.adb.tcp.port", 3000)
+   CLASSIFICATION: LEGITIMATE (AdbRuntime internal diagnostic probe)
+
+3. AdbEngineDeviceTest.kt:95,101,106,111 — test code
+   CLASSIFICATION: LEGITIMATE (explicit device test, not production consumer path)
+
+4. AdbBackend.kt:107 — comment only (not a call)
+   CLASSIFICATION: N/A (documentation)
+
+INVALID_ROUTER_BYPASS_COUNT = 0
+
+All transport-independent consumer paths route through AdbRuntime.executeShell.
+AdbOneShotBackend (the consumer) now calls AdbRuntime.executeShell (fixed in 4ebabe5).
